@@ -33,7 +33,7 @@ const STEPS = [
     outputTitle: "診断結果",
     help: [
       "HTML取得：検索結果ページで右クリック→「ページのソースを表示」→全選択してコピー",
-      "HTMLが大きすぎる場合は「Amazon HTML Cleaner」で軽量化してください",
+      "HTMLが大きすぎる場合は入力欄下の「HTMLをクリーニングする」ボタンで軽量化できます",
       "キーワードを変えて再実行で別の市場を診断できます"
     ]
   },
@@ -441,6 +441,103 @@ const HomePage = ({ project, stepStatuses, allSteps, onNavigate }) => {
 };
 
 // ============================================================
+// HTML Cleaner（STEP2用）
+// ============================================================
+
+function cleanHtmlMinimal(html) {
+  const results = [];
+  const seen = new Set();
+  const searchResultTags = html.match(/<[^>]*data-component-type\s*=\s*"s-search-result"[^>]*>/gi) || [];
+  for (const tag of searchResultTags) {
+    const asinMatch = tag.match(/data-asin="([A-Za-z0-9]{10})"/i);
+    if (asinMatch) {
+      const cleaned = '<div data-asin="' + asinMatch[1] + '" data-component-type="s-search-result">';
+      if (!seen.has(cleaned)) { seen.add(cleaned); results.push(cleaned); }
+    }
+  }
+  const asinTags = html.match(/<[^>]*data-asin="[A-Za-z0-9]{10}"[^>]*>/gi) || [];
+  for (const tag of asinTags) {
+    const asinMatch = tag.match(/data-asin="([A-Za-z0-9]{10})"/i);
+    if (asinMatch) {
+      const cleaned = '<div data-asin="' + asinMatch[1] + '">';
+      if (!seen.has(cleaned)) { seen.add(cleaned); results.push(cleaned); }
+    }
+  }
+  const dpLinks = html.match(/<a[^>]*href="[^"]*(?:\/dp\/|\/gp\/product\/)[A-Za-z0-9]{10}[^"]*"[^>]*>/gi) || [];
+  for (const tag of dpLinks) {
+    const hrefMatch = tag.match(/href="([^"]*(?:\/dp\/|\/gp\/product\/)[A-Za-z0-9]{10}[^"]*)"/i);
+    if (hrefMatch) {
+      let href = hrefMatch[1];
+      const qIdx = href.indexOf('?');
+      if (qIdx !== -1) href = href.substring(0, qIdx);
+      const cleaned = '<a href="' + href + '">';
+      if (!seen.has(cleaned)) { seen.add(cleaned); results.push(cleaned); }
+    }
+  }
+  return results.join('\n');
+}
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+const HtmlCleanerInline = ({ html, onCleaned }) => {
+  const [result, setResult] = useState(null);
+
+  const handleClean = () => {
+    const originalSize = new Blob([html]).size;
+    const cleaned = cleanHtmlMinimal(html);
+    const cleanedSize = new Blob([cleaned]).size;
+    const reduction = originalSize > 0 ? ((1 - cleanedSize / originalSize) * 100).toFixed(1) : 0;
+    setResult({ cleaned, originalSize, cleanedSize, reduction });
+  };
+
+  const handleApply = () => {
+    if (result) {
+      onCleaned(result.cleaned);
+      setResult(null);
+    }
+  };
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      {!result ? (
+        <button onClick={handleClean} style={{
+          padding: "8px 16px", background: "#f59e0b", color: "#fff", border: "none",
+          borderRadius: 6, fontWeight: 600, fontSize: 13, cursor: "pointer"
+        }}>
+          HTMLをクリーニングする
+        </button>
+      ) : (
+        <div style={{ padding: 14, background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 8 }}>
+          <div style={{ display: "flex", gap: 16, marginBottom: 10, fontSize: 13, flexWrap: "wrap" }}>
+            <span>元のサイズ：<strong>{formatBytes(result.originalSize)}</strong></span>
+            <span>クリーン後：<strong style={{ color: "#16a34a" }}>{formatBytes(result.cleanedSize)}</strong></span>
+            <span>削減率：<strong style={{ color: "#16a34a" }}>{result.reduction}%</strong></span>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={handleApply} style={{
+              padding: "8px 16px", background: "#16a34a", color: "#fff", border: "none",
+              borderRadius: 6, fontWeight: 600, fontSize: 13, cursor: "pointer"
+            }}>
+              クリーニング結果を適用する
+            </button>
+            <button onClick={() => setResult(null)} style={{
+              padding: "8px 16px", background: "rgba(0,0,0,0.04)", color: "#333",
+              border: "1px solid rgba(0,0,0,0.1)", borderRadius: 6, fontWeight: 500, fontSize: 13, cursor: "pointer"
+            }}>
+              キャンセル
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================================
 // 各機能画面（共通テンプレート）
 // ============================================================
 
@@ -551,6 +648,10 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                   fontFamily: "inherit", background: "#fff"
                 }}
               />
+            )}
+            {/* STEP2のHTML入力欄にクリーニングボタンを表示 */}
+            {step.num === 2 && field.name === "amazon_html" && inputs.amazon_html && (
+              <HtmlCleanerInline html={inputs.amazon_html} onCleaned={(cleaned) => handleInputChange("amazon_html", cleaned)} />
             )}
           </div>
         ))}
