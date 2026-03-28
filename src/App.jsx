@@ -322,13 +322,13 @@ const SideMenu = ({ currentPage, onNavigate, stepStatuses }) => {
         </div>
       </div>
 
-      <div style={{ fontSize: 10.5, fontWeight: 700, color: "#aaa", letterSpacing: "0.08em", padding: "0 14px", marginBottom: 4, marginTop: 4 }}>ホーム</div>
+      <div style={{ fontSize: 13, fontWeight: 800, color: "#1a1a2e", letterSpacing: "0.02em", padding: "0 14px", marginBottom: 6, marginTop: 4 }}>ホーム</div>
       {menuItem("ダッシュボード", "home", null)}
       {menuItem("使い方", "guide", null)}
 
       {CATEGORIES.map(cat => (
         <div key={cat.label}>
-          <div style={{ fontSize: 10.5, fontWeight: 700, color: "#aaa", letterSpacing: "0.08em", padding: "0 14px", marginBottom: 4, marginTop: 16 }}>{cat.label}</div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: "#1a1a2e", letterSpacing: "0.02em", padding: "0 14px", marginBottom: 6, marginTop: 20, borderTop: "1px solid rgba(0,0,0,0.06)", paddingTop: 16 }}>{cat.label}</div>
           {cat.steps.map(n => {
             const s = STEPS[n - 1];
             return menuItem(`STEP${n} ${s.title}`, `step_${n}`, stepStatuses[n]);
@@ -336,7 +336,7 @@ const SideMenu = ({ currentPage, onNavigate, stepStatuses }) => {
         </div>
       ))}
 
-      <div style={{ fontSize: 10.5, fontWeight: 700, color: "#aaa", letterSpacing: "0.08em", padding: "0 14px", marginBottom: 4, marginTop: 16 }}>データ管理</div>
+      <div style={{ fontSize: 13, fontWeight: 800, color: "#1a1a2e", letterSpacing: "0.02em", padding: "0 14px", marginBottom: 6, marginTop: 20, borderTop: "1px solid rgba(0,0,0,0.06)", paddingTop: 16 }}>データ管理</div>
       {menuItem("保存データ", "saved", null)}
     </div>
   );
