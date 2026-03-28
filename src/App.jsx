@@ -410,9 +410,9 @@ const HomePage = ({ project, stepStatuses, allSteps, onNavigate }) => {
       <div style={{ marginBottom: 32 }}>
         <h2 style={{ fontSize: 16, fontWeight: 700, color: "#1a1a2e", marginBottom: 14 }}>その他の操作</h2>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <BtnSecondary onClick={() => onNavigate("saved")}>保存データを見る</BtnSecondary>
-          <BtnSecondary onClick={() => onNavigate("guide")}>使い方を見る</BtnSecondary>
-          <BtnSecondary onClick={() => setShowResetConfirm(true)}>保存データを削除する</BtnSecondary>
+          <BtnSecondary onClick={() => onNavigate("saved")}>保存データを参照</BtnSecondary>
+          <BtnSecondary onClick={() => setShowResetConfirm(true)}>保存データを削除</BtnSecondary>
+          <BtnSecondary onClick={() => onNavigate("guide")}>使い方を参照</BtnSecondary>
         </div>
         {showResetConfirm && (
           <div style={{ marginTop: 12, padding: 16, background: "#fff4f4", border: "1px solid #fca5a5", borderRadius: 8 }}>
