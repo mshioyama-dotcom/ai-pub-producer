@@ -350,6 +350,7 @@ const HomePage = ({ project, stepStatuses, allSteps, onNavigate }) => {
   const completedCount = Object.values(stepStatuses).filter(s => s === "completed").length;
   const currentStep = project.currentStep || 1;
   const lastUpdated = project.lastUpdatedStep;
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   return (
     <div>
@@ -410,15 +411,21 @@ const HomePage = ({ project, stepStatuses, allSteps, onNavigate }) => {
         <h2 style={{ fontSize: 16, fontWeight: 700, color: "#1a1a2e", marginBottom: 14 }}>すぐに使う</h2>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <BtnPrimary onClick={() => onNavigate(`step_${currentStep}`)}>前回の続きから再開</BtnPrimary>
-          <BtnSecondary onClick={async () => {
-            if (confirm("新しい企画を始めますか？現在のデータはリセットされます。")) {
-              await resetAllData();
-              location.reload();
-            }
-          }}>新しい企画を始める</BtnSecondary>
+          <BtnSecondary onClick={() => setShowResetConfirm(true)}>新しい企画を始める</BtnSecondary>
           <BtnSecondary onClick={() => onNavigate("saved")}>保存データを見る</BtnSecondary>
           <BtnSecondary onClick={() => onNavigate("guide")}>使い方を見る</BtnSecondary>
         </div>
+        {showResetConfirm && (
+          <div style={{ marginTop: 12, padding: 16, background: "#fff4f4", border: "1px solid #fca5a5", borderRadius: 8 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#dc2626", marginBottom: 10 }}>
+              現在のデータはすべてリセットされます。よろしいですか？
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <BtnPrimary onClick={async () => { await resetAllData(); location.reload(); }} style={{ background: "#dc2626" }}>リセットする</BtnPrimary>
+              <BtnSecondary onClick={() => setShowResetConfirm(false)}>キャンセル</BtnSecondary>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 考え方 */}
