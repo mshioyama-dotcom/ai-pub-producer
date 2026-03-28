@@ -308,7 +308,7 @@ const SideMenu = ({ currentPage, onNavigate, stepStatuses }) => {
 
   return (
     <div style={{
-      width: 320, minWidth: 320, height: "100vh", overflowY: "auto",
+      width: 380, minWidth: 380, height: "100vh", overflowY: "auto",
       background: "#f8f9fb", borderRight: "1px solid rgba(0,0,0,0.07)",
       display: "flex", flexDirection: "column", padding: "24px 12px 24px 12px",
       boxSizing: "border-box", position: "fixed", left: 0, top: 0, zIndex: 10
@@ -364,18 +364,18 @@ const HomePage = ({ project, stepStatuses, allSteps, onNavigate }) => {
       </div>
 
       {/* 進行状況カード */}
-      <div style={{ display: "flex", gap: 14, marginBottom: 32, flexWrap: "wrap" }}>
-        <Card style={{ flex: "1 1 180px", minWidth: 180 }}>
+      <div style={{ display: "flex", gap: 14, marginBottom: 32, flexWrap: "nowrap" }}>
+        <Card style={{ flex: "1 1 0", minWidth: 0 }}>
           <div style={{ fontSize: 11.5, color: "#888", fontWeight: 600, marginBottom: 6 }}>現在のステップ</div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "#2563eb" }}>STEP{currentStep} {STEPS[currentStep-1]?.title}</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#2563eb", whiteSpace: "nowrap" }}>STEP{currentStep} {STEPS[currentStep-1]?.title}</div>
         </Card>
-        <Card style={{ flex: "1 1 180px", minWidth: 180 }}>
+        <Card style={{ flex: "1 1 0", minWidth: 0 }}>
           <div style={{ fontSize: 11.5, color: "#888", fontWeight: 600, marginBottom: 6 }}>最後に更新したステップ</div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "#333" }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#333", whiteSpace: "nowrap" }}>
             {lastUpdated ? `STEP${lastUpdated} ${STEPS[lastUpdated-1]?.title}` : "—"}
           </div>
         </Card>
-        <Card style={{ flex: "1 1 140px", minWidth: 140 }}>
+        <Card style={{ flex: "0 0 auto" }}>
           <div style={{ fontSize: 11.5, color: "#888", fontWeight: 600, marginBottom: 6 }}>完了数</div>
           <div style={{ fontSize: 24, fontWeight: 800, color: "#16a34a" }}>{completedCount}<span style={{ fontSize: 14, color: "#888", fontWeight: 500 }}> / 10</span></div>
         </Card>
@@ -966,7 +966,7 @@ export default function App() {
     <div style={{ display: "flex", minHeight: "100vh", fontFamily: "'Noto Sans JP', sans-serif", background: "#f0f2f5" }}>
       <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       <SideMenu currentPage={page} onNavigate={navigate} stepStatuses={stepStatuses} />
-      <div style={{ marginLeft: 320, flex: 1, padding: "32px 40px", maxWidth: 860, boxSizing: "border-box" }}>
+      <div style={{ marginLeft: 380, flex: 1, padding: "32px 40px", maxWidth: 860, boxSizing: "border-box" }}>
         {renderPage()}
       </div>
     </div>
