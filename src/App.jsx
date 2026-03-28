@@ -308,7 +308,7 @@ const SideMenu = ({ currentPage, onNavigate, stepStatuses }) => {
 
   return (
     <div style={{
-      width: 270, minWidth: 270, height: "100vh", overflowY: "auto",
+      width: 320, minWidth: 320, height: "100vh", overflowY: "auto",
       background: "#f8f9fb", borderRight: "1px solid rgba(0,0,0,0.07)",
       display: "flex", flexDirection: "column", padding: "24px 12px 24px 12px",
       boxSizing: "border-box", position: "fixed", left: 0, top: 0, zIndex: 10
@@ -966,7 +966,7 @@ export default function App() {
     <div style={{ display: "flex", minHeight: "100vh", fontFamily: "'Noto Sans JP', sans-serif", background: "#f0f2f5" }}>
       <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       <SideMenu currentPage={page} onNavigate={navigate} stepStatuses={stepStatuses} />
-      <div style={{ marginLeft: 270, flex: 1, padding: "32px 40px", maxWidth: 860, boxSizing: "border-box" }}>
+      <div style={{ marginLeft: 320, flex: 1, padding: "32px 40px", maxWidth: 860, boxSizing: "border-box" }}>
         {renderPage()}
       </div>
     </div>
