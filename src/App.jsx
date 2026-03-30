@@ -257,7 +257,7 @@ const Badge = ({ status }) => (
 
 const SourceLabel = ({ source }) => source ? (
   <span style={{ fontSize: 12, color: "#3b82f6", background: "rgba(59,130,246,0.07)", padding: "2px 7px", borderRadius: 4 }}>
-    入力元：{source}
+    ← {source}の出力を貼り付け
   </span>
 ) : null;
 
@@ -599,34 +599,28 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         </div>
       </div>
 
-      {/* Difyリンク */}
-      <Card style={{ marginBottom: 20, background: "rgba(37,99,235,0.03)", border: "1px solid rgba(37,99,235,0.12)" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#2563eb", marginBottom: 2 }}>
-              {step.type === "chat" ? "チャット（対話型）" : "ワークフロー"}
-            </div>
-            <div style={{ fontSize: 12, color: "#555", lineHeight: 1.6 }}>
-              右の青いボタンを押すと、このステップのAIツールが別タブで開きます
-            </div>
-          </div>
-          <a href={step.url} target="_blank" rel="noopener noreferrer" style={{
-            display: "inline-flex", alignItems: "center", gap: 6, padding: "12px 24px",
-            background: "#2563eb", color: "#fff", borderRadius: 7, fontWeight: 700, fontSize: 15,
-            textDecoration: "none", transition: "background 0.15s", boxShadow: "0 2px 8px rgba(37,99,235,0.3)"
-          }}>
-            Difyで実行する ↗
-          </a>
+      {/* このステップの使い方 */}
+      <Card style={{ marginBottom: 24, background: "#f8f9fb", border: "1px solid rgba(0,0,0,0.06)" }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a2e", marginBottom: 8 }}>このステップの進め方</div>
+        <div style={{ fontSize: 13, color: "#555", lineHeight: 2 }}>
+          <span style={{ fontWeight: 700, color: "#2563eb" }}>①</span> 下の「入力データ」に情報を入力して保存する{step.inputs.some(f => f.source) && "（前ステップの出力を貼り付け）"}<br/>
+          <span style={{ fontWeight: 700, color: "#2563eb" }}>②</span> 「入力データをコピー」→「Difyで実行する」を押してDifyに貼り付けて実行<br/>
+          <span style={{ fontWeight: 700, color: "#2563eb" }}>③</span> Difyの実行結果をコピー →「出力データ」に貼り付けて保存する
+        </div>
+        <div style={{ fontSize: 12, color: "#888", marginTop: 8, lineHeight: 1.6 }}>
+          このサイトはDifyの入出力を保存するメモ帳です。保存した出力は、次のステップの入力として使います。
         </div>
       </Card>
 
-      {/* 入力セクション */}
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 700, color: "#1a1a2e", marginBottom: 6 }}>入力</h2>
+      {/* ① 入力データ */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: "50%", background: "#2563eb", color: "#fff", fontSize: 13, fontWeight: 700 }}>①</span>
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: "#1a1a2e", margin: 0 }}>入力データ</h2>
+        </div>
         {step.inputs.some(f => f.source) && (
-          <div style={{ fontSize: 12.5, color: "#666", marginBottom: 14, padding: "8px 12px", background: "rgba(0,0,0,0.02)", borderRadius: 6, lineHeight: 1.7 }}>
-            「入力元」が表示されている項目は、該当ステップの出力をコピーして貼り付けてください。
-            左メニューの「保存データ」から過去の出力をコピーできます。
+          <div style={{ fontSize: 12.5, color: "#555", marginBottom: 12, padding: "8px 12px", background: "rgba(59,130,246,0.04)", border: "1px solid rgba(59,130,246,0.1)", borderRadius: 6, lineHeight: 1.7 }}>
+            前のステップの出力を貼り付けてください。左メニューの「保存データ」からコピーできます。
           </div>
         )}
         {step.inputs.map(field => (
@@ -664,23 +658,51 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           </div>
         ))}
         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-          <BtnPrimary onClick={handleSaveInput}>入力を保存</BtnPrimary>
+          <BtnPrimary onClick={handleSaveInput}>入力データを保存</BtnPrimary>
           <BtnSecondary onClick={() => {
             const text = step.inputs.map(f => `【${f.label}】\n${inputs[f.name] || ""}`).join("\n\n");
             handleCopy(text);
-          }}>入力をコピー</BtnSecondary>
+          }}>入力データをコピー</BtnSecondary>
+          {copyMsg === "コピーしました" && <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 500 }}>→ Difyに貼り付けてください</span>}
         </div>
       </div>
 
-      {/* 出力セクション */}
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 700, color: "#1a1a2e", marginBottom: 6 }}>{step.outputTitle}</h2>
-        <div style={{ fontSize: 12.5, color: "#666", marginBottom: 10, lineHeight: 1.7 }}>
-          「Difyで実行する」で開いたツールの実行結果をコピーして、下の欄に貼り付けてください。貼り付けたら「出力を保存」を押してください。
+      {/* ② Difyで実行 */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: "50%", background: "#2563eb", color: "#fff", fontSize: 13, fontWeight: 700 }}>②</span>
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: "#1a1a2e", margin: 0 }}>Difyで実行する</h2>
+        </div>
+        <Card style={{ background: "rgba(37,99,235,0.03)", border: "1px solid rgba(37,99,235,0.12)" }}>
+          <div style={{ fontSize: 13, color: "#555", lineHeight: 1.8, marginBottom: 12 }}>
+            上の「入力データをコピー」を押してから、下のボタンでDifyを開いてください。<br/>
+            Difyの入力欄に貼り付けて実行し、結果が出たらコピーしてください。
+          </div>
+          <a href={step.url} target="_blank" rel="noopener noreferrer" style={{
+            display: "inline-flex", alignItems: "center", gap: 6, padding: "12px 24px",
+            background: "#2563eb", color: "#fff", borderRadius: 7, fontWeight: 700, fontSize: 15,
+            textDecoration: "none", transition: "background 0.15s", boxShadow: "0 2px 8px rgba(37,99,235,0.3)"
+          }}>
+            Difyを開く ↗
+          </a>
+          <span style={{ fontSize: 12, color: "#888", marginLeft: 12 }}>
+            {step.type === "chat" ? "チャット（対話型）" : "ワークフロー"}
+          </span>
+        </Card>
+      </div>
+
+      {/* ③ 出力データ */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: "50%", background: "#2563eb", color: "#fff", fontSize: 13, fontWeight: 700 }}>③</span>
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: "#1a1a2e", margin: 0 }}>出力データ</h2>
+        </div>
+        <div style={{ fontSize: 12.5, color: "#555", marginBottom: 10, lineHeight: 1.7 }}>
+          Difyの実行結果をコピーして、下の欄に貼り付けてください。{nextStep && `この出力は次のステップ（STEP${nextStep.num}）の入力になります。`}
         </div>
         <textarea
           value={outputText} onChange={e => setOutputText(e.target.value)}
-          placeholder={"ここにDifyの実行結果を貼り付けてください"}
+          placeholder={"Difyの実行結果をここに貼り付けてください"}
           rows={10}
           style={{
             width: "100%", padding: "12px 14px", fontSize: 14, border: "1px solid rgba(0,0,0,0.12)",
@@ -689,8 +711,8 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           }}
         />
         <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <BtnPrimary onClick={handleSaveOutput}>出力を保存</BtnPrimary>
-          <BtnSecondary onClick={() => handleCopy(outputText)}>コピー</BtnSecondary>
+          <BtnPrimary onClick={handleSaveOutput}>出力データを保存</BtnPrimary>
+          <BtnSecondary onClick={() => handleCopy(outputText)}>出力データをコピー</BtnSecondary>
           {nextStep && (
             <BtnSecondary onClick={() => onNavigate(`step_${nextStep.num}`)} style={{ background: "rgba(34,197,94,0.08)", color: "#16a34a", border: "1px solid rgba(34,197,94,0.2)" }}>
               STEP{nextStep.num}へ進む →
@@ -701,7 +723,6 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
               完了 → 保存データを見る
             </BtnSecondary>
           )}
-          {copyMsg && <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 500 }}>{copyMsg}</span>}
         </div>
       </div>
 
