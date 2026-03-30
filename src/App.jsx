@@ -604,11 +604,12 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a2e", marginBottom: 8 }}>このステップの進め方</div>
         <div style={{ fontSize: 13, color: "#555", lineHeight: 2 }}>
           <span style={{ fontWeight: 700, color: "#2563eb" }}>①</span> 下の「入力データ」に情報を入力して保存する{step.inputs.some(f => f.source) && "（前ステップの出力を貼り付け）"}<br/>
-          <span style={{ fontWeight: 700, color: "#2563eb" }}>②</span> 「入力データをコピー」→「Difyで実行する」を押してDifyに貼り付けて実行<br/>
+          <span style={{ fontWeight: 700, color: "#2563eb" }}>②</span> 「入力データをコピー」でコピー →「Difyを開く」でDifyに貼り付けて実行<br/>
           <span style={{ fontWeight: 700, color: "#2563eb" }}>③</span> Difyの実行結果をコピー →「出力データ」に貼り付けて保存する
         </div>
         <div style={{ fontSize: 12, color: "#888", marginTop: 8, lineHeight: 1.6 }}>
-          このサイトはDifyの入出力を保存するメモ帳です。保存した出力は、次のステップの入力として使います。
+          このサイトはDifyの入出力を保存するメモ帳です。保存した出力は、次のステップの入力として使います。<br/>
+          出力はそのまま使うことも、自分で修正したり、AIチャット（Claude・ChatGPT等）で整えてから使うこともできます。
         </div>
       </Card>
 
@@ -657,13 +658,14 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
             )}
           </div>
         ))}
-        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+        <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
           <BtnPrimary onClick={handleSaveInput}>入力データを保存</BtnPrimary>
           <BtnSecondary onClick={() => {
             const text = step.inputs.map(f => `【${f.label}】\n${inputs[f.name] || ""}`).join("\n\n");
             handleCopy(text);
           }}>入力データをコピー</BtnSecondary>
-          {copyMsg === "コピーしました" && <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 500 }}>→ Difyに貼り付けてください</span>}
+          <span style={{ fontSize: 12, color: "#888" }}>※ コピーした内容をDifyに貼り付けます</span>
+          {copyMsg === "コピーしました" && <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 600 }}>→ 次に②でDifyを開いて貼り付けてください</span>}
         </div>
       </div>
 
@@ -698,7 +700,8 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           <h2 style={{ fontSize: 16, fontWeight: 700, color: "#1a1a2e", margin: 0 }}>出力データ</h2>
         </div>
         <div style={{ fontSize: 12.5, color: "#555", marginBottom: 10, lineHeight: 1.7 }}>
-          Difyの実行結果をコピーして、下の欄に貼り付けてください。{nextStep && `この出力は次のステップ（STEP${nextStep.num}）の入力になります。`}
+          Difyの実行結果をコピーして、下の欄に貼り付けてください。{nextStep && `この出力は次のステップ（STEP${nextStep.num}）の入力になります。`}<br/>
+          出力はそのまま使っても、自分で修正したり、AIチャットで整えてから貼り付けてもOKです。
         </div>
         <textarea
           value={outputText} onChange={e => setOutputText(e.target.value)}
@@ -713,6 +716,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
           <BtnPrimary onClick={handleSaveOutput}>出力データを保存</BtnPrimary>
           <BtnSecondary onClick={() => handleCopy(outputText)}>出力データをコピー</BtnSecondary>
+          <span style={{ fontSize: 12, color: "#888" }}>※ 次のステップの入力に使ったり、修正用にコピーできます</span>
           {nextStep && (
             <BtnSecondary onClick={() => onNavigate(`step_${nextStep.num}`)} style={{ background: "rgba(34,197,94,0.08)", color: "#16a34a", border: "1px solid rgba(34,197,94,0.2)" }}>
               STEP{nextStep.num}へ進む →
