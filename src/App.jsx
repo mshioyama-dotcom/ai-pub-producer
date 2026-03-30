@@ -606,12 +606,14 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
             <div style={{ fontSize: 13, fontWeight: 600, color: "#2563eb", marginBottom: 2 }}>
               {step.type === "chat" ? "チャット（対話型）" : "ワークフロー"}
             </div>
-            <div style={{ fontSize: 12, color: "#888" }}>下のリンクからDifyツールを開いて実行してください</div>
+            <div style={{ fontSize: 12, color: "#555", lineHeight: 1.6 }}>
+              右の青いボタンを押すと、このステップのAIツールが別タブで開きます
+            </div>
           </div>
           <a href={step.url} target="_blank" rel="noopener noreferrer" style={{
-            display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 20px",
-            background: "#2563eb", color: "#fff", borderRadius: 7, fontWeight: 600, fontSize: 14,
-            textDecoration: "none", transition: "background 0.15s"
+            display: "inline-flex", alignItems: "center", gap: 6, padding: "12px 24px",
+            background: "#2563eb", color: "#fff", borderRadius: 7, fontWeight: 700, fontSize: 15,
+            textDecoration: "none", transition: "background 0.15s", boxShadow: "0 2px 8px rgba(37,99,235,0.3)"
           }}>
             Difyで実行する ↗
           </a>
@@ -620,7 +622,13 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
 
       {/* 入力セクション */}
       <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 700, color: "#1a1a2e", marginBottom: 14 }}>入力</h2>
+        <h2 style={{ fontSize: 15, fontWeight: 700, color: "#1a1a2e", marginBottom: 6 }}>入力</h2>
+        {step.inputs.some(f => f.source) && (
+          <div style={{ fontSize: 12.5, color: "#666", marginBottom: 14, padding: "8px 12px", background: "rgba(0,0,0,0.02)", borderRadius: 6, lineHeight: 1.7 }}>
+            「入力元」が表示されている項目は、該当ステップの出力をコピーして貼り付けてください。
+            左メニューの「保存データ」から過去の出力をコピーできます。
+          </div>
+        )}
         {step.inputs.map(field => (
           <div key={field.name} style={{ marginBottom: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
@@ -666,10 +674,13 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
 
       {/* 出力セクション */}
       <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 700, color: "#1a1a2e", marginBottom: 14 }}>{step.outputTitle}</h2>
+        <h2 style={{ fontSize: 15, fontWeight: 700, color: "#1a1a2e", marginBottom: 6 }}>{step.outputTitle}</h2>
+        <div style={{ fontSize: 12.5, color: "#666", marginBottom: 10, lineHeight: 1.7 }}>
+          「Difyで実行する」で開いたツールの実行結果をコピーして、下の欄に貼り付けてください。貼り付けたら「出力を保存」を押してください。
+        </div>
         <textarea
           value={outputText} onChange={e => setOutputText(e.target.value)}
-          placeholder="Difyの出力をここに貼り付けてください"
+          placeholder={"ここにDifyの実行結果を貼り付けてください"}
           rows={10}
           style={{
             width: "100%", padding: "12px 14px", fontSize: 14, border: "1px solid rgba(0,0,0,0.12)",
