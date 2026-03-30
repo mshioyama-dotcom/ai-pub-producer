@@ -620,7 +620,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         </div>
         {step.inputs.some(f => f.source) && (
           <div style={{ fontSize: 12.5, color: "#555", marginBottom: 12, padding: "8px 12px", background: "rgba(59,130,246,0.04)", border: "1px solid rgba(59,130,246,0.1)", borderRadius: 6, lineHeight: 1.7 }}>
-            前のステップの出力を貼り付けてください。左メニューの「保存データ」からコピーできます。
+            左メニューの「保存データ」から前のステップの出力をコピーし、各欄に貼り付けてください。
           </div>
         )}
         {step.inputs.map(field => (
