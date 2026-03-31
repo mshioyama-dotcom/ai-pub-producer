@@ -28,7 +28,7 @@ const STEPS = [
     inputs: [
       { name: "keyword1", label: "1つ目のキーワード", desc: "テーマ発見で選んだ1語目", source: "STEP1", required: true, type: "text" },
       { name: "keyword2", label: "2つ目のキーワード", desc: "テーマ発見で選んだ2語目", source: "STEP1", required: true, type: "text" },
-      { name: "amazon_html", label: "Amazon検索結果のHTMLソース", desc: "AmazonでKindle検索した結果ページのHTMLソースを貼り付け", source: null, required: true, type: "textarea" }
+      { name: "amazon_html", label: "Amazon検索結果のHTMLソース", desc: "AmazonでKindle検索した結果ページのHTMLソースを貼り付けてください。貼り付けると「HTMLをクリーニングする」ボタンが表示されます。クリーニングを実行すると、必要な情報だけに軽量化されます。クリーニングせずにDifyに貼り付けると、処理が重すぎて動かないことがあります", source: null, required: true, type: "textarea" }
     ],
     outputTitle: "診断結果",
     help: [
