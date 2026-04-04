@@ -807,7 +807,8 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     setHelpOpen(false);
     setCopyMsg("");
     setValidationErrors([]);
-  }, [step.num, stepData]);
+    setRunError("");
+  }, [step.num]);
 
   const prevStep = step.num > 1 ? STEPS[step.num - 2] : null;
   const nextStep = step.num < 10 ? STEPS[step.num] : null;
