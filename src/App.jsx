@@ -1215,7 +1215,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         <textarea
           value={outputText}
           onChange={(e) => setOutputText(e.target.value)}
-          placeholder="Difyの実行結果をここに貼り付けてください"
+          placeholder={step.type === "chat" ? "AIツールの会話結果をここに貼り付けてください" : "実行するボタンを押すと結果が自動で表示されます"}
           rows={10}
           style={{
             width: "100%",
@@ -1408,6 +1408,25 @@ const GuidePage = ({ onNavigate }) => {
           <li>STEP1からSTEP10まで順番に進めます</li>
           <li>前のステップの出力を次のステップの入力に使います</li>
           <li>途中で止まっても、保存データからいつでも再開できます</li>
+        </ul>
+      </Section>
+
+      <Section title="操作方法（ワークフロー型：STEP2・3・5〜10）">
+        <ul style={{ margin: 0, paddingLeft: 18 }}>
+          <li>① 入力データ欄に情報を入力して「入力データを保存」を押す</li>
+          <li>② 「実行する」ボタンを押すとAIが自動で処理し、結果が出力欄に表示される</li>
+          <li>③ 内容を確認して「出力データを保存」を押す</li>
+        </ul>
+        <div style={{ marginTop: 8, fontSize: 12.5, color: "#888" }}>
+          コピー＆ペーストは不要です。ボタンを押すだけで結果が表示されます。
+        </div>
+      </Section>
+
+      <Section title="操作方法（チャット型：STEP1・4）">
+        <ul style={{ margin: 0, paddingLeft: 18 }}>
+          <li>① 入力データ欄に情報を入力して「入力データを保存」を押す</li>
+          <li>② 「入力データをコピー」でコピーして「AIツールを開く」でツールにアクセスし、貼り付けて対話する</li>
+          <li>③ 会話結果をコピーして出力データ欄に貼り付け「出力データを保存」を押す</li>
         </ul>
       </Section>
 
