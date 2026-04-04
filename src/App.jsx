@@ -28,12 +28,12 @@ const STEPS = [
     inputs: [
       { name: "keyword1", label: "1つ目のキーワード", desc: "テーマ発見で選んだ1語目", source: "STEP1", required: true, type: "text" },
       { name: "keyword2", label: "2つ目のキーワード", desc: "テーマ発見で選んだ2語目", source: "STEP1", required: true, type: "text" },
-      { name: "amazon_html", label: "Amazon検索結果のHTMLソース", desc: "AmazonでKindle検索した結果ページのHTMLソースを貼り付けてください。貼り付けると「HTMLをクリーニングする」ボタンが表示されます。クリーニングを実行すると、必要な情報だけに軽量化されます。クリーニングせずにDifyに貼り付けると、処理が重すぎて動かないことがあります", source: null, required: true, type: "textarea" }
+      { name: "amazon_html", label: "Amazon検索結果のHTMLソース", desc: "AmazonでKindle検索した結果ページのHTMLソースを貼り付けてください。「実行する」ボタンを押すと自動でクリーニングしてAIに渡します。", source: null, required: true, type: "textarea" }
     ],
     outputTitle: "診断結果",
     help: [
       "HTML取得：検索結果ページで右クリック→「ページのソースを表示」→全選択してコピー",
-      "HTMLが大きすぎる場合は入力欄下の「HTMLをクリーニングする」ボタンで軽量化できます",
+      "HTMLを貼り付けて「実行する」を押すと、自動でクリーニングしてAIに渡します。",
       "キーワードを変えて再実行で別の市場を診断できます"
     ]
   },
@@ -837,10 +837,14 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     const errors = validateInputs();
     if (errors.length > 0) return;
     await onSaveInput(step.num, inputs);
+    setCopyMsg("saved_input");
+    setTimeout(() => setCopyMsg(""), 2000);
   };
 
   const handleSaveOutput = async () => {
     await onSaveOutput(step.num, outputText);
+    setCopyMsg("saved_output");
+    setTimeout(() => setCopyMsg(""), 2000);
   };
 
   const handleRunDify = async () => {
@@ -849,10 +853,15 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     setIsRunning(true);
     setRunError("");
     try {
+      let execInputs = { ...inputs };
+      if (step.num === 2 && execInputs.amazon_html) {
+        const cleaned = cleanHtmlMinimal(execInputs.amazon_html);
+        if (cleaned) execInputs.amazon_html = cleaned;
+      }
       const response = await fetch("/api/dify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stepNum: step.num, inputs }),
+        body: JSON.stringify({ stepNum: step.num, inputs: execInputs }),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -1072,6 +1081,9 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
 
         <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
           <BtnPrimary onClick={handleSaveInput}>入力データを保存</BtnPrimary>
+          {copyMsg === "saved_input" && (
+            <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 600 }}>✓ 保存しました</span>
+          )}
           {step.type === "chat" && (
             <>
               <BtnSecondary
@@ -1238,7 +1250,13 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         />
         <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
           <BtnPrimary onClick={handleSaveOutput}>出力データを保存</BtnPrimary>
-          <BtnSecondary onClick={() => handleCopy(outputText)}>出力データをコピー</BtnSecondary>
+          {copyMsg === "saved_output" && (
+            <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 600 }}>✓ 保存しました</span>
+          )}
+          <BtnSecondary onClick={() => { handleCopy(outputText); setCopyMsg("copied_output"); setTimeout(() => setCopyMsg(""), 2000); }}>出力データをコピー</BtnSecondary>
+          {copyMsg === "copied_output" && (
+            <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 600 }}>✓ コピーしました</span>
+          )}
           <span style={{ fontSize: 12, color: "#888" }}>
             ※ 次のステップの入力に使ったり、修正用にコピーできます
           </span>
@@ -1543,10 +1561,10 @@ const GuidePage = ({ onNavigate }) => {
           <li>キーワード2語を入力して検索</li>
           <li>検索結果ページで右クリック→「ページのソースを表示」</li>
           <li>Ctrl+A → Ctrl+C で全選択コピー</li>
-          <li>STEP2の入力欄に貼り付ける</li>
+          <li>STEP2の入力欄に貼り付けて「実行する」を押す</li>
         </ol>
         <div style={{ marginTop: 8, fontSize: 12.5, color: "#888" }}>
-          HTMLが大きすぎる場合は、入力欄の下に表示される「HTMLをクリーニングする」ボタンで軽量化できます
+          「実行する」を押すと自動でクリーニングしてAIに渡します。クリーニング操作は不要です。
         </div>
       </Section>
 
