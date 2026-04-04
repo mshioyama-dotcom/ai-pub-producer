@@ -16,6 +16,16 @@ const API_KEYS = {
   10: process.env.DIFY_API_KEY_STEP10,
 };
 
+// ポータルのフィールド名をDifyの変数名にマッピング
+function mapInputs(stepNum, inputs) {
+  const mapped = { ...inputs };
+  if (stepNum === 2 && mapped.amazon_html !== undefined) {
+    mapped.HTML = mapped.amazon_html;
+    delete mapped.amazon_html;
+  }
+  return mapped;
+}
+
 export default async function handler(req, res) {
   // CORS設定
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -41,6 +51,8 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: `No API key configured for STEP${stepNum}` });
   }
 
+  const difyInputs = mapInputs(stepNum, inputs);
+
   try {
     const response = await fetch(`${DIFY_API_BASE}/workflows/run`, {
       method: "POST",
@@ -48,18 +60,11 @@ export default async function handler(req, res) {
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-// STEP2のamazon_htmlをHTMLに変換
-const difyInputs = { ...inputs };
-if (stepNum === 2 && difyInputs.amazon_html !== undefined) {
-  difyInputs.HTML = difyInputs.amazon_html;
-  delete difyInputs.amazon_html;
-}
-
-body: JSON.stringify({
-  inputs: difyInputs,
-  response_mode: "blocking",
-  user: "ai-pub-producer-user",
-}),
+      body: JSON.stringify({
+        inputs: difyInputs,
+        response_mode: "blocking",
+        user: "ai-pub-producer-user",
+      }),
     });
 
     if (!response.ok) {
