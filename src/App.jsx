@@ -26,8 +26,8 @@ const STEPS = [
     category: "企画設計", type: "workflow",
     url: "https://udify.app/workflow/x0Ce5PCv2FjEaFs4",
     inputs: [
-      { name: "keyword1", label: "1つ目のキーワード", desc: "テーマ発見で選んだ1語目", source: "STEP1", required: true, type: "text" },
-      { name: "keyword2", label: "2つ目のキーワード", desc: "テーマ発見で選んだ2語目", source: "STEP1", required: true, type: "text" },
+      { name: "keyword1", label: "1つ目のキーワード", desc: "テーマ発見で選んだ1語目", source: "STEP1", required: true, type: "text", autoFill: false },
+      { name: "keyword2", label: "2つ目のキーワード", desc: "テーマ発見で選んだ2語目", source: "STEP1", required: true, type: "text", autoFill: false },
       { name: "amazon_html", label: "Amazon検索結果のHTMLソース", desc: "AmazonでKindle検索した結果ページのHTMLソースを貼り付けてください。「実行する」ボタンを押すと自動でクリーニングしてAIに渡します。", source: null, required: true, type: "textarea" }
     ],
     outputTitle: "診断結果",
@@ -43,10 +43,10 @@ const STEPS = [
     category: "企画設計", type: "workflow",
     url: "https://udify.app/workflow/V0yHio0PcP42yJjQ",
     inputs: [
-      { name: "keyword1", label: "検索キーワード1", desc: "市場診断で確定した1語目", source: "STEP2", required: true, type: "text" },
-      { name: "keyword2", label: "検索キーワード2", desc: "市場診断で確定した2語目", source: "STEP2", required: true, type: "text" },
-      { name: "intent_lock", label: "検索意図仮説", desc: "読者が何を知りたくて検索するかの仮説", source: "STEP2", required: true, type: "textarea" },
-      { name: "market_report", label: "狙い目切り口（任意）", desc: "市場診断で見つけた狙い目の切り口", source: "STEP2", required: false, type: "textarea" }
+      { name: "keyword1", label: "検索キーワード1", desc: "市場診断で確定した1語目", source: "STEP2", required: true, type: "text", autoFill: false },
+      { name: "keyword2", label: "検索キーワード2", desc: "市場診断で確定した2語目", source: "STEP2", required: true, type: "text", autoFill: false },
+      { name: "intent_lock", label: "検索意図仮説", desc: "読者が何を知りたくて検索するかの仮説", source: "STEP2", required: true, type: "textarea", autoFill: false },
+      { name: "market_report", label: "狙い目切り口（任意）", desc: "市場診断で見つけた狙い目の切り口", source: "STEP2", required: false, type: "textarea", autoFill: false }
     ],
     outputTitle: "設計結果",
     help: [
@@ -74,10 +74,10 @@ const STEPS = [
     category: "企画設計", type: "workflow",
     url: "https://udify.app/workflow/z7djuT4RLqfAbEqY",
     inputs: [
-      { name: "keyword1", label: "検索キーワード1", desc: "確定した1語目", source: "STEP2", required: true, type: "text" },
-      { name: "keyword2", label: "検索キーワード2", desc: "確定した2語目", source: "STEP2", required: true, type: "text" },
-      { name: "blueprint_text", label: "読者・価値設計のアウトプット", desc: "読者・価値設計の出力を全文貼り付け", source: "STEP3", required: true, type: "textarea" },
-      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "エピソードインタビューの出力を全文貼り付け", source: "STEP4", required: true, type: "textarea" }
+      { name: "keyword1", label: "検索キーワード1", desc: "確定した1語目", source: "STEP2", required: true, type: "text", autoFill: false },
+      { name: "keyword2", label: "検索キーワード2", desc: "確定した2語目", source: "STEP2", required: true, type: "text", autoFill: false },
+      { name: "blueprint_text", label: "読者・価値設計のアウトプット", desc: "読者・価値設計の出力を全文貼り付け", source: "STEP3", required: true, type: "textarea", autoFill: true },
+      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "エピソードインタビューの出力を全文貼り付け", source: "STEP4", required: true, type: "textarea", autoFill: true }
     ],
     outputTitle: "タイトル案",
     help: [
@@ -92,8 +92,8 @@ const STEPS = [
     category: "執筆設計", type: "workflow",
     url: "https://udify.app/workflow/tcqNIyr8wpCBAJhb",
     inputs: [
-      { name: "blueprint_text", label: "読者・価値設計のアウトプット", desc: "読者・価値設計の出力を全文貼り付け", source: "STEP3", required: true, type: "textarea" },
-      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "エピソードインタビューの出力を全文貼り付け", source: "STEP4", required: true, type: "textarea" }
+      { name: "blueprint_text", label: "読者・価値設計のアウトプット", desc: "読者・価値設計の出力を全文貼り付け", source: "STEP3", required: true, type: "textarea", autoFill: true },
+      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "エピソードインタビューの出力を全文貼り付け", source: "STEP4", required: true, type: "textarea", autoFill: true }
     ],
     outputTitle: "完成目次",
     help: [
@@ -107,9 +107,9 @@ const STEPS = [
     category: "執筆設計", type: "workflow",
     url: "https://udify.app/workflow/4KDXsPKSlgk5qMu8",
     inputs: [
-      { name: "toc_text", label: "目次作成のアウトプット", desc: "目次作成の出力を全文貼り付け", source: "STEP6", required: true, type: "textarea" },
-      { name: "blueprint_text", label: "読者・価値設計のアウトプット", desc: "読者・価値設計の出力を全文貼り付け", source: "STEP3", required: true, type: "textarea" },
-      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "エピソードインタビューの出力を全文貼り付け", source: "STEP4", required: true, type: "textarea" }
+      { name: "toc_text", label: "目次作成のアウトプット", desc: "目次作成の出力を全文貼り付け", source: "STEP6", required: true, type: "textarea", autoFill: true },
+      { name: "blueprint_text", label: "読者・価値設計のアウトプット", desc: "読者・価値設計の出力を全文貼り付け", source: "STEP3", required: true, type: "textarea", autoFill: true },
+      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "エピソードインタビューの出力を全文貼り付け", source: "STEP4", required: true, type: "textarea", autoFill: true }
     ],
     outputTitle: "章構成",
     help: [
@@ -123,7 +123,7 @@ const STEPS = [
     category: "執筆設計", type: "workflow",
     url: "https://udify.app/workflow/Ka9gpeDvAnkPV9hW",
     inputs: [
-      { name: "chapter_outline_text", label: "1章分のアウトライン", desc: "章構成作成の出力から1章分を切り出して貼り付け", source: "STEP7", required: true, type: "textarea" },
+      { name: "chapter_outline_text", label: "1章分のアウトライン", desc: "章構成作成の出力から1章分を切り出して貼り付け", source: "STEP7", required: true, type: "textarea", autoFill: false },
       { name: "added_episode_text", label: "著者が入れたいエピソード（任意）", desc: "この章に入れたい体験やエピソード", source: null, required: false, type: "textarea" }
     ],
     outputTitle: "詳細プロット",
@@ -138,8 +138,8 @@ const STEPS = [
     category: "執筆設計", type: "workflow",
     url: "https://udify.app/workflow/lRAWtZGuVL4bqHM9",
     inputs: [
-      { name: "detailed_plot_text", label: "詳細プロット作成のアウトプット（1章分）", desc: "詳細プロット作成の出力を貼り付け", source: "STEP8", required: true, type: "textarea" },
-      { name: "target_heading", label: "執筆対象の目次見出し", desc: "書きたい項の見出しを正確に入力", source: "STEP8", required: true, type: "text" },
+      { name: "detailed_plot_text", label: "詳細プロット作成のアウトプット（1章分）", desc: "詳細プロット作成の出力を貼り付け", source: "STEP8", required: true, type: "textarea", autoFill: true },
+      { name: "target_heading", label: "執筆対象の目次見出し", desc: "書きたい項の見出しを正確に入力", source: "STEP8", required: true, type: "text", autoFill: false },
       { name: "past_writing_text", label: "著者の過去の執筆データ（任意）", desc: "文体参考の過去原稿（最大3000字）", source: null, required: false, type: "textarea" }
     ],
     outputTitle: "生成された本文",
@@ -154,11 +154,11 @@ const STEPS = [
     category: "販売準備", type: "workflow",
     url: "https://udify.app/workflow/6yWZfOGGU76ciJBI",
     inputs: [
-      { name: "title_text", label: "タイトル", desc: "確定したメインタイトル", source: "STEP5", required: true, type: "text" },
-      { name: "subtitle_text", label: "サブタイトル", desc: "確定したサブタイトル", source: "STEP5", required: true, type: "text" },
-      { name: "blueprint_text", label: "読者・価値設計のアウトプット", desc: "読者・価値設計の出力を全文貼り付け", source: "STEP3", required: true, type: "textarea" },
-      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "エピソードインタビューの出力を全文貼り付け", source: "STEP4", required: true, type: "textarea" },
-      { name: "outline_text", label: "章構成作成のアウトプット", desc: "章構成作成の出力を全文貼り付け", source: "STEP7", required: true, type: "textarea" },
+      { name: "title_text", label: "タイトル", desc: "確定したメインタイトル", source: "STEP5", required: true, type: "text", autoFill: false },
+      { name: "subtitle_text", label: "サブタイトル", desc: "確定したサブタイトル", source: "STEP5", required: true, type: "text", autoFill: false },
+      { name: "blueprint_text", label: "読者・価値設計のアウトプット", desc: "読者・価値設計の出力を全文貼り付け", source: "STEP3", required: true, type: "textarea", autoFill: true },
+      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "エピソードインタビューの出力を全文貼り付け", source: "STEP4", required: true, type: "textarea", autoFill: true },
+      { name: "outline_text", label: "章構成作成のアウトプット", desc: "章構成作成の出力を全文貼り付け", source: "STEP7", required: true, type: "textarea", autoFill: true },
       { name: "author_profile_text", label: "著者プロフィール（任意）", desc: "著者の経歴や実績", source: null, required: false, type: "textarea" }
     ],
     outputTitle: "Amazon説明文",
@@ -279,18 +279,25 @@ const Badge = ({ status }) => (
   </span>
 );
 
-const SourceLabel = ({ source, onAutoFill }) =>
+const SourceLabel = ({ source, autoFill, onAutoFill, onShowRef }) =>
   source ? (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
       <span style={{ fontSize: 12, color: "#3b82f6", background: "rgba(59,130,246,0.07)", padding: "2px 7px", borderRadius: 4 }}>
         ← {source}の出力
       </span>
-      {onAutoFill && (
+      {autoFill ? (
         <button
           onClick={onAutoFill}
-          style={{ fontSize: 11, color: "#fff", background: "#3b82f6", border: "none", borderRadius: 4, padding: "2px 8px", cursor: "pointer", fontWeight: 600 }}
+          style={{ fontSize: 11, color: "#fff", background: "#2563eb", border: "none", borderRadius: 4, padding: "2px 8px", cursor: "pointer", fontWeight: 600 }}
         >
           自動転記
+        </button>
+      ) : (
+        <button
+          onClick={onShowRef}
+          style={{ fontSize: 11, color: "#2563eb", background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.2)", borderRadius: 4, padding: "2px 8px", cursor: "pointer", fontWeight: 600 }}
+        >
+          参照
         </button>
       )}
     </span>
@@ -786,6 +793,31 @@ const HtmlCleanerInline = ({ html, onCleaned }) => {
           </div>
         </div>
       )}
+      {refModal && (
+        <div
+          style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={() => setRefModal(null)}
+        >
+          <div
+            style={{ background: "#fff", borderRadius: 12, padding: 24, maxWidth: 640, width: "90%", maxHeight: "70vh", display: "flex", flexDirection: "column", boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <span style={{ fontWeight: 700, fontSize: 14, color: "#1a1a2e" }}>STEP{refModal.stepNum}の出力（参照）</span>
+              <button onClick={() => setRefModal(null)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#888" }}>✕</button>
+            </div>
+            <div style={{ flex: 1, overflowY: "auto", background: "#f8f9fb", borderRadius: 8, padding: 12, fontSize: 13, color: "#333", lineHeight: 1.7, whiteSpace: "pre-wrap", marginBottom: 12 }}>
+              {refModal.text}
+            </div>
+            <button
+              onClick={() => { navigator.clipboard.writeText(refModal.text); setRefModal(null); }}
+              style={{ padding: "8px 20px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+            >
+              コピーして閉じる
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -804,6 +836,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   const [validationErrors, setValidationErrors] = useState([]);
   const [isRunning, setIsRunning] = useState(false);
   const [runError, setRunError] = useState("");
+  const [refModal, setRefModal] = useState(null); // { stepNum, text }
 
   useEffect(() => {
     setInputs(stepData.inputData || {});
@@ -1027,11 +1060,17 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                 {field.required && <RequiredMark />}
                 <SourceLabel
                   source={field.source}
-                  onAutoFill={field.source ? () => {
+                  autoFill={field.autoFill}
+                  onAutoFill={() => {
                     const srcNum = parseInt(field.source.replace("STEP", ""), 10);
                     const srcOutput = allSteps?.[srcNum]?.outputText;
                     if (srcOutput) handleInputChange(field.name, srcOutput);
-                  } : null}
+                  }}
+                  onShowRef={() => {
+                    const srcNum = parseInt(field.source.replace("STEP", ""), 10);
+                    const srcOutput = allSteps?.[srcNum]?.outputText || "（保存済みデータがありません）";
+                    setRefModal({ stepNum: srcNum, text: srcOutput });
+                  }}
                 />
                 {hasError && (
                   <span style={{ fontSize: 12, color: "#dc2626", fontWeight: 500 }}>
