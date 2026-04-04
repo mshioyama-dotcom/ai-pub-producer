@@ -48,11 +48,18 @@ export default async function handler(req, res) {
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        inputs,
-        response_mode: "blocking",
-        user: "ai-pub-producer-user",
-      }),
+// STEP2のamazon_htmlをHTMLに変換
+const difyInputs = { ...inputs };
+if (stepNum === 2 && difyInputs.amazon_html !== undefined) {
+  difyInputs.HTML = difyInputs.amazon_html;
+  delete difyInputs.amazon_html;
+}
+
+body: JSON.stringify({
+  inputs: difyInputs,
+  response_mode: "blocking",
+  user: "ai-pub-producer-user",
+}),
     });
 
     if (!response.ok) {
