@@ -60,7 +60,7 @@ const STEPS = [
     category: "企画設計", type: "chat",
     url: "https://udify.app/chat/qbB9SNU5UG3gryYp",
     inputs: [
-      { name: "blueprint_text", label: "読者・価値設計のアウトプット", desc: "読者・価値設計の出力を全文コピーして最初に貼り付けてください", source: "STEP3", required: true, type: "textarea" }
+      { name: "blueprint_text", label: "読者・価値設計のアウトプット", desc: "読者・価値設計の出力を全文コピーして最初に貼り付けてください", source: "STEP3", required: true, type: "textarea", autoFill: true }
     ],
     outputTitle: "インタビュー要約",
     help: [
