@@ -795,7 +795,9 @@ const HtmlCleanerInline = ({ html, onCleaned }) => {
 const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutput, onUpdateProject, onInputChange }) => {
   const [inputs, setInputs] = useState(stepData.inputData || {});
   const [outputText, setOutputText] = useState(stepData.outputText || "");
-  const [copyMsg, setCopyMsg] = useState("");
+  const [saveInputMsg, setSaveInputMsg] = useState(false);
+  const [saveOutputMsg, setSaveOutputMsg] = useState(false);
+  const [copyOutputMsg, setCopyOutputMsg] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [validationErrors, setValidationErrors] = useState([]);
   const [isRunning, setIsRunning] = useState(false);
@@ -805,7 +807,6 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     setInputs(stepData.inputData || {});
     setOutputText(stepData.outputText || "");
     setHelpOpen(false);
-    setCopyMsg("");
     setValidationErrors([]);
     setRunError("");
   }, [step.num]);
@@ -837,14 +838,14 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     const errors = validateInputs();
     if (errors.length > 0) return;
     await onSaveInput(step.num, inputs);
-    setCopyMsg("saved_input");
-    setTimeout(() => setCopyMsg(""), 2000);
+    setSaveInputMsg(true);
+    setTimeout(() => setSaveInputMsg(false), 2000);
   };
 
   const handleSaveOutput = async () => {
     await onSaveOutput(step.num, outputText);
-    setCopyMsg("saved_output");
-    setTimeout(() => setCopyMsg(""), 2000);
+    setSaveOutputMsg(true);
+    setTimeout(() => setSaveOutputMsg(false), 2000);
   };
 
   const handleRunDify = async () => {
@@ -868,7 +869,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         setRunError(data.error || "実行中にエラーが発生しました");
       } else {
         setOutputText(data.output || "");
-        await onSaveInput(step.num, inputs);
+        await onSaveInput(step.num, execInputs);
       }
     } catch (e) {
       setRunError("通信エラーが発生しました。時間をおいて再度お試しください。");
@@ -1081,7 +1082,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
 
         <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
           <BtnPrimary onClick={handleSaveInput}>入力データを保存</BtnPrimary>
-          {copyMsg === "saved_input" && (
+          {saveInputMsg && (
             <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 600 }}>✓ 保存しました</span>
           )}
           {step.type === "chat" && (
@@ -1097,11 +1098,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                 入力データをコピー
               </BtnSecondary>
               <span style={{ fontSize: 12, color: "#888" }}>※ コピーしてAIツールに貼り付けてください</span>
-              {copyMsg === "コピーしました" && (
-                <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 600 }}>
-                  → 次に②でAIツールを開いて貼り付けてください
-                </span>
-              )}
+
             </>
           )}
         </div>
@@ -1250,11 +1247,11 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         />
         <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
           <BtnPrimary onClick={handleSaveOutput}>出力データを保存</BtnPrimary>
-          {copyMsg === "saved_output" && (
+          {saveOutputMsg && (
             <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 600 }}>✓ 保存しました</span>
           )}
-          <BtnSecondary onClick={() => { handleCopy(outputText); setCopyMsg("copied_output"); setTimeout(() => setCopyMsg(""), 2000); }}>出力データをコピー</BtnSecondary>
-          {copyMsg === "copied_output" && (
+          <BtnSecondary onClick={() => { navigator.clipboard.writeText(outputText); setCopyOutputMsg(true); setTimeout(() => setCopyOutputMsg(false), 2000); }}>出力データをコピー</BtnSecondary>
+          {copyOutputMsg && (
             <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 600 }}>✓ コピーしました</span>
           )}
           <span style={{ fontSize: 12, color: "#888" }}>
