@@ -1403,6 +1403,100 @@ const GuidePage = ({ onNavigate }) => {
       <h1 style={{ fontSize: 22, fontWeight: 800, color: "#1a1a2e", margin: "0 0 6px" }}>使い方</h1>
       <p style={{ fontSize: 14, color: "#666", marginBottom: 28 }}>AI出版プロデューサーの進め方を、短く確認できます</p>
 
+      <div style={{ marginBottom: 28 }}>
+        <h2 style={{ fontSize: 15, fontWeight: 700, color: "#1a1a2e", marginBottom: 16 }}>AI出版プロデューサーの3つの特徴</h2>
+
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#2563eb", marginBottom: 8 }}>① コンセプトを固めてから書く — 手戻りが少ない理由</div>
+          <svg width="100%" viewBox="0 0 680 220" xmlns="http://www.w3.org/2000/svg">
+            <defs><marker id="ga1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#555" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></marker></defs>
+            <rect x="20" y="60" width="104" height="56" rx="8" fill="#E6F1FB" stroke="#185FA5" strokeWidth="0.5"/>
+            <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#0C447C" x="72" y="87" textAnchor="middle">STEP1-2</text>
+            <text fontFamily="sans-serif" fontSize="11" fill="#185FA5" x="72" y="105" textAnchor="middle">テーマ・市場</text>
+            <line x1="124" y1="88" x2="148" y2="88" stroke="#555" strokeWidth="1.5" markerEnd="url(#ga1)"/>
+            <rect x="152" y="60" width="104" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" strokeWidth="0.5"/>
+            <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#085041" x="204" y="87" textAnchor="middle">STEP3-4</text>
+            <text fontFamily="sans-serif" fontSize="11" fill="#0F6E56" x="204" y="105" textAnchor="middle">読者・素材</text>
+            <line x1="256" y1="88" x2="280" y2="88" stroke="#555" strokeWidth="1.5" markerEnd="url(#ga1)"/>
+            <rect x="284" y="60" width="104" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" strokeWidth="0.5"/>
+            <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#3C3489" x="336" y="87" textAnchor="middle">STEP5-8</text>
+            <text fontFamily="sans-serif" fontSize="11" fill="#534AB7" x="336" y="105" textAnchor="middle">設計・構成</text>
+            <line x1="388" y1="88" x2="412" y2="88" stroke="#555" strokeWidth="1.5" markerEnd="url(#ga1)"/>
+            <rect x="416" y="60" width="104" height="56" rx="8" fill="#FAEEDA" stroke="#854F0B" strokeWidth="0.5"/>
+            <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#633806" x="468" y="87" textAnchor="middle">STEP9</text>
+            <text fontFamily="sans-serif" fontSize="11" fill="#854F0B" x="468" y="105" textAnchor="middle">本文執筆</text>
+            <line x1="520" y1="88" x2="544" y2="88" stroke="#555" strokeWidth="1.5" markerEnd="url(#ga1)"/>
+            <rect x="548" y="60" width="112" height="56" rx="8" fill="#EAF3DE" stroke="#3B6D11" strokeWidth="0.5"/>
+            <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#27500A" x="604" y="87" textAnchor="middle">STEP10</text>
+            <text fontFamily="sans-serif" fontSize="11" fill="#3B6D11" x="604" y="105" textAnchor="middle">Amazon出版</text>
+            <rect x="20" y="140" width="632" height="1" fill="#ccc"/>
+            <text fontFamily="sans-serif" fontSize="11" fill="#666" x="72" y="162" textAnchor="middle">コンセプト確定</text>
+            <text fontFamily="sans-serif" fontSize="11" fill="#666" x="204" y="162" textAnchor="middle">差別化の核を発見</text>
+            <text fontFamily="sans-serif" fontSize="11" fill="#666" x="336" y="162" textAnchor="middle">設計図が揃う</text>
+            <text fontFamily="sans-serif" fontSize="11" fill="#666" x="468" y="162" textAnchor="middle">書くだけの状態</text>
+            <text fontFamily="sans-serif" fontSize="11" fill="#666" x="604" y="162" textAnchor="middle">完成</text>
+            <rect x="284" y="182" width="240" height="22" rx="4" fill="#f0f0f0"/>
+            <text fontFamily="sans-serif" fontSize="11" fill="#444" x="404" y="197" textAnchor="middle">ここまでが「設計」— 本文前に固める</text>
+          </svg>
+          <div style={{ fontSize: 12, color: "#888", marginTop: 6 }}>設計フェーズ（STEP1〜8）を先に固めることで、本文執筆に入ってから大幅な方向転換が起きにくくなります。</div>
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#2563eb", marginBottom: 8 }}>② 市場勝率診断でテーマを外しにくい</div>
+          <svg width="100%" viewBox="0 0 680 200" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <marker id="ga2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#555" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></marker>
+              <marker id="ga2g" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#22863a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></marker>
+              <marker id="ga2r" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#E24B4A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></marker>
+            </defs>
+            <rect x="20" y="70" width="130" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" strokeWidth="0.5"/>
+            <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#444441" x="85" y="92" textAnchor="middle">テーマ候補</text>
+            <text fontFamily="sans-serif" fontSize="11" fill="#5F5E5A" x="85" y="110" textAnchor="middle">気になる2語</text>
+            <line x1="150" y1="98" x2="178" y2="98" stroke="#555" strokeWidth="1.5" markerEnd="url(#ga2)"/>
+            <rect x="182" y="50" width="160" height="96" rx="8" fill="#E6F1FB" stroke="#185FA5" strokeWidth="0.5"/>
+            <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#0C447C" x="262" y="78" textAnchor="middle">市場勝率診断</text>
+            <text fontFamily="sans-serif" fontSize="11" fill="#185FA5" x="262" y="96" textAnchor="middle">Amazonデータで判定</text>
+            <text fontFamily="sans-serif" fontSize="11" fill="#185FA5" x="262" y="114" textAnchor="middle">競合・レビュー分析</text>
+            <text fontFamily="sans-serif" fontSize="11" fill="#185FA5" x="262" y="132" textAnchor="middle">狙い目の切り口発見</text>
+            <line x1="342" y1="78" x2="378" y2="58" stroke="#22863a" strokeWidth="1.5" markerEnd="url(#ga2g)"/>
+            <line x1="342" y1="118" x2="378" y2="148" stroke="#E24B4A" strokeWidth="1.5" markerEnd="url(#ga2r)"/>
+            <rect x="382" y="32" width="140" height="52" rx="8" fill="#EAF3DE" stroke="#3B6D11" strokeWidth="0.5"/>
+            <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#27500A" x="452" y="52" textAnchor="middle">勝率あり</text>
+            <text fontFamily="sans-serif" fontSize="11" fill="#3B6D11" x="452" y="70" textAnchor="middle">次のステップへ進む</text>
+            <rect x="382" y="122" width="140" height="52" rx="8" fill="#FCEBEB" stroke="#A32D2D" strokeWidth="0.5"/>
+            <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#791F1F" x="452" y="142" textAnchor="middle">勝率が低い</text>
+            <text fontFamily="sans-serif" fontSize="11" fill="#A32D2D" x="452" y="160" textAnchor="middle">テーマを再検討</text>
+            <path d="M452 174 Q452 188 340 188 Q220 188 85 188 Q85 180 85 126" fill="none" stroke="#aaa" strokeWidth="1" strokeDasharray="4 3" markerEnd="url(#ga2)"/>
+            <text fontFamily="sans-serif" fontSize="11" fill="#888" x="300" y="184" textAnchor="middle">テーマを変えてやり直せる</text>
+          </svg>
+          <div style={{ fontSize: 12, color: "#888", marginTop: 6 }}>Amazonの実データで市場を診断します。勝率が低ければテーマを変えてやり直せるため、「書き終えてから気づく」失敗を防げます。</div>
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#2563eb", marginBottom: 8 }}>③ AIは素材を出す — 判断するのは人間</div>
+          <svg width="100%" viewBox="0 0 680 180" xmlns="http://www.w3.org/2000/svg">
+            <defs><marker id="ga3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#555" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></marker></defs>
+            <rect x="20" y="60" width="160" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" strokeWidth="0.5"/>
+            <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#3C3489" x="100" y="82" textAnchor="middle">AIが素材を出す</text>
+            <text fontFamily="sans-serif" fontSize="11" fill="#534AB7" x="100" y="100" textAnchor="middle">叩き台・候補・草案</text>
+            <line x1="180" y1="88" x2="208" y2="88" stroke="#555" strokeWidth="1.5" markerEnd="url(#ga3)"/>
+            <rect x="212" y="44" width="176" height="88" rx="8" fill="#FAEEDA" stroke="#854F0B" strokeWidth="0.5"/>
+            <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#633806" x="300" y="72" textAnchor="middle">人間が判断する</text>
+            <text fontFamily="sans-serif" fontSize="11" fill="#854F0B" x="300" y="90" textAnchor="middle">これでいい？違う？</text>
+            <text fontFamily="sans-serif" fontSize="11" fill="#854F0B" x="300" y="108" textAnchor="middle">どう修正する？</text>
+            <line x1="388" y1="88" x2="416" y2="88" stroke="#555" strokeWidth="1.5" markerEnd="url(#ga3)"/>
+            <rect x="420" y="60" width="160" height="56" rx="8" fill="#EAF3DE" stroke="#3B6D11" strokeWidth="0.5"/>
+            <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#27500A" x="500" y="82" textAnchor="middle">修正・確定する</text>
+            <text fontFamily="sans-serif" fontSize="11" fill="#3B6D11" x="500" y="100" textAnchor="middle">自分でもAIチャットでも</text>
+            <rect x="20" y="148" width="160" height="20" rx="4" fill="#f0f0f0"/>
+            <text fontFamily="sans-serif" fontSize="11" fill="#555" x="100" y="162" textAnchor="middle">10ツール全てが対象</text>
+            <rect x="420" y="148" width="160" height="20" rx="4" fill="#f0f0f0"/>
+            <text fontFamily="sans-serif" fontSize="11" fill="#555" x="500" y="162" textAnchor="middle">Claude・ChatGPT等を活用</text>
+          </svg>
+          <div style={{ fontSize: 12, color: "#888", marginTop: 6 }}>各ツールの出力は叩き台です。そのまま使うことも、自分で修正することも、AIチャットで整えることもできます。</div>
+        </div>
+      </div>
+
       <Section title="全体の流れ">
         <ul style={{ margin: 0, paddingLeft: 18 }}>
           <li>STEP1からSTEP10まで順番に進めます</li>
