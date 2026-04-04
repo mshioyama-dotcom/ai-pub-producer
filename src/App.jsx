@@ -1198,10 +1198,19 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           <h2 style={{ fontSize: 16, fontWeight: 700, color: "#1a1a2e", margin: 0 }}>出力データ</h2>
         </div>
         <div style={{ fontSize: 12.5, color: "#555", marginBottom: 10, lineHeight: 1.7 }}>
-          AIの実行結果が自動で表示されます。内容を確認してから保存してください。
-          {nextStep && `この出力は次のステップ（STEP${nextStep.num}）の入力になります。`}
+          {step.type === "chat" ? (
+            <>
+              AIツールの会話結果をコピーして、下の欄に貼り付けてください。
+              {nextStep && ` この出力は次のステップ（STEP${nextStep.num}）の入力になります。`}
+            </>
+          ) : (
+            <>
+              AIの実行結果が自動で表示されます。内容を確認してから保存してください。
+              {nextStep && ` この出力は次のステップ（STEP${nextStep.num}）の入力になります。`}
+            </>
+          )}
           <br />
-          出力はそのまま使っても、自分で修正したり、AIチャットで整えてから貼り付けてもOKです。
+          出力はそのまま使っても、自分で修正したり、AIチャットで整えてから使うこともできます。
         </div>
         <textarea
           value={outputText}
