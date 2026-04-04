@@ -279,18 +279,20 @@ const Badge = ({ status }) => (
   </span>
 );
 
-const SourceLabel = ({ source }) =>
+const SourceLabel = ({ source, onAutoFill }) =>
   source ? (
-    <span
-      style={{
-        fontSize: 12,
-        color: "#3b82f6",
-        background: "rgba(59,130,246,0.07)",
-        padding: "2px 7px",
-        borderRadius: 4
-      }}
-    >
-      ← {source}の出力を貼り付け
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+      <span style={{ fontSize: 12, color: "#3b82f6", background: "rgba(59,130,246,0.07)", padding: "2px 7px", borderRadius: 4 }}>
+        ← {source}の出力
+      </span>
+      {onAutoFill && (
+        <button
+          onClick={onAutoFill}
+          style={{ fontSize: 11, color: "#fff", background: "#3b82f6", border: "none", borderRadius: 4, padding: "2px 8px", cursor: "pointer", fontWeight: 600 }}
+        >
+          自動転記
+        </button>
+      )}
     </span>
   ) : null;
 
@@ -792,7 +794,7 @@ const HtmlCleanerInline = ({ html, onCleaned }) => {
 // 各機能画面（共通テンプレート）
 // ============================================================
 
-const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutput, onUpdateProject, onInputChange }) => {
+const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutput, onUpdateProject, onInputChange, allSteps }) => {
   const [inputs, setInputs] = useState(stepData.inputData || {});
   const [outputText, setOutputText] = useState(stepData.outputText || "");
   const [saveInputMsg, setSaveInputMsg] = useState(false);
@@ -1023,7 +1025,14 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                   {field.label}
                 </label>
                 {field.required && <RequiredMark />}
-                <SourceLabel source={field.source} />
+                <SourceLabel
+                  source={field.source}
+                  onAutoFill={field.source ? () => {
+                    const srcNum = parseInt(field.source.replace("STEP", ""), 10);
+                    const srcOutput = allSteps?.[srcNum]?.outputText;
+                    if (srcOutput) handleInputChange(field.name, srcOutput);
+                  } : null}
+                />
                 {hasError && (
                   <span style={{ fontSize: 12, color: "#dc2626", fontWeight: 500 }}>
                     ← 入力してください
@@ -1745,6 +1754,7 @@ export default function App() {
           onSaveOutput={handleSaveOutput}
           onUpdateProject={setProject}
           onInputChange={handlePendingInputChange}
+          allSteps={allSteps}
         />
       );
     }
