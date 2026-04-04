@@ -546,12 +546,14 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   const [outputText, setOutputText] = useState(stepData.outputText || "");
   const [copyMsg, setCopyMsg] = useState("");
   const [helpOpen, setHelpOpen] = useState(false);
+  const [validationErrors, setValidationErrors] = useState([]);
 
   useEffect(() => {
     setInputs(stepData.inputData || {});
     setOutputText(stepData.outputText || "");
     setHelpOpen(false);
     setCopyMsg("");
+    setValidationErrors([]);
   }, [step.num, stepData]);
 
   const prevStep = step.num > 1 ? STEPS[step.num - 2] : null;
@@ -559,6 +561,18 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
 
   const handleInputChange = (name, value) => {
     setInputs(prev => ({ ...prev, [name]: value }));
+    setValidationErrors(prev => prev.filter(e => e !== name));
+  };
+
+  const validateInputs = () => {
+    const errors = [];
+    step.inputs.forEach(field => {
+      if (field.required && !(inputs[field.name] || "").trim()) {
+        errors.push(field.name);
+      }
+    });
+    setValidationErrors(errors);
+    return errors;
   };
 
   const handleSaveInput = async () => {
@@ -624,12 +638,15 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
             左メニューの「保存データ」から前のステップの出力をコピーし、各欄に貼り付けてください。
           </div>
         )}
-        {step.inputs.map(field => (
+        {step.inputs.map(field => {
+          const hasError = validationErrors.includes(field.name);
+          return (
           <div key={field.name} style={{ marginBottom: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
-              <label style={{ fontSize: 13.5, fontWeight: 600, color: "#333" }}>{field.label}</label>
+              <label style={{ fontSize: 13.5, fontWeight: 600, color: hasError ? "#dc2626" : "#333" }}>{field.label}</label>
               {field.required && <RequiredMark />}
               <SourceLabel source={field.source} />
+              {hasError && <span style={{ fontSize: 12, color: "#dc2626", fontWeight: 500 }}>← 入力してください</span>}
             </div>
             <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>{field.desc}</div>
             {field.type === "text" ? (
@@ -637,8 +654,10 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                 type="text" value={inputs[field.name] || ""} onChange={e => handleInputChange(field.name, e.target.value)}
                 placeholder={field.label}
                 style={{
-                  width: "100%", padding: "10px 12px", fontSize: 14, border: "1px solid rgba(0,0,0,0.12)",
-                  borderRadius: 6, outline: "none", boxSizing: "border-box", background: "#fff"
+                  width: "100%", padding: "10px 12px", fontSize: 14,
+                  border: hasError ? "2px solid #dc2626" : "1px solid rgba(0,0,0,0.12)",
+                  borderRadius: 6, outline: "none", boxSizing: "border-box",
+                  background: hasError ? "#fef2f2" : "#fff"
                 }}
               />
             ) : (
@@ -646,9 +665,10 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                 value={inputs[field.name] || ""} onChange={e => handleInputChange(field.name, e.target.value)}
                 placeholder={field.label} rows={field.name.includes("html") ? 6 : 4}
                 style={{
-                  width: "100%", padding: "10px 12px", fontSize: 14, border: "1px solid rgba(0,0,0,0.12)",
+                  width: "100%", padding: "10px 12px", fontSize: 14,
+                  border: hasError ? "2px solid #dc2626" : "1px solid rgba(0,0,0,0.12)",
                   borderRadius: 6, outline: "none", boxSizing: "border-box", resize: "vertical",
-                  fontFamily: "inherit", background: "#fff"
+                  fontFamily: "inherit", background: hasError ? "#fef2f2" : "#fff"
                 }}
               />
             )}
@@ -657,10 +677,18 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
               <HtmlCleanerInline html={inputs.amazon_html} onCleaned={(cleaned) => handleInputChange("amazon_html", cleaned)} />
             )}
           </div>
-        ))}
+          );
+        })}
+        {validationErrors.length > 0 && (
+          <div style={{ padding: "10px 14px", background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 6, marginBottom: 10, fontSize: 13, color: "#dc2626", fontWeight: 500 }}>
+            必須項目が未入力です。入力してから「入力データをコピー」を押してください。
+          </div>
+        )}
         <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
           <BtnPrimary onClick={handleSaveInput}>入力データを保存</BtnPrimary>
           <BtnSecondary onClick={() => {
+            const errors = validateInputs();
+            if (errors.length > 0) return;
             const text = step.inputs.map(f => `【${f.label}】\n${inputs[f.name] || ""}`).join("\n\n");
             handleCopy(text);
           }}>入力データをコピー</BtnSecondary>
