@@ -793,23 +793,6 @@ const HtmlCleanerInline = ({ html, onCleaned }) => {
           </div>
         </div>
       )}
-      {refModal && (
-        <div style={{ margin: "16px 0", border: "1.5px solid #2563eb", borderRadius: 10, background: "#f0f6ff", padding: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-            <span style={{ fontWeight: 700, fontSize: 14, color: "#1a1a2e" }}>STEP{refModal.stepNum}の出力（参照）</span>
-            <button onClick={() => setRefModal(null)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#888", lineHeight: 1 }}>✕</button>
-          </div>
-          <div style={{ maxHeight: 300, overflowY: "auto", background: "#fff", borderRadius: 8, padding: 12, fontSize: 13, color: "#333", lineHeight: 1.7, whiteSpace: "pre-wrap", marginBottom: 12, border: "1px solid #dbeafe" }}>
-            {refModal.text}
-          </div>
-          <button
-            onClick={() => { navigator.clipboard.writeText(refModal.text); setRefModal(null); }}
-            style={{ padding: "8px 20px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: "pointer" }}
-          >
-            コピーして閉じる
-          </button>
-        </div>
-      )}
     </div>
   );
 };
@@ -1440,6 +1423,23 @@ const SavedPage = ({ project, stepStatuses, allSteps, onNavigate }) => {
         <BtnPrimary onClick={() => onNavigate(`step_${project.currentStep}`)}>この企画を再開する</BtnPrimary>
         <BtnSecondary onClick={() => onNavigate("home")}>ホームへ戻る</BtnSecondary>
       </div>
+      {refModal && (
+        <div style={{ margin: "16px 0", border: "1.5px solid #2563eb", borderRadius: 10, background: "#f0f6ff", padding: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <span style={{ fontWeight: 700, fontSize: 14, color: "#1a1a2e" }}>STEP{refModal.stepNum}の出力（参照）</span>
+            <button onClick={() => setRefModal(null)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#888", lineHeight: 1 }}>✕</button>
+          </div>
+          <div style={{ maxHeight: 300, overflowY: "auto", background: "#fff", borderRadius: 8, padding: 12, fontSize: 13, color: "#333", lineHeight: 1.7, whiteSpace: "pre-wrap", marginBottom: 12, border: "1px solid #dbeafe" }}>
+            {refModal.text}
+          </div>
+          <button
+            onClick={() => { navigator.clipboard.writeText(refModal.text); setRefModal(null); }}
+            style={{ padding: "8px 20px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+          >
+            コピーして閉じる
+          </button>
+        </div>
+      )}
     </div>
   );
 };
