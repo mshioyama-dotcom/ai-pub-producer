@@ -923,9 +923,9 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
               <span style={{ fontWeight: 700, color: "#2563eb" }}>①</span>{" "}
               下の「入力データ」に情報を入力して保存する<br />
               <span style={{ fontWeight: 700, color: "#2563eb" }}>②</span>{" "}
-              「Difyを開く」でDifyにアクセスして対話する<br />
+              「AIツールを開く」ボタンでツールにアクセスして対話する<br />
               <span style={{ fontWeight: 700, color: "#2563eb" }}>③</span>{" "}
-              Difyの会話結果をコピー →「出力データ」に貼り付けて保存する
+              会話結果をコピー →「出力データ」に貼り付けて保存する
             </>
           ) : (
             <>
@@ -933,9 +933,9 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
               下の「入力データ」に情報を入力する
               {step.inputs.some((f) => f.source) && "（前ステップの出力を貼り付け）"}<br />
               <span style={{ fontWeight: 700, color: "#2563eb" }}>②</span>{" "}
-              「実行する」ボタンを押す → 結果が自動で表示される<br />
+              「実行する」ボタンを押す → AIが処理して結果が自動で表示される<br />
               <span style={{ fontWeight: 700, color: "#2563eb" }}>③</span>{" "}
-              出力データを確認して保存する
+              出力内容を確認して保存する
             </>
           )}
         </div>
@@ -1067,21 +1067,25 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
 
         <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
           <BtnPrimary onClick={handleSaveInput}>入力データを保存</BtnPrimary>
-          <BtnSecondary
-            onClick={() => {
-              const errors = validateInputs();
-              if (errors.length > 0) return;
-              const text = step.inputs.map((f) => `【${f.label}】\n${inputs[f.name] || ""}`).join("\n\n");
-              handleCopy(text);
-            }}
-          >
-            入力データをコピー
-          </BtnSecondary>
-          <span style={{ fontSize: 12, color: "#888" }}>※ コピーした内容をDifyに貼り付けます</span>
-          {copyMsg === "コピーしました" && (
-            <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 600 }}>
-              → 次に②でDifyを開いて貼り付けてください
-            </span>
+          {step.type === "chat" && (
+            <>
+              <BtnSecondary
+                onClick={() => {
+                  const errors = validateInputs();
+                  if (errors.length > 0) return;
+                  const text = step.inputs.map((f) => `【${f.label}】\n${inputs[f.name] || ""}`).join("\n\n");
+                  handleCopy(text);
+                }}
+              >
+                入力データをコピー
+              </BtnSecondary>
+              <span style={{ fontSize: 12, color: "#888" }}>※ コピーしてAIツールに貼り付けてください</span>
+              {copyMsg === "コピーしました" && (
+                <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 600 }}>
+                  → 次に②でAIツールを開いて貼り付けてください
+                </span>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -1110,7 +1114,8 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           {step.type === "chat" ? (
             <div>
               <div style={{ fontSize: 13, color: "#555", lineHeight: 1.8, marginBottom: 12 }}>
-                このステップは対話型です。下のボタンからDifyを開いて会話してください。
+                このステップは対話型です。下のボタンからAIツールを開いて会話してください。
+                入力データ欄の内容をコピーしてからツールに貼り付けてください。
               </div>
               <a
                 href={step.url}
@@ -1131,7 +1136,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                   boxShadow: "0 2px 8px rgba(37,99,235,0.3)"
                 }}
               >
-                Difyを開く ↗
+                AIツールを開く ↗
               </a>
             </div>
           ) : (
@@ -1193,7 +1198,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           <h2 style={{ fontSize: 16, fontWeight: 700, color: "#1a1a2e", margin: 0 }}>出力データ</h2>
         </div>
         <div style={{ fontSize: 12.5, color: "#555", marginBottom: 10, lineHeight: 1.7 }}>
-          Difyの実行結果をコピーして、下の欄に貼り付けてください。
+          AIの実行結果が自動で表示されます。内容を確認してから保存してください。
           {nextStep && `この出力は次のステップ（STEP${nextStep.num}）の入力になります。`}
           <br />
           出力はそのまま使っても、自分で修正したり、AIチャットで整えてから貼り付けてもOKです。
