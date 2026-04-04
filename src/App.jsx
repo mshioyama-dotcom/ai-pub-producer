@@ -798,6 +798,8 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   const [copyMsg, setCopyMsg] = useState("");
   const [helpOpen, setHelpOpen] = useState(false);
   const [validationErrors, setValidationErrors] = useState([]);
+  const [isRunning, setIsRunning] = useState(false);
+  const [runError, setRunError] = useState("");
 
   useEffect(() => {
     setInputs(stepData.inputData || {});
@@ -834,6 +836,31 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
 
   const handleSaveOutput = async () => {
     await onSaveOutput(step.num, outputText);
+  };
+
+  const handleRunDify = async () => {
+    const errors = validateInputs();
+    if (errors.length > 0) return;
+    setIsRunning(true);
+    setRunError("");
+    try {
+      const response = await fetch("/api/dify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stepNum: step.num, inputs }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setRunError(data.error || "実行中にエラーが発生しました");
+      } else {
+        setOutputText(data.output || "");
+        await onSaveInput(step.num, inputs);
+      }
+    } catch (e) {
+      setRunError("通信エラーが発生しました。時間をおいて再度お試しください。");
+    } finally {
+      setIsRunning(false);
+    }
   };
 
   const handleCopy = (text) => {
@@ -891,19 +918,28 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           このステップの進め方
         </div>
         <div style={{ fontSize: 13, color: "#555", lineHeight: 2 }}>
-          <span style={{ fontWeight: 700, color: "#2563eb" }}>①</span>{" "}
-          下の「入力データ」に情報を入力して保存する
-          {step.inputs.some((f) => f.source) && "（前ステップの出力を貼り付け）"}
-          <br />
-          <span style={{ fontWeight: 700, color: "#2563eb" }}>②</span>{" "}
-          「入力データをコピー」でコピー →「Difyを開く」でDifyに貼り付けて実行
-          <br />
-          <span style={{ fontWeight: 700, color: "#2563eb" }}>③</span>{" "}
-          Difyの実行結果をコピー →「出力データ」に貼り付けて保存する
+          {step.type === "chat" ? (
+            <>
+              <span style={{ fontWeight: 700, color: "#2563eb" }}>①</span>{" "}
+              下の「入力データ」に情報を入力して保存する<br />
+              <span style={{ fontWeight: 700, color: "#2563eb" }}>②</span>{" "}
+              「Difyを開く」でDifyにアクセスして対話する<br />
+              <span style={{ fontWeight: 700, color: "#2563eb" }}>③</span>{" "}
+              Difyの会話結果をコピー →「出力データ」に貼り付けて保存する
+            </>
+          ) : (
+            <>
+              <span style={{ fontWeight: 700, color: "#2563eb" }}>①</span>{" "}
+              下の「入力データ」に情報を入力する
+              {step.inputs.some((f) => f.source) && "（前ステップの出力を貼り付け）"}<br />
+              <span style={{ fontWeight: 700, color: "#2563eb" }}>②</span>{" "}
+              「実行する」ボタンを押す → 結果が自動で表示される<br />
+              <span style={{ fontWeight: 700, color: "#2563eb" }}>③</span>{" "}
+              出力データを確認して保存する
+            </>
+          )}
         </div>
         <div style={{ fontSize: 12, color: "#888", marginTop: 8, lineHeight: 1.6 }}>
-          このサイトはDifyの入出力を保存するメモ帳です。保存した出力は、次のステップの入力として使います。
-          <br />
           出力はそのまま使うことも、自分で修正したり、AIチャット（Claude・ChatGPT等）で整えてから使うこともできます。
         </div>
       </Card>
@@ -1068,38 +1104,71 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           >
             ②
           </span>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: "#1a1a2e", margin: 0 }}>Difyで実行する</h2>
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: "#1a1a2e", margin: 0 }}>AIで実行する</h2>
         </div>
         <Card style={{ background: "rgba(37,99,235,0.03)", border: "1px solid rgba(37,99,235,0.12)" }}>
-          <div style={{ fontSize: 13, color: "#555", lineHeight: 1.8, marginBottom: 12 }}>
-            上の「入力データをコピー」を押してから、下のボタンでDifyを開いてください。
-            <br />
-            Difyの入力欄に貼り付けて実行し、結果が出たらコピーしてください。
-          </div>
-          <a
-            href={step.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "12px 24px",
-              background: "#2563eb",
-              color: "#fff",
-              borderRadius: 7,
-              fontWeight: 700,
-              fontSize: 15,
-              textDecoration: "none",
-              transition: "background 0.15s",
-              boxShadow: "0 2px 8px rgba(37,99,235,0.3)"
-            }}
-          >
-            Difyを開く ↗
-          </a>
-          <span style={{ fontSize: 12, color: "#888", marginLeft: 12 }}>
-            {step.type === "chat" ? "チャット（対話型）" : "ワークフロー"}
-          </span>
+          {step.type === "chat" ? (
+            <div>
+              <div style={{ fontSize: 13, color: "#555", lineHeight: 1.8, marginBottom: 12 }}>
+                このステップは対話型です。下のボタンからDifyを開いて会話してください。
+              </div>
+              <a
+                href={step.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "12px 24px",
+                  background: "#2563eb",
+                  color: "#fff",
+                  borderRadius: 7,
+                  fontWeight: 700,
+                  fontSize: 15,
+                  textDecoration: "none",
+                  transition: "background 0.15s",
+                  boxShadow: "0 2px 8px rgba(37,99,235,0.3)"
+                }}
+              >
+                Difyを開く ↗
+              </a>
+            </div>
+          ) : (
+            <div>
+              <div style={{ fontSize: 13, color: "#555", lineHeight: 1.8, marginBottom: 12 }}>
+                入力データを確認して「実行」を押してください。結果が下の出力欄に自動で表示されます。
+              </div>
+              {runError && (
+                <div style={{ padding: "10px 14px", background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 6, marginBottom: 12, fontSize: 13, color: "#dc2626" }}>
+                  {runError}
+                </div>
+              )}
+              <button
+                onClick={handleRunDify}
+                disabled={isRunning}
+                style={{
+                  padding: "12px 32px",
+                  background: isRunning ? "#93c5fd" : "#2563eb",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 7,
+                  fontWeight: 700,
+                  fontSize: 15,
+                  cursor: isRunning ? "default" : "pointer",
+                  boxShadow: "0 2px 8px rgba(37,99,235,0.3)",
+                  transition: "background 0.15s"
+                }}
+              >
+                {isRunning ? "実行中..." : "▶ 実行する"}
+              </button>
+              {isRunning && (
+                <span style={{ fontSize: 13, color: "#2563eb", marginLeft: 12 }}>
+                  AIが処理しています。少々お待ちください...
+                </span>
+              )}
+            </div>
+          )}
         </Card>
       </div>
 
