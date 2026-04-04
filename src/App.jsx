@@ -792,7 +792,7 @@ const HtmlCleanerInline = ({ html, onCleaned }) => {
 // 各機能画面（共通テンプレート）
 // ============================================================
 
-const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutput, onUpdateProject }) => {
+const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutput, onUpdateProject, onInputChange }) => {
   const [inputs, setInputs] = useState(stepData.inputData || {});
   const [outputText, setOutputText] = useState(stepData.outputText || "");
   const [copyMsg, setCopyMsg] = useState("");
@@ -814,7 +814,11 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   const nextStep = step.num < 10 ? STEPS[step.num] : null;
 
   const handleInputChange = (name, value) => {
-    setInputs((prev) => ({ ...prev, [name]: value }));
+    setInputs((prev) => {
+      const updated = { ...prev, [name]: value };
+      onInputChange?.(step.num, updated);
+      return updated;
+    });
     setValidationErrors((prev) => prev.filter((e) => e !== name));
   };
 
@@ -1610,7 +1614,31 @@ export default function App() {
     stepStatuses[i] = allSteps[i]?.status || "not_started";
   }
 
-  const navigate = useCallback((p) => {
+  const [pendingInputs, setPendingInputs] = useState({});
+
+  const handlePendingInputChange = useCallback((stepNum, inputs) => {
+    setPendingInputs((prev) => ({ ...prev, [stepNum]: inputs }));
+  }, []);
+
+  const navigate = useCallback(async (p) => {
+    setPendingInputs((pending) => {
+      Object.entries(pending).forEach(async ([stepNum, inputs]) => {
+        const num = parseInt(stepNum, 10);
+        setAllSteps((prev) => {
+          const existing = prev[num] || defaultStepData(num);
+          if (JSON.stringify(existing.inputData) === JSON.stringify(inputs)) return prev;
+          const updated = {
+            ...existing,
+            inputData: inputs,
+            status: existing.status === "completed" ? "completed" : "in_progress",
+            updatedAt: new Date().toISOString()
+          };
+          saveStepData(num, updated);
+          return { ...prev, [num]: updated };
+        });
+      });
+      return {};
+    });
     setPage(p);
     if (p.startsWith("step_")) {
       const num = parseInt(p.replace("step_", ""), 10);
@@ -1701,6 +1729,7 @@ export default function App() {
           onSaveInput={handleSaveInput}
           onSaveOutput={handleSaveOutput}
           onUpdateProject={setProject}
+          onInputChange={handlePendingInputChange}
         />
       );
     }
