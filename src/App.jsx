@@ -285,7 +285,7 @@ const SourceLabel = ({ source, autoFill, onAutoFill, onShowRef }) =>
       <span style={{ fontSize: 12, color: "#3b82f6", background: "rgba(59,130,246,0.07)", padding: "2px 7px", borderRadius: 4 }}>
         ← {source}の出力
       </span>
-      {autoFill ? (
+      {autoFill === true ? (
         <button
           onClick={onAutoFill}
           style={{ fontSize: 11, color: "#fff", background: "#2563eb", border: "none", borderRadius: 4, padding: "2px 8px", cursor: "pointer", fontWeight: 600 }}
