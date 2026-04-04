@@ -279,7 +279,7 @@ const Badge = ({ status }) => (
   </span>
 );
 
-const SourceLabel = ({ source, autoFill, onAutoFill, onShowRef }) =>
+const SourceLabel = ({ source, autoFill, onAutoFill, onRef }) =>
   source ? (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
       <span style={{ fontSize: 12, color: "#3b82f6", background: "rgba(59,130,246,0.07)", padding: "2px 7px", borderRadius: 4 }}>
@@ -294,7 +294,7 @@ const SourceLabel = ({ source, autoFill, onAutoFill, onShowRef }) =>
         </button>
       ) : (
         <button
-          onClick={onShowRef}
+          onClick={onRef}
           style={{ fontSize: 11, color: "#2563eb", background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.2)", borderRadius: 4, padding: "2px 8px", cursor: "pointer", fontWeight: 600 }}
         >
           参照
@@ -801,7 +801,7 @@ const HtmlCleanerInline = ({ html, onCleaned }) => {
 // 各機能画面（共通テンプレート）
 // ============================================================
 
-const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutput, onUpdateProject, onInputChange, allSteps }) => {
+const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutput, onUpdateProject, onInputChange, allSteps, onRefPanel }) => {
   const [inputs, setInputs] = useState(stepData.inputData || {});
   const [outputText, setOutputText] = useState(stepData.outputText || "");
   const [saveInputMsg, setSaveInputMsg] = useState(false);
@@ -811,7 +811,6 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   const [validationErrors, setValidationErrors] = useState([]);
   const [isRunning, setIsRunning] = useState(false);
   const [runError, setRunError] = useState("");
-  const [refModal, setRefModal] = useState(null); // { stepNum, text }
 
   useEffect(() => {
     setInputs(stepData.inputData || {});
@@ -1041,10 +1040,10 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                     const srcOutput = allSteps?.[srcNum]?.outputText;
                     if (srcOutput) handleInputChange(field.name, srcOutput);
                   }}
-                  onShowRef={() => {
+                  onRef={() => {
                     const srcNum = parseInt(field.source.replace("STEP", ""), 10);
                     const srcOutput = allSteps?.[srcNum]?.outputText || "（保存済みデータがありません）";
-                    setRefModal({ stepNum: srcNum, text: srcOutput });
+                    onRefPanel({ stepNum: srcNum, text: srcOutput });
                   }}
                 />
                 {hasError && (
@@ -1423,23 +1422,6 @@ const SavedPage = ({ project, stepStatuses, allSteps, onNavigate }) => {
         <BtnPrimary onClick={() => onNavigate(`step_${project.currentStep}`)}>この企画を再開する</BtnPrimary>
         <BtnSecondary onClick={() => onNavigate("home")}>ホームへ戻る</BtnSecondary>
       </div>
-      {refModal && (
-        <div style={{ margin: "16px 0", border: "1.5px solid #2563eb", borderRadius: 10, background: "#f0f6ff", padding: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-            <span style={{ fontWeight: 700, fontSize: 14, color: "#1a1a2e" }}>STEP{refModal.stepNum}の出力（参照）</span>
-            <button onClick={() => setRefModal(null)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#888", lineHeight: 1 }}>✕</button>
-          </div>
-          <div style={{ maxHeight: 300, overflowY: "auto", background: "#fff", borderRadius: 8, padding: 12, fontSize: 13, color: "#333", lineHeight: 1.7, whiteSpace: "pre-wrap", marginBottom: 12, border: "1px solid #dbeafe" }}>
-            {refModal.text}
-          </div>
-          <button
-            onClick={() => { navigator.clipboard.writeText(refModal.text); setRefModal(null); }}
-            style={{ padding: "8px 20px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: "pointer" }}
-          >
-            コピーして閉じる
-          </button>
-        </div>
-      )}
     </div>
   );
 };
@@ -1670,6 +1652,7 @@ export default function App() {
   }
 
   const [pendingInputs, setPendingInputs] = useState({});
+  const [refPanel, setRefPanel] = useState(null); // { stepNum, text }
 
   const handlePendingInputChange = useCallback((stepNum, inputs) => {
     setPendingInputs((prev) => ({ ...prev, [stepNum]: inputs }));
@@ -1786,6 +1769,7 @@ export default function App() {
           onUpdateProject={setProject}
           onInputChange={handlePendingInputChange}
           allSteps={allSteps}
+          onRefPanel={setRefPanel}
         />
       );
     }
@@ -1803,9 +1787,50 @@ export default function App() {
     >
       <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       <SideMenu currentPage={page} onNavigate={navigate} stepStatuses={stepStatuses} />
-      <div style={{ marginLeft: 380, flex: 1, padding: "32px 40px", maxWidth: 860, boxSizing: "border-box" }}>
+      <div style={{ marginLeft: 380, flex: 1, padding: "32px 40px", maxWidth: refPanel ? 600 : 860, boxSizing: "border-box", transition: "max-width 0.2s" }}>
         {renderPage()}
       </div>
+      {refPanel && (
+        <div style={{
+          position: "sticky",
+          top: 0,
+          width: 340,
+          minWidth: 340,
+          height: "100vh",
+          background: "#fff",
+          borderLeft: "1.5px solid #dbeafe",
+          display: "flex",
+          flexDirection: "column",
+          padding: 20,
+          boxSizing: "border-box",
+          flexShrink: 0,
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <span style={{ fontWeight: 700, fontSize: 14, color: "#1a1a2e" }}>STEP{refPanel.stepNum}の出力（参照）</span>
+            <button
+              onClick={() => setRefPanel(null)}
+              style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#888", lineHeight: 1, padding: "0 4px" }}
+            >
+              ✕
+            </button>
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", background: "#f8f9fb", borderRadius: 8, padding: 12, fontSize: 12.5, color: "#333", lineHeight: 1.7, whiteSpace: "pre-wrap", border: "1px solid #e5e7eb", marginBottom: 12 }}>
+            {refPanel.text}
+          </div>
+          <button
+            onClick={() => { navigator.clipboard.writeText(refPanel.text); }}
+            style={{ padding: "10px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: "pointer", marginBottom: 8 }}
+          >
+            コピー
+          </button>
+          <button
+            onClick={() => setRefPanel(null)}
+            style={{ padding: "8px", background: "transparent", color: "#888", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, cursor: "pointer" }}
+          >
+            閉じる
+          </button>
+        </div>
+      )}
     </div>
   );
 }
