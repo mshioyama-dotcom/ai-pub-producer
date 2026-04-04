@@ -1069,7 +1069,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                 />
               )}
 
-              {step.num === 2 && field.name === "amazon_html" && inputs.amazon_html && (
+              {false && step.num === 2 && field.name === "amazon_html" && inputs.amazon_html && (
                 <HtmlCleanerInline
                   html={inputs.amazon_html}
                   onCleaned={(cleaned) => handleInputChange("amazon_html", cleaned)}
