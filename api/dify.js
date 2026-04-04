@@ -1,9 +1,6 @@
 // Vercel Serverless Function - Dify API Proxy
-// APIキーはVercelの環境変数に設定する
-
 const DIFY_API_BASE = "https://api.dify.ai/v1";
 
-// 各STEPのAPIキー（環境変数から取得）
 const API_KEYS = {
   2:  process.env.DIFY_API_KEY_STEP02,
   3:  process.env.DIFY_API_KEY_STEP03,
@@ -16,40 +13,65 @@ const API_KEYS = {
   10: process.env.DIFY_API_KEY_STEP10,
 };
 
-// ポータルのフィールド名をDifyの変数名にマッピング
 function mapInputs(stepNum, inputs) {
-  const mapped = { ...inputs };
-  if (stepNum === 2 && mapped.amazon_html !== undefined) {
-    mapped.HTML = mapped.amazon_html;
-    delete mapped.amazon_html;
+  const m = { ...inputs };
+
+  if (stepNum === 2) {
+    if (m.amazon_html !== undefined) { m.HTML = m.amazon_html; delete m.amazon_html; }
   }
-  return mapped;
+
+  if (stepNum === 5) {
+    if (m.keyword1 !== undefined)       { m.kw1 = m.keyword1; delete m.keyword1; }
+    if (m.keyword2 !== undefined)       { m.kw2 = m.keyword2; delete m.keyword2; }
+    if (m.blueprint_text !== undefined) { m.theme_output = m.blueprint_text; delete m.blueprint_text; }
+    if (m.interview_text !== undefined) { m.diff_elements = m.interview_text; delete m.interview_text; }
+  }
+
+  if (stepNum === 6) {
+    if (m.blueprint_text !== undefined) { m.blueprint = m.blueprint_text; delete m.blueprint_text; }
+    if (m.interview_text !== undefined) { m.interview_notes = m.interview_text; delete m.interview_text; }
+  }
+
+  if (stepNum === 7) {
+    if (m.toc_text !== undefined)       { m.refined_toc = m.toc_text; delete m.toc_text; }
+    if (m.blueprint_text !== undefined) { m.blueprint = m.blueprint_text; delete m.blueprint_text; }
+    if (m.interview_text !== undefined) { m.nterview_notes = m.interview_text; delete m.interview_text; }
+  }
+
+  if (stepNum === 8) {
+    if (m.chapter_outline_text !== undefined) { m.plot_instruction = m.chapter_outline_text; delete m.chapter_outline_text; }
+    if (m.added_episode_text !== undefined)   { m.added_episodes = m.added_episode_text; delete m.added_episode_text; }
+  }
+
+  if (stepNum === 9) {
+    if (m.past_writing_text !== undefined) { m.past_writing_data = m.past_writing_text; delete m.past_writing_text; }
+  }
+
+  if (stepNum === 10) {
+    if (m.title_text !== undefined)          { m.title = m.title_text; delete m.title_text; }
+    if (m.subtitle_text !== undefined)       { m.subtitle = m.subtitle_text; delete m.subtitle_text; }
+    if (m.blueprint_text !== undefined)      { m.reader_value_design = m.blueprint_text; delete m.blueprint_text; }
+    if (m.interview_text !== undefined)      { m.author_episode = m.interview_text; delete m.interview_text; }
+    if (m.outline_text !== undefined)        { m.toc_text = m.outline_text; delete m.outline_text; }
+    if (m.author_profile_text !== undefined) { m.author_profile = m.author_profile_text; delete m.author_profile_text; }
+  }
+
+  return m;
 }
 
 export default async function handler(req, res) {
-  // CORS設定
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
-
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   const { stepNum, inputs } = req.body;
-
-  if (!stepNum || !inputs) {
-    return res.status(400).json({ error: "stepNum and inputs are required" });
-  }
+  if (!stepNum || !inputs) return res.status(400).json({ error: "stepNum and inputs are required" });
 
   const apiKey = API_KEYS[stepNum];
-  if (!apiKey) {
-    return res.status(400).json({ error: `No API key configured for STEP${stepNum}` });
-  }
+  if (!apiKey) return res.status(400).json({ error: `No API key configured for STEP${stepNum}` });
 
   const difyInputs = mapInputs(stepNum, inputs);
 
@@ -73,8 +95,6 @@ export default async function handler(req, res) {
     }
 
     const data = await response.json();
-
-    // Difyのワークフロー実行結果から出力テキストを抽出
     const output = data?.data?.outputs?.text
       || data?.data?.outputs?.output
       || data?.data?.outputs?.result
