@@ -1626,19 +1626,7 @@ const GuidePage = ({ onNavigate }) => {
         </ul>
       </Section>
 
-      <Section title="全ツールURL一覧">
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          {STEPS.map((s) => (
-            <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-              <span style={{ fontWeight: 600, color: "#2563eb", minWidth: 48 }}>STEP{s.num}</span>
-              <span style={{ color: "#333", flex: 1 }}>{s.title}</span>
-              <a href={s.url} target="_blank" rel="noopener noreferrer" style={{ color: "#2563eb", fontSize: 12 }}>
-                開く ↗
-              </a>
-            </div>
-          ))}
-        </div>
-      </Section>
+
 
       <BtnSecondary onClick={() => onNavigate("home")}>ホームへ戻る</BtnSecondary>
     </div>
