@@ -1038,12 +1038,22 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                   onAutoFill={() => {
                     const srcNum = parseInt(field.source.replace("STEP", ""), 10);
                     const srcOutput = allSteps?.[srcNum]?.outputText;
-                    if (srcOutput) handleInputChange(field.name, srcOutput);
+                    if (srcOutput) {
+                      handleInputChange(field.name, srcOutput);
+                    } else {
+                      alert(`STEP${srcNum}の出力データがまだ保存されていません。
+STEP${srcNum}で「出力データを保存」を押してから再度お試しください。`);
+                    }
                   }}
                   onRef={() => {
                     const srcNum = parseInt(field.source.replace("STEP", ""), 10);
-                    const srcOutput = allSteps?.[srcNum]?.outputText || "（保存済みデータがありません）";
-                    onRefPanel({ stepNum: srcNum, text: srcOutput });
+                    const srcOutput = allSteps?.[srcNum]?.outputText;
+                    if (srcOutput) {
+                      onRefPanel({ stepNum: srcNum, text: srcOutput });
+                    } else {
+                      alert(`STEP${srcNum}の出力データがまだ保存されていません。
+STEP${srcNum}で「出力データを保存」を押してから再度お試しください。`);
+                    }
                   }}
                 />
                 {hasError && (
@@ -1549,12 +1559,19 @@ const GuidePage = ({ onNavigate }) => {
 
       <Section title="操作方法（ワークフロー型：STEP2・3・5〜10）">
         <ul style={{ margin: 0, paddingLeft: 18 }}>
-          <li>① 入力データ欄に情報を入力して「入力データを保存」を押す</li>
+          <li>① 入力データ欄に情報を入力する。前のSTEPの出力を使う欄には「自動転記」または「参照」ボタンが表示される</li>
+          <li style={{ marginTop: 4 }}>
+            <span style={{ fontWeight: 700 }}>自動転記（青）</span>：押すと前のSTEPの出力が自動で入力欄に入る
+          </li>
+          <li style={{ marginTop: 4 }}>
+            <span style={{ fontWeight: 700 }}>参照（薄青）</span>：押すと画面右側に前のSTEPの出力が表示され、見ながら手入力できる
+          </li>
+          <li style={{ marginTop: 8 }}>入力が終わったら「入力データを保存」を押す</li>
           <li>② 「実行する」ボタンを押すとAIが自動で処理し、結果が出力欄に表示される</li>
-          <li>③ 内容を確認して「出力データを保存」を押す</li>
+          <li>③ 内容を確認・修正して「出力データを保存」を押す</li>
         </ul>
-        <div style={{ marginTop: 8, fontSize: 12.5, color: "#888" }}>
-          コピー＆ペーストは不要です。ボタンを押すだけで結果が表示されます。
+        <div style={{ marginTop: 8, fontSize: 12.5, color: "#e05a00", fontWeight: 600 }}>
+          ⚠️ 出力を修正した場合も必ず「出力データを保存」を押してから次のステップへ。保存しないと次のステップの「自動転記」「参照」に反映されません。
         </div>
       </Section>
 
@@ -1564,6 +1581,9 @@ const GuidePage = ({ onNavigate }) => {
           <li>② 「入力データをコピー」でコピーして「AIツールを開く」でツールにアクセスし、貼り付けて対話する</li>
           <li>③ 会話結果をコピーして出力データ欄に貼り付け「出力データを保存」を押す</li>
         </ul>
+        <div style={{ marginTop: 8, fontSize: 12.5, color: "#e05a00", fontWeight: 600 }}>
+          ⚠️ 修正した内容が次のステップの土台になります。必ず保存してから次へ進んでください。
+        </div>
       </Section>
 
       <Section title="出力の扱い方">
