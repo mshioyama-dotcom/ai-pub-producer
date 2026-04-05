@@ -959,8 +959,8 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           </div>
         )}
 
-        {/* STEP3専用：振り分けガイド */}
-        {step.num === 3 && (
+        {/* STEP3・STEP5専用：振り分けガイド */}
+        {(step.num === 3 || step.num === 5) && (
           <div style={{ fontSize: 12.5, color: "#555", marginBottom: 12, padding: "10px 14px", background: "rgba(124,58,237,0.04)", border: "1px solid rgba(124,58,237,0.15)", borderRadius: 6, lineHeight: 1.8 }}>
             「検索意図仮説」と「狙い目切り口」の欄にある
             <span style={{ fontWeight: 700, color: "#7c3aed" }}>「自動振り分け」</span>
@@ -968,7 +968,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           </div>
         )}
 
-        {step.num !== 3 && step.inputs.some((f) => f.source) && (
+        {step.num !== 3 && step.num !== 5 && step.inputs.some((f) => f.source) && (
           <div style={{ fontSize: 12.5, color: "#555", marginBottom: 12, padding: "8px 12px", background: "rgba(59,130,246,0.04)", border: "1px solid rgba(59,130,246,0.1)", borderRadius: 6, lineHeight: 1.7 }}>
             左メニューの「保存データ」から前のステップの出力をコピーし、各欄に貼り付けてください。
           </div>
@@ -979,7 +979,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
 
           // STEP3の intent_lock / market_report は自動振り分けボタンを使う
           const isStep3ParsedField =
-            step.num === 3 &&
+            (step.num === 3 || step.num === 5) &&
             (field.name === "keyword1" || field.name === "keyword2" || field.name === "intent_lock" || field.name === "market_report");
 
           const handleAutoFillParsed = isStep3ParsedField
