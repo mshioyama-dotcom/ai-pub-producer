@@ -266,13 +266,24 @@ function parseStep2Output(text) {
   const intentMatch = text.match(
     /###\s*🎯\s*検索者の意図[（(]仮説[）)]\s*\n([\s\S]*?)(?=\n---|\n##|$)/
   );
-  // 「狙い目の切り口」セクションを抽出
+
+  // 「狙い目の切り口」セクションを抽出して案ごとに分割
   const marketMatch = text.match(
     /【狙い目の切り口】\s*\n([\s\S]*?)(?=\n---|\n##|\n【|$)/
   );
+  let markets = [];
+  if (marketMatch) {
+    // 空行区切りで段落に分割し、空の要素を除去
+    const blocks = marketMatch[1]
+      .split(/\n{2,}/)
+      .map((b) => b.trim())
+      .filter(Boolean);
+    markets = blocks.length > 0 ? blocks : [marketMatch[1].trim()];
+  }
+
   return {
     intent: intentMatch ? intentMatch[1].trim() : "",
-    market: marketMatch ? marketMatch[1].trim() : ""
+    markets // 配列（0〜N件）
   };
 }
 
@@ -297,6 +308,85 @@ const Badge = ({ status }) => (
     {STATUS_LABELS[status]}
   </span>
 );
+
+// STEP3 狙い目切り口 選択UI
+const MarketReportSelector = ({ options, selected, onSelect, value, onChange }) => {
+  if (!options || options.length === 0) return null;
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ fontSize: 12, color: "#7c3aed", fontWeight: 600, marginBottom: 8 }}>
+        切り口を1つ選んでください（選んだ後に編集できます）
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+        {options.map((opt, i) => {
+          const isSelected = selected === i;
+          return (
+            <div
+              key={i}
+              onClick={() => onSelect(i, opt)}
+              style={{
+                padding: "12px 14px",
+                borderRadius: 8,
+                border: isSelected ? "2px solid #7c3aed" : "1px solid rgba(0,0,0,0.1)",
+                background: isSelected ? "rgba(124,58,237,0.05)" : "#fff",
+                cursor: "pointer",
+                fontSize: 13,
+                color: "#333",
+                lineHeight: 1.7,
+                transition: "all 0.12s"
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                <span style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 22,
+                  height: 22,
+                  borderRadius: "50%",
+                  background: isSelected ? "#7c3aed" : "rgba(0,0,0,0.06)",
+                  color: isSelected ? "#fff" : "#888",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  flexShrink: 0,
+                  marginTop: 2
+                }}>
+                  {i + 1}
+                </span>
+                <span style={{ whiteSpace: "pre-wrap" }}>{opt}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {selected !== null && (
+        <div>
+          <div style={{ fontSize: 12, color: "#555", marginBottom: 6 }}>
+            選んだ切り口（必要に応じて編集してください）
+          </div>
+          <textarea
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            rows={4}
+            style={{
+              width: "100%",
+              padding: "10px 12px",
+              fontSize: 14,
+              border: "1px solid rgba(124,58,237,0.4)",
+              borderRadius: 6,
+              outline: "none",
+              boxSizing: "border-box",
+              resize: "vertical",
+              fontFamily: "inherit",
+              background: "#fff",
+              lineHeight: 1.7
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+};
 
 const SourceLabel = ({ source, autoFill, onAutoFill, onRef, onAutoFillParsed }) =>
   source ? (
@@ -689,6 +779,9 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   const [validationErrors, setValidationErrors] = useState([]);
   const [isRunning, setIsRunning] = useState(false);
   const [runError, setRunError] = useState("");
+  // STEP3 狙い目切り口用
+  const [marketOptions, setMarketOptions] = useState([]);
+  const [selectedMarket, setSelectedMarket] = useState(null);
 
   useEffect(() => {
     setInputs(stepData.inputData || {});
@@ -696,6 +789,8 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     setHelpOpen(false);
     setValidationErrors([]);
     setRunError("");
+    setMarketOptions([]);
+    setSelectedMarket(null);
   }, [step.num]);
 
   const prevStep = step.num > 1 ? STEPS[step.num - 2] : null;
@@ -871,14 +966,76 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                   }
                 }
                 if (field.name === "market_report") {
-                  if (parsed.market) {
-                    handleInputChange("market_report", parsed.market);
+                  if (parsed.markets && parsed.markets.length > 0) {
+                    setMarketOptions(parsed.markets);
+                    setSelectedMarket(null);
+                    handleInputChange("market_report", "");
                   } else {
                     alert("「狙い目の切り口」セクションが見つかりませんでした。\nSTEP2の出力を確認してください。");
                   }
                 }
               }
             : undefined;
+
+          // market_reportフィールドはカード選択UIで描画
+          if (field.name === "market_report") {
+            return (
+              <div key={field.name} style={{ marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
+                  <label style={{ fontSize: 13.5, fontWeight: 600, color: "#333" }}>{field.label}</label>
+                  <SourceLabel
+                    source={field.source}
+                    autoFill={field.autoFill}
+                    onAutoFill={() => {}}
+                    onRef={() => {
+                      const srcOutput = allSteps?.[2]?.outputText;
+                      if (srcOutput) onRefPanel({ stepNum: 2, text: srcOutput });
+                      else alert("STEP2の出力データがまだ保存されていません。");
+                    }}
+                    onAutoFillParsed={handleAutoFillParsed}
+                  />
+                </div>
+                <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>{field.desc}</div>
+
+                {/* カード未表示のとき：通常のテキストエリア（手入力用） */}
+                {marketOptions.length === 0 && (
+                  <textarea
+                    value={inputs[field.name] || ""}
+                    onChange={(e) => handleInputChange(field.name, e.target.value)}
+                    placeholder="「自動振り分け」ボタンで候補を表示するか、直接入力してください"
+                    rows={4}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      fontSize: 14,
+                      border: "1px solid rgba(0,0,0,0.12)",
+                      borderRadius: 6,
+                      outline: "none",
+                      boxSizing: "border-box",
+                      resize: "vertical",
+                      fontFamily: "inherit",
+                      background: "#fff",
+                      lineHeight: 1.7
+                    }}
+                  />
+                )}
+
+                {/* カード選択UI */}
+                {marketOptions.length > 0 && (
+                  <MarketReportSelector
+                    options={marketOptions}
+                    selected={selectedMarket}
+                    onSelect={(i, opt) => {
+                      setSelectedMarket(i);
+                      handleInputChange("market_report", opt);
+                    }}
+                    value={inputs["market_report"] || ""}
+                    onChange={(v) => handleInputChange("market_report", v)}
+                  />
+                )}
+              </div>
+            );
+          }
 
           return (
             <div key={field.name} style={{ marginBottom: 16 }}>
