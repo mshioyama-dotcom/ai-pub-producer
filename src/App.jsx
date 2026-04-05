@@ -815,6 +815,9 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   // STEP3 狙い目切り口用
   const [marketOptions, setMarketOptions] = useState([]);
   const [selectedMarket, setSelectedMarket] = useState(null);
+  // STEP8 章選択用
+  const [chapterOptions, setChapterOptions] = useState([]);
+  const [selectedChapter, setSelectedChapter] = useState(null);
 
   useEffect(() => {
     setInputs(stepData.inputData || {});
@@ -825,6 +828,8 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     setRunError("");
     setMarketOptions([]);
     setSelectedMarket(null);
+    setChapterOptions([]);
+    setSelectedChapter(null);
   }, [step.num]);
 
   const prevStep = step.num > 1 ? STEPS[step.num - 2] : null;
@@ -1054,79 +1059,99 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
             );
           }
 
-          // ---- chapter_select（STEP8）：STEP7出力から章をプルダウン選択→ブロック転記 ----
+          // ---- chapter_select（STEP8）：狙い目切り口と同じカード選択UI ----
           if (field.type === "chapter_select") {
-            const step7Output = allSteps?.[7]?.outputText || "";
-
-            // 「第N章」で始まる行を区切りとしてブロック分割
-            const chapterBlocks = [];
-            if (step7Output) {
-              const lines = step7Output.split("\n");
-              let cur = [];
-              let inChapter = false;
-              for (const line of lines) {
-                const trimmed = line.trim();
-                if (/^第\d+章/.test(trimmed) || /^#{1,3}\s*第\d+章/.test(trimmed)) {
-                  if (cur.length > 0) chapterBlocks.push(cur.join("\n").trim());
-                  cur = [line];
-                  inChapter = true;
-                } else {
-                  cur.push(line);
-                }
-              }
-              if (cur.length > 0 && inChapter) chapterBlocks.push(cur.join("\n").trim());
-            }
-
-            // 各ブロックの章タイトルを抽出
-            const chapterTitles = chapterBlocks.map((b) => {
-              const firstLine = b.split("\n")[0].trim();
-              return firstLine.replace(/^#+\s*/, "").trim();
-            });
-
-            // 現在選択中のインデックス
-            const selectedIdx = chapterBlocks.findIndex((b) => inputs[field.name] === b);
-
             return (
               <div key={field.name} style={{ marginBottom: 16 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
                   <label style={{ fontSize: 13.5, fontWeight: 600, color: hasError ? "#dc2626" : "#333" }}>{field.label}</label>
                   {field.required && <RequiredMark />}
+                  {/* 自動振り分けボタン */}
+                  <button
+                    onClick={() => {
+                      const step7Output = allSteps?.[7]?.outputText || "";
+                      if (!step7Output) {
+                        alert("STEP7の出力データがまだ保存されていません。\nSTEP7で「出力データを保存」を押してから再度お試しください。");
+                        return;
+                      }
+                      // 「第N章」で始まる行を区切りにブロック分割
+                      const lines = step7Output.split("\n");
+                      const blocks = [];
+                      let cur = [];
+                      for (const line of lines) {
+                        const t = line.trim();
+                        if (/^第\d+章/.test(t) || /^#+\s*第\d+章/.test(t)) {
+                          if (cur.length > 0) blocks.push(cur.join("\n").trim());
+                          cur = [line];
+                        } else {
+                          cur.push(line);
+                        }
+                      }
+                      if (cur.length > 0) blocks.push(cur.join("\n").trim());
+                      const filtered = blocks.filter((b) => /第\d+章/.test(b));
+                      if (filtered.length === 0) {
+                        alert("章の区切り（第N章）が見つかりませんでした。\nSTEP7の出力を確認してください。");
+                        return;
+                      }
+                      setChapterOptions(filtered);
+                      setSelectedChapter(null);
+                      handleInputChange(field.name, "");
+                    }}
+                    style={{ fontSize: 11, color: "#fff", background: "#7c3aed", border: "none", borderRadius: 4, padding: "2px 8px", cursor: "pointer", fontWeight: 600 }}
+                  >
+                    章を読み込む
+                  </button>
                   {hasError && <span style={{ fontSize: 12, color: "#dc2626", fontWeight: 500 }}>← 選択してください</span>}
                 </div>
                 <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>{field.desc}</div>
 
-                {chapterBlocks.length === 0 ? (
+                {/* カード未表示：通常テキストエリア */}
+                {chapterOptions.length === 0 && (
                   <div style={{ fontSize: 13, color: "#888", padding: "10px 12px", background: "#f8f9fb", borderRadius: 6, border: "1px solid rgba(0,0,0,0.08)" }}>
-                    STEP7の出力を保存してからここに戻ってください
+                    「章を読み込む」ボタンを押すとSTEP7の出力から章一覧が表示されます
                   </div>
-                ) : (
-                  <>
-                    <select
-                      value={selectedIdx >= 0 ? selectedIdx : ""}
-                      onChange={(e) => {
-                        const idx = parseInt(e.target.value, 10);
-                        if (isNaN(idx)) {
-                          handleInputChange(field.name, "");
-                        } else {
-                          handleInputChange(field.name, chapterBlocks[idx]);
-                        }
-                      }}
-                      style={{ width: "100%", padding: "10px 12px", fontSize: 14, border: hasError ? "2px solid #dc2626" : "1px solid rgba(0,0,0,0.12)", borderRadius: 6, outline: "none", boxSizing: "border-box", background: "#fff", cursor: "pointer", marginBottom: 6 }}
-                    >
-                      <option value="">── 章を選択してください ──</option>
-                      {chapterTitles.map((t, i) => <option key={i} value={i}>{t}</option>)}
-                    </select>
-                    {selectedIdx >= 0 && (
-                      <div style={{ fontSize: 12, color: "#16a34a", fontWeight: 600 }}>
-                        ✓ {chapterTitles[selectedIdx]} の内容を転記しました
-                      </div>
-                    )}
-                  </>
+                )}
+
+                {/* カード選択UI */}
+                {chapterOptions.length > 0 && selectedChapter === null && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ fontSize: 12, color: "#7c3aed", fontWeight: 600, marginBottom: 4 }}>
+                      処理する章を1つ選んでください
+                    </div>
+                    {chapterOptions.map((block, i) => {
+                      const title = block.split("\n")[0].trim().replace(/^#+\s*/, "");
+                      return (
+                        <div key={i} onClick={() => { setSelectedChapter(i); handleInputChange(field.name, block); }}
+                          style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid rgba(0,0,0,0.1)", background: "#fff", cursor: "pointer", fontSize: 13, color: "#333", lineHeight: 1.6, display: "flex", alignItems: "center", gap: 10, transition: "all 0.12s" }}>
+                          <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.06)", color: "#888", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{i + 1}</span>
+                          <span>{title}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* 選択済み：タイトル＋選び直すリンク */}
+                {chapterOptions.length > 0 && selectedChapter !== null && (
+                  <div>
+                    <div style={{ fontSize: 12, color: "#555", marginBottom: 6, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span style={{ fontWeight: 600, color: "#2563eb" }}>
+                        ✓ {chapterOptions[selectedChapter]?.split("\n")[0].trim().replace(/^#+\s*/, "")} を選択中
+                      </span>
+                      <button onClick={() => { setSelectedChapter(null); handleInputChange(field.name, ""); }}
+                        style={{ fontSize: 11, color: "#7c3aed", background: "none", border: "none", cursor: "pointer", fontWeight: 600, padding: 0, textDecoration: "underline" }}>
+                        選び直す
+                      </button>
+                    </div>
+                    <div style={{ fontSize: 12, color: "#aaa" }}>
+                      選んだ章の内容が入力データとして転記されました
+                    </div>
+                  </div>
                 )}
 
                 {isOverLimit && (
                   <div style={{ fontSize: 12, color: "#dc2626", marginTop: 6 }}>
-                    選択した章が上限（{field.maxChars.toLocaleString()}文字）を超えています。章の内容を短くしてからDifyで処理してください。
+                    選択した章が上限（{field.maxChars.toLocaleString()}文字）を超えています。Dify側のフォーム文字数制限を確認してください。
                   </div>
                 )}
               </div>
