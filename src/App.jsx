@@ -123,12 +123,12 @@ const STEPS = [
     category: "執筆設計", type: "workflow",
     url: "https://udify.app/workflow/Ka9gpeDvAnkPV9hW",
     inputs: [
-      { name: "chapter_outline_text", label: "1章分のアウトライン", desc: "STEP7の出力から章を選んでください", source: "STEP7", required: true, type: "chapter_select", autoFill: false, maxChars: 2048 },
+      { name: "chapter_outline_text", label: "1章分のアウトライン", desc: "STEP7の出力から処理したい章の部分だけをコピーして貼り付けてください", source: "STEP7", required: true, type: "textarea", autoFill: false, maxChars: 2048 },
       { name: "added_episode_text", label: "著者が入れたいエピソード（任意）", desc: "この章に入れたい体験やエピソード", source: null, required: false, type: "textarea", maxChars: 1024 }
     ],
     outputTitle: "詳細プロット",
     help: [
-      "1章ずつ処理します。処理した章の出力を保存してからSTEP9へ進んでください",
+      "1章ずつ処理します。「参照」ボタンでSTEP7の出力を右側に表示し、処理したい章だけをコピーして貼り付けてください",
       "特定の項だけ修正したい場合は、出力をAIチャットに貼り付けて修正を指示してください"
     ]
   },
@@ -139,12 +139,12 @@ const STEPS = [
     url: "https://udify.app/workflow/lRAWtZGuVL4bqHM9",
     inputs: [
       { name: "detailed_plot_text", label: "詳細プロット作成のアウトプット（1章分）", desc: "詳細プロット作成の出力を貼り付け", source: "STEP8", required: true, type: "textarea", autoFill: true, maxChars: 5000 },
-      { name: "target_heading", label: "執筆対象の見出し", desc: "書きたい項の見出しをプルダウンから選んでください", source: "STEP8", required: true, type: "heading_select", autoFill: false, maxChars: 256 },
+      { name: "target_heading", label: "執筆対象の見出し", desc: "「参照」ボタンで詳細プロットを表示し、書きたい項の見出しをコピーして貼り付けてください", source: "STEP8", required: true, type: "text", autoFill: false, maxChars: 256 },
       { name: "past_writing_text", label: "著者の過去の執筆データ（任意）", desc: "文体参考の過去原稿（最大4000字）", source: null, required: false, type: "textarea", maxChars: 4000 }
     ],
     outputTitle: "生成された本文",
     help: [
-      "1項ずつ処理します。詳細プロットを自動転記するとプルダウンに見出しが表示されます",
+      "1項ずつ処理します。「参照」ボタンで詳細プロットを表示し、書きたい項の①②③の見出しをコピーして貼り付けてください",
       "文体を変えたい場合は、出力をAIチャットに貼り付けて修正を指示してください"
     ]
   },
@@ -815,9 +815,6 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   // STEP3 狙い目切り口用
   const [marketOptions, setMarketOptions] = useState([]);
   const [selectedMarket, setSelectedMarket] = useState(null);
-  // STEP8 章選択用
-  const [chapterOptions, setChapterOptions] = useState([]);
-  const [selectedChapter, setSelectedChapter] = useState(null);
 
   useEffect(() => {
     setInputs(stepData.inputData || {});
@@ -828,8 +825,6 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     setRunError("");
     setMarketOptions([]);
     setSelectedMarket(null);
-    setChapterOptions([]);
-    setSelectedChapter(null);
   }, [step.num]);
 
   const prevStep = step.num > 1 ? STEPS[step.num - 2] : null;
@@ -1054,147 +1049,6 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                     onSelect={(i, opt) => { setSelectedMarket(i); handleInputChange("market_report", opt); }}
                     onReselect={() => { setSelectedMarket(null); handleInputChange("market_report", ""); }}
                     value={inputs["market_report"] || ""} onChange={(v) => handleInputChange("market_report", v)} />
-                )}
-              </div>
-            );
-          }
-
-          // ---- chapter_select（STEP8）：狙い目切り口と同じカード選択UI ----
-          if (field.type === "chapter_select") {
-            return (
-              <div key={field.name} style={{ marginBottom: 16 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
-                  <label style={{ fontSize: 13.5, fontWeight: 600, color: hasError ? "#dc2626" : "#333" }}>{field.label}</label>
-                  {field.required && <RequiredMark />}
-                  {/* 自動振り分けボタン */}
-                  <button
-                    onClick={() => {
-                      const step7Output = allSteps?.[7]?.outputText || "";
-                      if (!step7Output) {
-                        alert("STEP7の出力データがまだ保存されていません。\nSTEP7で「出力データを保存」を押してから再度お試しください。");
-                        return;
-                      }
-                      // 「第N章」で始まる行を区切りにブロック分割
-                      const lines = step7Output.split("\n");
-                      const blocks = [];
-                      let cur = [];
-                      for (const line of lines) {
-                        const t = line.trim();
-                        if (/^第\d+章/.test(t) || /^#+\s*第\d+章/.test(t)) {
-                          if (cur.length > 0) blocks.push(cur.join("\n").trim());
-                          cur = [line];
-                        } else {
-                          cur.push(line);
-                        }
-                      }
-                      if (cur.length > 0) blocks.push(cur.join("\n").trim());
-                      const filtered = blocks.filter((b) => /第\d+章/.test(b));
-                      if (filtered.length === 0) {
-                        alert("章の区切り（第N章）が見つかりませんでした。\nSTEP7の出力を確認してください。");
-                        return;
-                      }
-                      setChapterOptions(filtered);
-                      setSelectedChapter(null);
-                      handleInputChange(field.name, "");
-                    }}
-                    style={{ fontSize: 11, color: "#fff", background: "#7c3aed", border: "none", borderRadius: 4, padding: "2px 8px", cursor: "pointer", fontWeight: 600 }}
-                  >
-                    章を読み込む
-                  </button>
-                  {hasError && <span style={{ fontSize: 12, color: "#dc2626", fontWeight: 500 }}>← 選択してください</span>}
-                </div>
-                <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>{field.desc}</div>
-
-                {/* カード未表示：通常テキストエリア */}
-                {chapterOptions.length === 0 && (
-                  <div style={{ fontSize: 13, color: "#888", padding: "10px 12px", background: "#f8f9fb", borderRadius: 6, border: "1px solid rgba(0,0,0,0.08)" }}>
-                    「章を読み込む」ボタンを押すとSTEP7の出力から章一覧が表示されます
-                  </div>
-                )}
-
-                {/* カード選択UI */}
-                {chapterOptions.length > 0 && selectedChapter === null && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    <div style={{ fontSize: 12, color: "#7c3aed", fontWeight: 600, marginBottom: 4 }}>
-                      処理する章を1つ選んでください
-                    </div>
-                    {chapterOptions.map((block, i) => {
-                      const title = block.split("\n")[0].trim().replace(/^#+\s*/, "");
-                      return (
-                        <div key={i} onClick={() => { setSelectedChapter(i); handleInputChange(field.name, block); }}
-                          style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid rgba(0,0,0,0.1)", background: "#fff", cursor: "pointer", fontSize: 13, color: "#333", lineHeight: 1.6, display: "flex", alignItems: "center", gap: 10, transition: "all 0.12s" }}>
-                          <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.06)", color: "#888", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{i + 1}</span>
-                          <span>{title}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* 選択済み：タイトル＋選び直すリンク */}
-                {chapterOptions.length > 0 && selectedChapter !== null && (
-                  <div>
-                    <div style={{ fontSize: 12, color: "#555", marginBottom: 6, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <span style={{ fontWeight: 600, color: "#2563eb" }}>
-                        ✓ {chapterOptions[selectedChapter]?.split("\n")[0].trim().replace(/^#+\s*/, "")} を選択中
-                      </span>
-                      <button onClick={() => { setSelectedChapter(null); handleInputChange(field.name, ""); }}
-                        style={{ fontSize: 11, color: "#7c3aed", background: "none", border: "none", cursor: "pointer", fontWeight: 600, padding: 0, textDecoration: "underline" }}>
-                        選び直す
-                      </button>
-                    </div>
-                    <div style={{ fontSize: 12, color: "#aaa" }}>
-                      選んだ章の内容が入力データとして転記されました
-                    </div>
-                  </div>
-                )}
-
-                {isOverLimit && (
-                  <div style={{ fontSize: 12, color: "#dc2626", marginTop: 6 }}>
-                    選択した章が上限（{field.maxChars.toLocaleString()}文字）を超えています。Dify側のフォーム文字数制限を確認してください。
-                  </div>
-                )}
-              </div>
-            );
-          }
-
-          // ---- heading_select（STEP9）：STEP8出力から見出しをプルダウン ----
-          if (field.type === "heading_select") {
-            const plotText = inputs["detailed_plot_text"] || allSteps?.[8]?.outputText || "";
-            // STEP8出力フォーマット：① ② ③ などの丸数字で始まる項レベルを抽出
-            const headings = plotText
-              .split("\n")
-              .map((l) => l.trim())
-              .filter((l) => /^[①②③④⑤⑥⑦⑧⑨⑩]/.test(l))
-              .map((l) => l.replace(/^[①②③④⑤⑥⑦⑧⑨⑩]\s*/, "").trim())
-              .filter((l) => l.length > 0 && l.length < 120);
-
-            return (
-              <div key={field.name} style={{ marginBottom: 16 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
-                  <label style={{ fontSize: 13.5, fontWeight: 600, color: hasError ? "#dc2626" : "#333" }}>{field.label}</label>
-                  {field.required && <RequiredMark />}
-                  {hasError && <span style={{ fontSize: 12, color: "#dc2626", fontWeight: 500 }}>← 選択してください</span>}
-                </div>
-                <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>{field.desc}</div>
-                {headings.length === 0 ? (
-                  plotText.length > 0 ? (
-                    // 詳細プロットはあるが見出し形式が不一致→手入力へフォールバック
-                    <input type="text" value={inputs[field.name] || ""} onChange={(e) => handleInputChange(field.name, e.target.value)}
-                      placeholder="見出しを手入力してください（例：典型例：議事録AIを入れたのに修正が増える）"
-                      style={{ width: "100%", padding: "10px 12px", fontSize: 14, border: hasError ? "2px solid #dc2626" : "1px solid rgba(0,0,0,0.12)", borderRadius: 6, outline: "none", boxSizing: "border-box", background: "#fff" }} />
-                  ) : (
-                    // 詳細プロット未入力
-                    <div style={{ fontSize: 13, color: "#888", padding: "10px 12px", background: "#f8f9fb", borderRadius: 6, border: "1px solid rgba(0,0,0,0.08)" }}>
-                      詳細プロットを自動転記すると見出しが表示されます
-                    </div>
-                  )
-                ) : (
-                  <select value={inputs[field.name] || ""} onChange={(e) => handleInputChange(field.name, e.target.value)}
-                    style={{ width: "100%", padding: "10px 12px", fontSize: 14, border: hasError ? "2px solid #dc2626" : "1px solid rgba(0,0,0,0.12)", borderRadius: 6, outline: "none", boxSizing: "border-box", background: "#fff", cursor: "pointer" }}>
-                    <option value="">── 見出しを選択してください ──</option>
-                    {headings.map((h, i) => <option key={i} value={h}>{h}</option>)}
-                  </select>
                 )}
               </div>
             );
