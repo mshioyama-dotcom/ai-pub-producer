@@ -262,6 +262,11 @@ async function resetAllData() {
 // ============================================================
 
 function parseStep2Output(text) {
+  // タイトル行「# 🧠 市場分析レポート: KW1 × KW2」からキーワードを抽出
+  const titleMatch = text.match(/^#[^#].*[:：]\s*(.+?)\s*[×x×]\s*(.+?)\s*$/m);
+  const keyword1 = titleMatch ? titleMatch[1].trim() : "";
+  const keyword2 = titleMatch ? titleMatch[2].trim() : "";
+
   // 「🎯 検索者の意図（仮説）」セクションを抽出
   const intentMatch = text.match(
     /###\s*🎯\s*検索者の意図[（(]仮説[）)]\s*\n([\s\S]*?)(?=\n---|\n##|$)/
@@ -274,54 +279,35 @@ function parseStep2Output(text) {
   let markets = [];
   if (marketMatch) {
     const section = marketMatch[1];
-
-    // まず空行（\n\n）で分割を試みる
     const byBlankLine = section
       .split(/\n{2,}/)
       .map((b) => b.trim())
       .filter(Boolean);
-
     if (byBlankLine.length >= 2) {
-      // 空行区切りで複数に分割できた場合はそのまま使う
       markets = byBlankLine;
     } else {
-      // 空行がない場合：行頭が全角・半角文字（インデントなし）で始まる行を
-      // 新しい段落の開始とみなして分割する
       const lines = section.split("\n");
       const blocks = [];
       let current = [];
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
-        // 空行はスキップ
         if (line.trim() === "") {
-          if (current.length > 0) {
-            blocks.push(current.join("\n").trim());
-            current = [];
-          }
+          if (current.length > 0) { blocks.push(current.join("\n").trim()); current = []; }
           continue;
         }
-        // 行頭がスペース・タブでなく、かつ現在のブロックが空でない場合は
-        // 新しい段落の開始と判定（先頭文字が「・」「-」「•」でない通常行）
         const isNewParagraph =
           current.length > 0 &&
           !/^[\s　・\-•]/.test(line) &&
           /^[^\s　]/.test(line);
-        if (isNewParagraph) {
-          blocks.push(current.join("\n").trim());
-          current = [line];
-        } else {
-          current.push(line);
-        }
+        if (isNewParagraph) { blocks.push(current.join("\n").trim()); current = [line]; }
+        else { current.push(line); }
       }
       if (current.length > 0) blocks.push(current.join("\n").trim());
       markets = blocks.filter(Boolean);
     }
   }
 
-  return {
-    intent: intentMatch ? intentMatch[1].trim() : "",
-    markets
-  };
+  return { keyword1, keyword2, intent: intentMatch ? intentMatch[1].trim() : "", markets };
 }
 
 // ============================================================
@@ -347,80 +333,89 @@ const Badge = ({ status }) => (
 );
 
 // STEP3 狙い目切り口 選択UI
-const MarketReportSelector = ({ options, selected, onSelect, value, onChange }) => {
+const MarketReportSelector = ({ options, selected, onSelect, onReselect, value, onChange }) => {
   if (!options || options.length === 0) return null;
+
+  // 選択済み：テキストエリア＋選び直すリンクのみ表示
+  if (selected !== null) {
+    return (
+      <div style={{ marginTop: 8 }}>
+        <div style={{ fontSize: 12, color: "#555", marginBottom: 6, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span>選んだ切り口（必要に応じて編集してください）</span>
+          <button
+            onClick={onReselect}
+            style={{ fontSize: 11, color: "#7c3aed", background: "none", border: "none", cursor: "pointer", fontWeight: 600, padding: 0, textDecoration: "underline" }}
+          >
+            選び直す
+          </button>
+        </div>
+        <textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          rows={4}
+          style={{
+            width: "100%",
+            padding: "10px 12px",
+            fontSize: 14,
+            border: "1px solid rgba(124,58,237,0.4)",
+            borderRadius: 6,
+            outline: "none",
+            boxSizing: "border-box",
+            resize: "vertical",
+            fontFamily: "inherit",
+            background: "#fff",
+            lineHeight: 1.7
+          }}
+        />
+      </div>
+    );
+  }
+
+  // 未選択：カード一覧を表示
   return (
     <div style={{ marginTop: 8 }}>
       <div style={{ fontSize: 12, color: "#7c3aed", fontWeight: 600, marginBottom: 8 }}>
         切り口を1つ選んでください（選んだ後に編集できます）
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
-        {options.map((opt, i) => {
-          const isSelected = selected === i;
-          return (
-            <div
-              key={i}
-              onClick={() => onSelect(i, opt)}
-              style={{
-                padding: "12px 14px",
-                borderRadius: 8,
-                border: isSelected ? "2px solid #7c3aed" : "1px solid rgba(0,0,0,0.1)",
-                background: isSelected ? "rgba(124,58,237,0.05)" : "#fff",
-                cursor: "pointer",
-                fontSize: 13,
-                color: "#333",
-                lineHeight: 1.7,
-                transition: "all 0.12s"
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                <span style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: 22,
-                  height: 22,
-                  borderRadius: "50%",
-                  background: isSelected ? "#7c3aed" : "rgba(0,0,0,0.06)",
-                  color: isSelected ? "#fff" : "#888",
-                  fontSize: 11,
-                  fontWeight: 700,
-                  flexShrink: 0,
-                  marginTop: 2
-                }}>
-                  {i + 1}
-                </span>
-                <span style={{ whiteSpace: "pre-wrap" }}>{opt}</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      {selected !== null && (
-        <div>
-          <div style={{ fontSize: 12, color: "#555", marginBottom: 6 }}>
-            選んだ切り口（必要に応じて編集してください）
-          </div>
-          <textarea
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            rows={4}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {options.map((opt, i) => (
+          <div
+            key={i}
+            onClick={() => onSelect(i, opt)}
             style={{
-              width: "100%",
-              padding: "10px 12px",
-              fontSize: 14,
-              border: "1px solid rgba(124,58,237,0.4)",
-              borderRadius: 6,
-              outline: "none",
-              boxSizing: "border-box",
-              resize: "vertical",
-              fontFamily: "inherit",
+              padding: "12px 14px",
+              borderRadius: 8,
+              border: "1px solid rgba(0,0,0,0.1)",
               background: "#fff",
-              lineHeight: 1.7
+              cursor: "pointer",
+              fontSize: 13,
+              color: "#333",
+              lineHeight: 1.7,
+              transition: "all 0.12s"
             }}
-          />
-        </div>
-      )}
+          >
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+              <span style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 22,
+                height: 22,
+                borderRadius: "50%",
+                background: "rgba(0,0,0,0.06)",
+                color: "#888",
+                fontSize: 11,
+                fontWeight: 700,
+                flexShrink: 0,
+                marginTop: 2
+              }}>
+                {i + 1}
+              </span>
+              <span style={{ whiteSpace: "pre-wrap" }}>{opt}</span>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
@@ -985,7 +980,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           // STEP3の intent_lock / market_report は自動振り分けボタンを使う
           const isStep3ParsedField =
             step.num === 3 &&
-            (field.name === "intent_lock" || field.name === "market_report");
+            (field.name === "keyword1" || field.name === "keyword2" || field.name === "intent_lock" || field.name === "market_report");
 
           const handleAutoFillParsed = isStep3ParsedField
             ? () => {
@@ -995,6 +990,20 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                   return;
                 }
                 const parsed = parseStep2Output(srcOutput);
+                if (field.name === "keyword1") {
+                  if (parsed.keyword1) {
+                    handleInputChange("keyword1", parsed.keyword1);
+                  } else {
+                    alert("キーワード1が見つかりませんでした。\nSTEP2の出力を確認してください。");
+                  }
+                }
+                if (field.name === "keyword2") {
+                  if (parsed.keyword2) {
+                    handleInputChange("keyword2", parsed.keyword2);
+                  } else {
+                    alert("キーワード2が見つかりませんでした。\nSTEP2の出力を確認してください。");
+                  }
+                }
                 if (field.name === "intent_lock") {
                   if (parsed.intent) {
                     handleInputChange("intent_lock", parsed.intent);
@@ -1065,6 +1074,10 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                     onSelect={(i, opt) => {
                       setSelectedMarket(i);
                       handleInputChange("market_report", opt);
+                    }}
+                    onReselect={() => {
+                      setSelectedMarket(null);
+                      handleInputChange("market_report", "");
                     }}
                     value={inputs["market_report"] || ""}
                     onChange={(v) => handleInputChange("market_report", v)}
