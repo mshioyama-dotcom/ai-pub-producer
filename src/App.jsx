@@ -1057,7 +1057,6 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           // ---- chapter_select（STEP8）：STEP7出力から章を選択 ----
           if (field.type === "chapter_select") {
             const step7Output = allSteps?.[7]?.outputText || "";
-            // 「第N章」または「## 第N章」単位で分割
             const chapterBlocks = [];
             if (step7Output) {
               const lines = step7Output.split("\n");
@@ -1096,11 +1095,18 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                     {chapterBlocks.map((block, i) => {
                       const isSelected = inputs[field.name] === block;
                       return (
-                        <div key={i} onClick={() => handleInputChange(field.name, block)}
+                        <div key={i}
+                          onClick={() => {
+                            // 選択済みをもう一度クリックで解除
+                            handleInputChange(field.name, isSelected ? "" : block);
+                          }}
                           style={{ padding: "10px 14px", borderRadius: 8, border: isSelected ? "2px solid #2563eb" : "1px solid rgba(0,0,0,0.1)", background: isSelected ? "rgba(37,99,235,0.05)" : "#fff", cursor: "pointer", fontSize: 13, color: "#333", transition: "all 0.12s", display: "flex", alignItems: "center", gap: 10 }}>
                           <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, borderRadius: "50%", background: isSelected ? "#2563eb" : "rgba(0,0,0,0.06)", color: isSelected ? "#fff" : "#888", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{i + 1}</span>
-                          <span style={{ fontWeight: isSelected ? 600 : 400 }}>{chapterTitles[i]}</span>
-                          {isSelected && <span style={{ marginLeft: "auto", fontSize: 11, color: "#2563eb", fontWeight: 600 }}>✓ 選択中</span>}
+                          <span style={{ fontWeight: isSelected ? 600 : 400, flex: 1 }}>{chapterTitles[i]}</span>
+                          {isSelected
+                            ? <span style={{ fontSize: 11, color: "#2563eb", fontWeight: 600, whiteSpace: "nowrap" }}>✓ 選択中（再クリックで解除）</span>
+                            : <span style={{ fontSize: 11, color: "#aaa", whiteSpace: "nowrap" }}>クリックで選択</span>
+                          }
                         </div>
                       );
                     })}
@@ -1118,12 +1124,13 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           // ---- heading_select（STEP9）：STEP8出力から見出しをプルダウン ----
           if (field.type === "heading_select") {
             const plotText = inputs["detailed_plot_text"] || allSteps?.[8]?.outputText || "";
-            // 「■」「###」「##」などで始まる最小見出しを抽出
+            // STEP8出力フォーマット：① ② ③ などの丸数字で始まる項レベルを抽出
             const headings = plotText
               .split("\n")
-              .filter((l) => /^(■|###\s|##\s|★|【)/.test(l.trim()))
-              .map((l) => l.replace(/^#+\s*/, "").replace(/^[■★【]\s*/, "").trim())
-              .filter(Boolean);
+              .map((l) => l.trim())
+              .filter((l) => /^[①②③④⑤⑥⑦⑧⑨⑩]/.test(l))
+              .map((l) => l.replace(/^[①②③④⑤⑥⑦⑧⑨⑩]\s*/, "").trim())
+              .filter((l) => l.length > 0 && l.length < 120);
 
             return (
               <div key={field.name} style={{ marginBottom: 16 }}>
@@ -1134,9 +1141,17 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                 </div>
                 <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>{field.desc}</div>
                 {headings.length === 0 ? (
-                  <div style={{ fontSize: 13, color: "#888", padding: "10px 12px", background: "#f8f9fb", borderRadius: 6, border: "1px solid rgba(0,0,0,0.08)" }}>
-                    詳細プロットを自動転記すると見出しが表示されます
-                  </div>
+                  plotText.length > 0 ? (
+                    // 詳細プロットはあるが見出し形式が不一致→手入力へフォールバック
+                    <input type="text" value={inputs[field.name] || ""} onChange={(e) => handleInputChange(field.name, e.target.value)}
+                      placeholder="見出しを手入力してください（例：典型例：議事録AIを入れたのに修正が増える）"
+                      style={{ width: "100%", padding: "10px 12px", fontSize: 14, border: hasError ? "2px solid #dc2626" : "1px solid rgba(0,0,0,0.12)", borderRadius: 6, outline: "none", boxSizing: "border-box", background: "#fff" }} />
+                  ) : (
+                    // 詳細プロット未入力
+                    <div style={{ fontSize: 13, color: "#888", padding: "10px 12px", background: "#f8f9fb", borderRadius: 6, border: "1px solid rgba(0,0,0,0.08)" }}>
+                      詳細プロットを自動転記すると見出しが表示されます
+                    </div>
+                  )
                 ) : (
                   <select value={inputs[field.name] || ""} onChange={(e) => handleInputChange(field.name, e.target.value)}
                     style={{ width: "100%", padding: "10px 12px", fontSize: 14, border: hasError ? "2px solid #dc2626" : "1px solid rgba(0,0,0,0.12)", borderRadius: 6, outline: "none", boxSizing: "border-box", background: "#fff", cursor: "pointer" }}>
