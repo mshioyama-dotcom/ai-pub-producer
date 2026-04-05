@@ -26,9 +26,9 @@ const STEPS = [
     category: "企画設計", type: "workflow",
     url: "https://udify.app/workflow/x0Ce5PCv2FjEaFs4",
     inputs: [
-      { name: "keyword1", label: "1つ目のキーワード", desc: "テーマ発見で選んだ1語目", source: "STEP1", required: true, type: "text", autoFill: false },
-      { name: "keyword2", label: "2つ目のキーワード", desc: "テーマ発見で選んだ2語目", source: "STEP1", required: true, type: "text", autoFill: false },
-      { name: "amazon_html", label: "Amazon検索結果のHTMLソース", desc: "AmazonでKindle検索した結果ページのHTMLソースを貼り付けてください。「実行する」ボタンを押すと自動でクリーニングしてAIに渡します。", source: null, required: true, type: "textarea" }
+      { name: "keyword1", label: "1つ目のキーワード", desc: "テーマ発見で選んだ1語目", source: "STEP1", required: true, type: "text", autoFill: false, maxChars: 256 },
+      { name: "keyword2", label: "2つ目のキーワード", desc: "テーマ発見で選んだ2語目", source: "STEP1", required: true, type: "text", autoFill: false, maxChars: 256 },
+      { name: "amazon_html", label: "Amazon検索結果のHTMLソース", desc: "AmazonでKindle検索した結果ページのHTMLソースを貼り付けてください。「実行する」ボタンを押すと自動でクリーニングしてAIに渡します。", source: null, required: true, type: "textarea", maxChars: 1000000 }
     ],
     outputTitle: "診断結果",
     help: [
@@ -43,10 +43,10 @@ const STEPS = [
     category: "企画設計", type: "workflow",
     url: "https://udify.app/workflow/V0yHio0PcP42yJjQ",
     inputs: [
-      { name: "keyword1", label: "検索キーワード1", desc: "市場診断で確定した1語目", source: "STEP2", required: true, type: "text", autoFill: false },
-      { name: "keyword2", label: "検索キーワード2", desc: "市場診断で確定した2語目", source: "STEP2", required: true, type: "text", autoFill: false },
-      { name: "intent_lock", label: "検索意図仮説", desc: "STEP2の出力「🎯 検索者の意図（仮説）」の文章をそのまま貼り付けてください", source: "STEP2", required: true, type: "textarea", autoFill: false },
-      { name: "market_report", label: "狙い目切り口（任意）", desc: "STEP2の出力「狙い目の切り口」の箇条書きをそのまま貼り付けてください", source: "STEP2", required: false, type: "textarea", autoFill: false }
+      { name: "keyword1", label: "検索キーワード1", desc: "市場診断で確定した1語目", source: "STEP2", required: true, type: "text", autoFill: false, maxChars: 128 },
+      { name: "keyword2", label: "検索キーワード2", desc: "市場診断で確定した2語目", source: "STEP2", required: true, type: "text", autoFill: false, maxChars: 256 },
+      { name: "intent_lock", label: "検索意図仮説", desc: "STEP2の出力「🎯 検索者の意図（仮説）」の文章をそのまま貼り付けてください", source: "STEP2", required: true, type: "textarea", autoFill: false, maxChars: 256 },
+      { name: "market_report", label: "狙い目切り口（任意）", desc: "STEP2の出力「狙い目の切り口」から1つ選んでください", source: "STEP2", required: false, type: "textarea", autoFill: false, maxChars: 256 }
     ],
     outputTitle: "設計結果",
     help: [
@@ -74,10 +74,10 @@ const STEPS = [
     category: "企画設計", type: "workflow",
     url: "https://udify.app/workflow/z7djuT4RLqfAbEqY",
     inputs: [
-      { name: "keyword1", label: "検索キーワード1", desc: "確定した1語目", source: "STEP2", required: true, type: "text", autoFill: false },
-      { name: "keyword2", label: "検索キーワード2", desc: "確定した2語目", source: "STEP2", required: true, type: "text", autoFill: false },
-      { name: "blueprint_text", label: "読者・価値設計のアウトプット", desc: "読者・価値設計の出力を全文貼り付け", source: "STEP3", required: true, type: "textarea", autoFill: true },
-      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "エピソードインタビューの出力を全文貼り付け", source: "STEP4", required: true, type: "textarea", autoFill: true }
+      { name: "keyword1", label: "検索キーワード1", desc: "確定した1語目", source: "STEP2", required: true, type: "text", autoFill: false, maxChars: 256 },
+      { name: "keyword2", label: "検索キーワード2", desc: "確定した2語目", source: "STEP2", required: true, type: "text", autoFill: false, maxChars: 256 },
+      { name: "blueprint_text", label: "読者・価値設計のアウトプット", desc: "読者・価値設計の出力を全文貼り付け", source: "STEP3", required: true, type: "textarea", autoFill: true, maxChars: 2048 },
+      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "エピソードインタビューの出力を全文貼り付け", source: "STEP4", required: true, type: "textarea", autoFill: true, maxChars: 2048 }
     ],
     outputTitle: "タイトル案",
     help: [
@@ -92,8 +92,8 @@ const STEPS = [
     category: "執筆設計", type: "workflow",
     url: "https://udify.app/workflow/tcqNIyr8wpCBAJhb",
     inputs: [
-      { name: "blueprint_text", label: "読者・価値設計のアウトプット", desc: "読者・価値設計の出力を全文貼り付け", source: "STEP3", required: true, type: "textarea", autoFill: true },
-      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "エピソードインタビューの出力を全文貼り付け", source: "STEP4", required: true, type: "textarea", autoFill: true }
+      { name: "blueprint_text", label: "読者・価値設計のアウトプット", desc: "読者・価値設計の出力を全文貼り付け", source: "STEP3", required: true, type: "textarea", autoFill: true, maxChars: 2048 },
+      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "エピソードインタビューの出力を全文貼り付け", source: "STEP4", required: true, type: "textarea", autoFill: true, maxChars: 2048 }
     ],
     outputTitle: "完成目次",
     help: [
@@ -107,9 +107,9 @@ const STEPS = [
     category: "執筆設計", type: "workflow",
     url: "https://udify.app/workflow/4KDXsPKSlgk5qMu8",
     inputs: [
-      { name: "toc_text", label: "目次作成のアウトプット", desc: "目次作成の出力を全文貼り付け", source: "STEP6", required: true, type: "textarea", autoFill: true },
-      { name: "blueprint_text", label: "読者・価値設計のアウトプット", desc: "読者・価値設計の出力を全文貼り付け", source: "STEP3", required: true, type: "textarea", autoFill: true },
-      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "エピソードインタビューの出力を全文貼り付け", source: "STEP4", required: true, type: "textarea", autoFill: true }
+      { name: "toc_text", label: "目次作成のアウトプット", desc: "目次作成の出力を全文貼り付け", source: "STEP6", required: true, type: "textarea", autoFill: true, maxChars: 5000 },
+      { name: "blueprint_text", label: "読者・価値設計のアウトプット", desc: "読者・価値設計の出力を全文貼り付け", source: "STEP3", required: true, type: "textarea", autoFill: true, maxChars: 5000 },
+      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "エピソードインタビューの出力を全文貼り付け", source: "STEP4", required: true, type: "textarea", autoFill: true, maxChars: 5000 }
     ],
     outputTitle: "章構成",
     help: [
@@ -123,12 +123,12 @@ const STEPS = [
     category: "執筆設計", type: "workflow",
     url: "https://udify.app/workflow/Ka9gpeDvAnkPV9hW",
     inputs: [
-      { name: "chapter_outline_text", label: "1章分のアウトライン", desc: "章構成作成の出力から1章分を切り出して貼り付け", source: "STEP7", required: true, type: "textarea", autoFill: false },
-      { name: "added_episode_text", label: "著者が入れたいエピソード（任意）", desc: "この章に入れたい体験やエピソード", source: null, required: false, type: "textarea" }
+      { name: "chapter_outline_text", label: "1章分のアウトライン", desc: "STEP7の出力から章を選んでください", source: "STEP7", required: true, type: "chapter_select", autoFill: false, maxChars: 2048 },
+      { name: "added_episode_text", label: "著者が入れたいエピソード（任意）", desc: "この章に入れたい体験やエピソード", source: null, required: false, type: "textarea", maxChars: 1024 }
     ],
     outputTitle: "詳細プロット",
     help: [
-      "1章ずつ処理します。章構成の出力から該当章だけをコピーして入力してください",
+      "1章ずつ処理します。処理した章の出力を保存してからSTEP9へ進んでください",
       "特定の項だけ修正したい場合は、出力をAIチャットに貼り付けて修正を指示してください"
     ]
   },
@@ -138,13 +138,13 @@ const STEPS = [
     category: "執筆設計", type: "workflow",
     url: "https://udify.app/workflow/lRAWtZGuVL4bqHM9",
     inputs: [
-      { name: "detailed_plot_text", label: "詳細プロット作成のアウトプット（1章分）", desc: "詳細プロット作成の出力を貼り付け", source: "STEP8", required: true, type: "textarea", autoFill: true },
-      { name: "target_heading", label: "執筆対象の目次見出し", desc: "書きたい項の見出しを正確に入力", source: "STEP8", required: true, type: "text", autoFill: false },
-      { name: "past_writing_text", label: "著者の過去の執筆データ（任意）", desc: "文体参考の過去原稿（最大3000字）", source: null, required: false, type: "textarea" }
+      { name: "detailed_plot_text", label: "詳細プロット作成のアウトプット（1章分）", desc: "詳細プロット作成の出力を貼り付け", source: "STEP8", required: true, type: "textarea", autoFill: true, maxChars: 5000 },
+      { name: "target_heading", label: "執筆対象の見出し", desc: "書きたい項の見出しをプルダウンから選んでください", source: "STEP8", required: true, type: "heading_select", autoFill: false, maxChars: 256 },
+      { name: "past_writing_text", label: "著者の過去の執筆データ（任意）", desc: "文体参考の過去原稿（最大4000字）", source: null, required: false, type: "textarea", maxChars: 4000 }
     ],
     outputTitle: "生成された本文",
     help: [
-      "1項ずつ処理します。見出しは詳細プロットから正確にコピーしてください",
+      "1項ずつ処理します。詳細プロットを自動転記するとプルダウンに見出しが表示されます",
       "文体を変えたい場合は、出力をAIチャットに貼り付けて修正を指示してください"
     ]
   },
@@ -154,12 +154,12 @@ const STEPS = [
     category: "販売準備", type: "workflow",
     url: "https://udify.app/workflow/6yWZfOGGU76ciJBI",
     inputs: [
-      { name: "title_text", label: "タイトル", desc: "確定したメインタイトル", source: "STEP5", required: true, type: "text", autoFill: false },
-      { name: "subtitle_text", label: "サブタイトル", desc: "確定したサブタイトル", source: "STEP5", required: true, type: "text", autoFill: false },
-      { name: "blueprint_text", label: "読者・価値設計のアウトプット", desc: "読者・価値設計の出力を全文貼り付け", source: "STEP3", required: true, type: "textarea", autoFill: true },
-      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "エピソードインタビューの出力を全文貼り付け", source: "STEP4", required: true, type: "textarea", autoFill: true },
-      { name: "outline_text", label: "章構成作成のアウトプット", desc: "章構成作成の出力を全文貼り付け", source: "STEP7", required: true, type: "textarea", autoFill: true },
-      { name: "author_profile_text", label: "著者プロフィール（任意）", desc: "著者の経歴や実績", source: null, required: false, type: "textarea" }
+      { name: "title_text", label: "タイトル", desc: "確定したメインタイトル", source: "STEP5", required: true, type: "text", autoFill: false, maxChars: 128 },
+      { name: "subtitle_text", label: "サブタイトル", desc: "確定したサブタイトル", source: "STEP5", required: true, type: "text", autoFill: false, maxChars: 256 },
+      { name: "blueprint_text", label: "読者・価値設計のアウトプット", desc: "読者・価値設計の出力を全文貼り付け", source: "STEP3", required: true, type: "textarea", autoFill: true, maxChars: 5000 },
+      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "エピソードインタビューの出力を全文貼り付け", source: "STEP4", required: true, type: "textarea", autoFill: true, maxChars: 5000 },
+      { name: "outline_text", label: "章構成作成のアウトプット", desc: "章構成作成の出力を全文貼り付け", source: "STEP7", required: true, type: "textarea", autoFill: true, maxChars: 20000 },
+      { name: "author_profile_text", label: "著者プロフィール（任意）", desc: "著者の経歴や実績", source: null, required: false, type: "textarea", maxChars: 2000 }
     ],
     outputTitle: "Amazon説明文",
     help: [
@@ -806,9 +806,10 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   const [outputText, setOutputText] = useState(stepData.outputText || "");
   const [saveInputMsg, setSaveInputMsg] = useState(false);
   const [saveOutputMsg, setSaveOutputMsg] = useState(false);
-  const [copyOutputMsg, setCopyOutputMsg] = useState(false);
+  const [copyInputMsg, setCopyInputMsg] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [validationErrors, setValidationErrors] = useState([]);
+  const [charErrors, setCharErrors] = useState({}); // { fieldName: true }
   const [isRunning, setIsRunning] = useState(false);
   const [runError, setRunError] = useState("");
   // STEP3 狙い目切り口用
@@ -820,6 +821,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     setOutputText(stepData.outputText || "");
     setHelpOpen(false);
     setValidationErrors([]);
+    setCharErrors({});
     setRunError("");
     setMarketOptions([]);
     setSelectedMarket(null);
@@ -835,17 +837,27 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
       return updated;
     });
     setValidationErrors((prev) => prev.filter((e) => e !== name));
+    // 文字数チェック（リアルタイム）
+    const field = step.inputs.find((f) => f.name === name);
+    if (field?.maxChars) {
+      setCharErrors((prev) => ({ ...prev, [name]: value.length > field.maxChars }));
+    }
   };
 
   const validateInputs = () => {
     const errors = [];
+    const newCharErrors = {};
     step.inputs.forEach((field) => {
       if (field.required && !(inputs[field.name] || "").trim()) {
         errors.push(field.name);
       }
+      if (field.maxChars && (inputs[field.name] || "").length > field.maxChars) {
+        newCharErrors[field.name] = true;
+      }
     });
     setValidationErrors(errors);
-    return errors;
+    setCharErrors(newCharErrors);
+    return errors.length > 0 || Object.keys(newCharErrors).length > 0 ? [...errors, ...Object.keys(newCharErrors)] : [];
   };
 
   const handleSaveInput = async () => {
@@ -976,8 +988,10 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
 
         {step.inputs.map((field) => {
           const hasError = validationErrors.includes(field.name);
+          const hasCharError = charErrors[field.name];
+          const currentLen = (inputs[field.name] || "").length;
+          const isOverLimit = field.maxChars && currentLen > field.maxChars;
 
-          // STEP3の intent_lock / market_report は自動振り分けボタンを使う
           const isStep3ParsedField =
             (step.num === 3 || step.num === 5) &&
             (field.name === "keyword1" || field.name === "keyword2" || field.name === "intent_lock" || field.name === "market_report");
@@ -991,25 +1005,16 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                 }
                 const parsed = parseStep2Output(srcOutput);
                 if (field.name === "keyword1") {
-                  if (parsed.keyword1) {
-                    handleInputChange("keyword1", parsed.keyword1);
-                  } else {
-                    alert("キーワード1が見つかりませんでした。\nSTEP2の出力を確認してください。");
-                  }
+                  if (parsed.keyword1) handleInputChange("keyword1", parsed.keyword1);
+                  else alert("キーワード1が見つかりませんでした。\nSTEP2の出力を確認してください。");
                 }
                 if (field.name === "keyword2") {
-                  if (parsed.keyword2) {
-                    handleInputChange("keyword2", parsed.keyword2);
-                  } else {
-                    alert("キーワード2が見つかりませんでした。\nSTEP2の出力を確認してください。");
-                  }
+                  if (parsed.keyword2) handleInputChange("keyword2", parsed.keyword2);
+                  else alert("キーワード2が見つかりませんでした。\nSTEP2の出力を確認してください。");
                 }
                 if (field.name === "intent_lock") {
-                  if (parsed.intent) {
-                    handleInputChange("intent_lock", parsed.intent);
-                  } else {
-                    alert("「検索者の意図（仮説）」セクションが見つかりませんでした。\nSTEP2の出力を確認してください。");
-                  }
+                  if (parsed.intent) handleInputChange("intent_lock", parsed.intent);
+                  else alert("「検索者の意図（仮説）」セクションが見つかりませんでした。\nSTEP2の出力を確認してください。");
                 }
                 if (field.name === "market_report") {
                   if (parsed.markets && parsed.markets.length > 0) {
@@ -1023,142 +1028,191 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
               }
             : undefined;
 
-          // market_reportフィールドはカード選択UIで描画
+          // ---- market_report：カード選択UI ----
           if (field.name === "market_report") {
             return (
               <div key={field.name} style={{ marginBottom: 16 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
                   <label style={{ fontSize: 13.5, fontWeight: 600, color: "#333" }}>{field.label}</label>
-                  <SourceLabel
-                    source={field.source}
-                    autoFill={field.autoFill}
-                    onAutoFill={() => {}}
-                    onRef={() => {
-                      const srcOutput = allSteps?.[2]?.outputText;
-                      if (srcOutput) onRefPanel({ stepNum: 2, text: srcOutput });
-                      else alert("STEP2の出力データがまだ保存されていません。");
-                    }}
-                    onAutoFillParsed={handleAutoFillParsed}
-                  />
+                  <SourceLabel source={field.source} autoFill={field.autoFill} onAutoFill={() => {}}
+                    onRef={() => { const s = allSteps?.[2]?.outputText; if (s) onRefPanel({ stepNum: 2, text: s }); else alert("STEP2の出力データがまだ保存されていません。"); }}
+                    onAutoFillParsed={handleAutoFillParsed} />
                 </div>
                 <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>{field.desc}</div>
-
-                {/* カード未表示のとき：通常のテキストエリア（手入力用） */}
                 {marketOptions.length === 0 && (
-                  <textarea
-                    value={inputs[field.name] || ""}
-                    onChange={(e) => handleInputChange(field.name, e.target.value)}
-                    placeholder="「自動振り分け」ボタンで候補を表示するか、直接入力してください"
-                    rows={4}
-                    style={{
-                      width: "100%",
-                      padding: "10px 12px",
-                      fontSize: 14,
-                      border: "1px solid rgba(0,0,0,0.12)",
-                      borderRadius: 6,
-                      outline: "none",
-                      boxSizing: "border-box",
-                      resize: "vertical",
-                      fontFamily: "inherit",
-                      background: "#fff",
-                      lineHeight: 1.7
-                    }}
-                  />
+                  <textarea value={inputs[field.name] || ""} onChange={(e) => handleInputChange(field.name, e.target.value)}
+                    placeholder="「自動振り分け」ボタンで候補を表示するか、直接入力してください" rows={4}
+                    style={{ width: "100%", padding: "10px 12px", fontSize: 14, border: "1px solid rgba(0,0,0,0.12)", borderRadius: 6, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: "#fff", lineHeight: 1.7 }} />
                 )}
-
-                {/* カード選択UI */}
                 {marketOptions.length > 0 && (
-                  <MarketReportSelector
-                    options={marketOptions}
-                    selected={selectedMarket}
-                    onSelect={(i, opt) => {
-                      setSelectedMarket(i);
-                      handleInputChange("market_report", opt);
-                    }}
-                    onReselect={() => {
-                      setSelectedMarket(null);
-                      handleInputChange("market_report", "");
-                    }}
-                    value={inputs["market_report"] || ""}
-                    onChange={(v) => handleInputChange("market_report", v)}
-                  />
+                  <MarketReportSelector options={marketOptions} selected={selectedMarket}
+                    onSelect={(i, opt) => { setSelectedMarket(i); handleInputChange("market_report", opt); }}
+                    onReselect={() => { setSelectedMarket(null); handleInputChange("market_report", ""); }}
+                    value={inputs["market_report"] || ""} onChange={(v) => handleInputChange("market_report", v)} />
                 )}
               </div>
             );
           }
 
+          // ---- chapter_select（STEP8）：STEP7出力から章を選択 ----
+          if (field.type === "chapter_select") {
+            const step7Output = allSteps?.[7]?.outputText || "";
+            // 「第N章」または「## 第N章」単位で分割
+            const chapterBlocks = [];
+            if (step7Output) {
+              const lines = step7Output.split("\n");
+              let cur = [];
+              for (const line of lines) {
+                if (/^#{0,3}\s*第\d+章/.test(line) && cur.length > 0) {
+                  chapterBlocks.push(cur.join("\n").trim());
+                  cur = [line];
+                } else {
+                  cur.push(line);
+                }
+              }
+              if (cur.length > 0) chapterBlocks.push(cur.join("\n").trim());
+            }
+            const chapterTitles = chapterBlocks.map((b) => {
+              const m = b.match(/第\d+章[^\n]*/);
+              return m ? m[0].replace(/^#+\s*/, "").trim() : b.slice(0, 30);
+            });
+
+            return (
+              <div key={field.name} style={{ marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
+                  <label style={{ fontSize: 13.5, fontWeight: 600, color: hasError ? "#dc2626" : "#333" }}>{field.label}</label>
+                  {field.required && <RequiredMark />}
+                  <SourceLabel source={field.source} autoFill={false}
+                    onRef={() => { const s = allSteps?.[7]?.outputText; if (s) onRefPanel({ stepNum: 7, text: s }); else alert("STEP7の出力データがまだ保存されていません。"); }} />
+                  {hasError && <span style={{ fontSize: 12, color: "#dc2626", fontWeight: 500 }}>← 選択してください</span>}
+                </div>
+                <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>{field.desc}</div>
+                {chapterBlocks.length === 0 ? (
+                  <div style={{ fontSize: 13, color: "#888", padding: "10px 12px", background: "#f8f9fb", borderRadius: 6, border: "1px solid rgba(0,0,0,0.08)" }}>
+                    STEP7の出力を保存してからここに戻ってください
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {chapterBlocks.map((block, i) => {
+                      const isSelected = inputs[field.name] === block;
+                      return (
+                        <div key={i} onClick={() => handleInputChange(field.name, block)}
+                          style={{ padding: "10px 14px", borderRadius: 8, border: isSelected ? "2px solid #2563eb" : "1px solid rgba(0,0,0,0.1)", background: isSelected ? "rgba(37,99,235,0.05)" : "#fff", cursor: "pointer", fontSize: 13, color: "#333", transition: "all 0.12s", display: "flex", alignItems: "center", gap: 10 }}>
+                          <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, borderRadius: "50%", background: isSelected ? "#2563eb" : "rgba(0,0,0,0.06)", color: isSelected ? "#fff" : "#888", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{i + 1}</span>
+                          <span style={{ fontWeight: isSelected ? 600 : 400 }}>{chapterTitles[i]}</span>
+                          {isSelected && <span style={{ marginLeft: "auto", fontSize: 11, color: "#2563eb", fontWeight: 600 }}>✓ 選択中</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {isOverLimit && (
+                  <div style={{ fontSize: 12, color: "#dc2626", marginTop: 6 }}>
+                    選択した章が上限（{field.maxChars.toLocaleString()}文字）を超えています。章の内容を短くしてからDifyで処理してください。
+                  </div>
+                )}
+              </div>
+            );
+          }
+
+          // ---- heading_select（STEP9）：STEP8出力から見出しをプルダウン ----
+          if (field.type === "heading_select") {
+            const plotText = inputs["detailed_plot_text"] || allSteps?.[8]?.outputText || "";
+            // 「■」「###」「##」などで始まる最小見出しを抽出
+            const headings = plotText
+              .split("\n")
+              .filter((l) => /^(■|###\s|##\s|★|【)/.test(l.trim()))
+              .map((l) => l.replace(/^#+\s*/, "").replace(/^[■★【]\s*/, "").trim())
+              .filter(Boolean);
+
+            return (
+              <div key={field.name} style={{ marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
+                  <label style={{ fontSize: 13.5, fontWeight: 600, color: hasError ? "#dc2626" : "#333" }}>{field.label}</label>
+                  {field.required && <RequiredMark />}
+                  {hasError && <span style={{ fontSize: 12, color: "#dc2626", fontWeight: 500 }}>← 選択してください</span>}
+                </div>
+                <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>{field.desc}</div>
+                {headings.length === 0 ? (
+                  <div style={{ fontSize: 13, color: "#888", padding: "10px 12px", background: "#f8f9fb", borderRadius: 6, border: "1px solid rgba(0,0,0,0.08)" }}>
+                    詳細プロットを自動転記すると見出しが表示されます
+                  </div>
+                ) : (
+                  <select value={inputs[field.name] || ""} onChange={(e) => handleInputChange(field.name, e.target.value)}
+                    style={{ width: "100%", padding: "10px 12px", fontSize: 14, border: hasError ? "2px solid #dc2626" : "1px solid rgba(0,0,0,0.12)", borderRadius: 6, outline: "none", boxSizing: "border-box", background: "#fff", cursor: "pointer" }}>
+                    <option value="">── 見出しを選択してください ──</option>
+                    {headings.map((h, i) => <option key={i} value={h}>{h}</option>)}
+                  </select>
+                )}
+              </div>
+            );
+          }
+
+          // ---- 通常フィールド ----
           return (
             <div key={field.name} style={{ marginBottom: 16 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
-                <label style={{ fontSize: 13.5, fontWeight: 600, color: hasError ? "#dc2626" : "#333" }}>
-                  {field.label}
-                </label>
+                <label style={{ fontSize: 13.5, fontWeight: 600, color: hasError ? "#dc2626" : "#333" }}>{field.label}</label>
                 {field.required && <RequiredMark />}
-                <SourceLabel
-                  source={field.source}
-                  autoFill={field.autoFill}
+                <SourceLabel source={field.source} autoFill={field.autoFill}
                   onAutoFill={() => {
                     const srcNum = parseInt(field.source.replace("STEP", ""), 10);
                     const srcOutput = allSteps?.[srcNum]?.outputText;
-                    if (srcOutput) {
-                      handleInputChange(field.name, srcOutput);
-                    } else {
-                      alert(`STEP${srcNum}の出力データがまだ保存されていません。\nSTEP${srcNum}で「出力データを保存」を押してから再度お試しください。`);
-                    }
+                    if (srcOutput) handleInputChange(field.name, srcOutput);
+                    else alert(`STEP${srcNum}の出力データがまだ保存されていません。\nSTEP${srcNum}で「出力データを保存」を押してから再度お試しください。`);
                   }}
                   onRef={() => {
                     const srcNum = parseInt(field.source.replace("STEP", ""), 10);
                     const srcOutput = allSteps?.[srcNum]?.outputText;
-                    if (srcOutput) {
-                      onRefPanel({ stepNum: srcNum, text: srcOutput });
-                    } else {
-                      alert(`STEP${srcNum}の出力データがまだ保存されていません。\nSTEP${srcNum}で「出力データを保存」を押してから再度お試しください。`);
-                    }
+                    if (srcOutput) onRefPanel({ stepNum: srcNum, text: srcOutput });
+                    else alert(`STEP${srcNum}の出力データがまだ保存されていません。\nSTEP${srcNum}で「出力データを保存」を押してから再度お試しください。`);
                   }}
-                  onAutoFillParsed={handleAutoFillParsed}
-                />
-                {hasError && (
-                  <span style={{ fontSize: 12, color: "#dc2626", fontWeight: 500 }}>← 入力してください</span>
-                )}
+                  onAutoFillParsed={handleAutoFillParsed} />
+                {hasError && <span style={{ fontSize: 12, color: "#dc2626", fontWeight: 500 }}>← 入力してください</span>}
               </div>
               <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>{field.desc}</div>
 
+              {/* STEP2 HTMLフィールド専用：図解ガイド */}
+              {step.num === 2 && field.name === "amazon_html" && (
+                <div style={{ marginBottom: 10, padding: "12px 14px", background: "#f8f9fb", border: "1px solid rgba(0,0,0,0.08)", borderRadius: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#333", marginBottom: 8 }}>HTMLソースの取得手順</div>
+                  <svg width="100%" viewBox="0 0 640 90" xmlns="http://www.w3.org/2000/svg">
+                    <defs><marker id="ha" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#555" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></marker></defs>
+                    {[
+                      { x: 10, label: "①Amazon", sub: "Kindleストアで検索" },
+                      { x: 170, label: "②右クリック", sub: "ページのソースを表示" },
+                      { x: 330, label: "③全選択コピー", sub: "Ctrl+A → Ctrl+C" },
+                      { x: 490, label: "④ここに貼付", sub: "「実行する」を押す" },
+                    ].map((s, i) => (
+                      <g key={i}>
+                        <rect x={s.x} y={10} width={130} height={50} rx={8} fill="#E6F1FB" stroke="#185FA5" strokeWidth={0.5}/>
+                        <text fontFamily="sans-serif" fontSize={12} fontWeight="bold" fill="#0C447C" x={s.x + 65} y={33} textAnchor="middle">{s.label}</text>
+                        <text fontFamily="sans-serif" fontSize={10} fill="#185FA5" x={s.x + 65} y={50} textAnchor="middle">{s.sub}</text>
+                        {i < 3 && <line x1={s.x + 130} y1={35} x2={s.x + 150} y2={35} stroke="#555" strokeWidth={1.5} markerEnd="url(#ha)"/>}
+                      </g>
+                    ))}
+                  </svg>
+                  <div style={{ fontSize: 11.5, color: "#888", marginTop: 6 }}>
+                    貼り付け後は「実行する」を押すだけ。自動でクリーニングしてAIに渡します。
+                  </div>
+                </div>
+              )}
+
               {field.type === "text" ? (
-                <input
-                  type="text"
-                  value={inputs[field.name] || ""}
-                  onChange={(e) => handleInputChange(field.name, e.target.value)}
-                  placeholder={field.label}
-                  style={{
-                    width: "100%",
-                    padding: "10px 12px",
-                    fontSize: 14,
-                    border: hasError ? "2px solid #dc2626" : "1px solid rgba(0,0,0,0.12)",
-                    borderRadius: 6,
-                    outline: "none",
-                    boxSizing: "border-box",
-                    background: hasError ? "#fef2f2" : "#fff"
-                  }}
-                />
+                <input type="text" value={inputs[field.name] || ""} onChange={(e) => handleInputChange(field.name, e.target.value)} placeholder={field.label}
+                  style={{ width: "100%", padding: "10px 12px", fontSize: 14, border: hasError ? "2px solid #dc2626" : isOverLimit ? "2px solid #f59e0b" : "1px solid rgba(0,0,0,0.12)", borderRadius: 6, outline: "none", boxSizing: "border-box", background: hasError ? "#fef2f2" : "#fff" }} />
               ) : (
-                <textarea
-                  value={inputs[field.name] || ""}
-                  onChange={(e) => handleInputChange(field.name, e.target.value)}
-                  placeholder={field.label}
+                <textarea value={inputs[field.name] || ""} onChange={(e) => handleInputChange(field.name, e.target.value)} placeholder={field.label}
                   rows={field.name.includes("html") ? 6 : 4}
-                  style={{
-                    width: "100%",
-                    padding: "10px 12px",
-                    fontSize: 14,
-                    border: hasError ? "2px solid #dc2626" : "1px solid rgba(0,0,0,0.12)",
-                    borderRadius: 6,
-                    outline: "none",
-                    boxSizing: "border-box",
-                    resize: "vertical",
-                    fontFamily: "inherit",
-                    background: hasError ? "#fef2f2" : "#fff"
-                  }}
-                />
+                  style={{ width: "100%", padding: "10px 12px", fontSize: 14, border: hasError ? "2px solid #dc2626" : isOverLimit ? "2px solid #f59e0b" : "1px solid rgba(0,0,0,0.12)", borderRadius: 6, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: hasError ? "#fef2f2" : "#fff" }} />
+              )}
+
+              {/* 文字数カウンター */}
+              {field.maxChars && (
+                <div style={{ fontSize: 11, color: isOverLimit ? "#dc2626" : "#aaa", textAlign: "right", marginTop: 3 }}>
+                  {currentLen.toLocaleString()} / {field.maxChars.toLocaleString()}文字
+                  {isOverLimit && <span style={{ fontWeight: 600, marginLeft: 6 }}>⚠ 上限超過</span>}
+                </div>
               )}
             </div>
           );
@@ -1176,11 +1230,16 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                   const errors = validateInputs();
                   if (errors.length > 0) return;
                   const text = step.inputs.map((f) => `【${f.label}】\n${inputs[f.name] || ""}`).join("\n\n");
-                  handleCopy(text);
+                  navigator.clipboard.writeText(text);
+                  setCopyInputMsg(true);
+                  setTimeout(() => setCopyInputMsg(false), 2000);
                 }}
               >
                 入力データをコピー
               </BtnSecondary>
+              {copyInputMsg && (
+                <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 600 }}>✓ コピーしました</span>
+              )}
               <span style={{ fontSize: 12, color: "#888" }}>※ コピーしてAIツールに貼り付けてください</span>
             </>
           )}
@@ -1303,15 +1362,6 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           {saveOutputMsg && (
             <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 600 }}>✓ 保存しました</span>
           )}
-          <BtnSecondary onClick={() => { navigator.clipboard.writeText(outputText); setCopyOutputMsg(true); setTimeout(() => setCopyOutputMsg(false), 2000); }}>
-            出力データをコピー
-          </BtnSecondary>
-          {copyOutputMsg && (
-            <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 600 }}>✓ コピーしました</span>
-          )}
-          <span style={{ fontSize: 12, color: "#888" }}>
-            ※ 次のステップの入力に使ったり、修正用にコピーできます
-          </span>
           {nextStep && (
             <BtnSecondary
               onClick={() => onNavigate(`step_${nextStep.num}`)}
