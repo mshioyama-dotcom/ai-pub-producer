@@ -273,17 +273,54 @@ function parseStep2Output(text) {
   );
   let markets = [];
   if (marketMatch) {
-    // 空行区切りで段落に分割し、空の要素を除去
-    const blocks = marketMatch[1]
+    const section = marketMatch[1];
+
+    // まず空行（\n\n）で分割を試みる
+    const byBlankLine = section
       .split(/\n{2,}/)
       .map((b) => b.trim())
       .filter(Boolean);
-    markets = blocks.length > 0 ? blocks : [marketMatch[1].trim()];
+
+    if (byBlankLine.length >= 2) {
+      // 空行区切りで複数に分割できた場合はそのまま使う
+      markets = byBlankLine;
+    } else {
+      // 空行がない場合：行頭が全角・半角文字（インデントなし）で始まる行を
+      // 新しい段落の開始とみなして分割する
+      const lines = section.split("\n");
+      const blocks = [];
+      let current = [];
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        // 空行はスキップ
+        if (line.trim() === "") {
+          if (current.length > 0) {
+            blocks.push(current.join("\n").trim());
+            current = [];
+          }
+          continue;
+        }
+        // 行頭がスペース・タブでなく、かつ現在のブロックが空でない場合は
+        // 新しい段落の開始と判定（先頭文字が「・」「-」「•」でない通常行）
+        const isNewParagraph =
+          current.length > 0 &&
+          !/^[\s　・\-•]/.test(line) &&
+          /^[^\s　]/.test(line);
+        if (isNewParagraph) {
+          blocks.push(current.join("\n").trim());
+          current = [line];
+        } else {
+          current.push(line);
+        }
+      }
+      if (current.length > 0) blocks.push(current.join("\n").trim());
+      markets = blocks.filter(Boolean);
+    }
   }
 
   return {
     intent: intentMatch ? intentMatch[1].trim() : "",
-    markets // 配列（0〜N件）
+    markets
   };
 }
 
