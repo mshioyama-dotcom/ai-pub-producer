@@ -1054,27 +1054,38 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
             );
           }
 
-          // ---- chapter_select（STEP8）：STEP7出力から章を選択 ----
+          // ---- chapter_select（STEP8）：STEP7出力から章を選択→ブロック転記 ----
           if (field.type === "chapter_select") {
             const step7Output = allSteps?.[7]?.outputText || "";
+
+            // 「第N章」で始まる行を区切りとしてブロック分割
             const chapterBlocks = [];
             if (step7Output) {
               const lines = step7Output.split("\n");
               let cur = [];
+              let inChapter = false;
               for (const line of lines) {
-                if (/^#{0,3}\s*第\d+章/.test(line) && cur.length > 0) {
-                  chapterBlocks.push(cur.join("\n").trim());
+                if (/^#{0,3}\s*第\d+章/.test(line.trim()) || /^第\d+章/.test(line.trim())) {
+                  if (inChapter && cur.length > 0) {
+                    chapterBlocks.push(cur.join("\n").trim());
+                  }
                   cur = [line];
+                  inChapter = true;
                 } else {
                   cur.push(line);
                 }
               }
-              if (cur.length > 0) chapterBlocks.push(cur.join("\n").trim());
+              if (inChapter && cur.length > 0) chapterBlocks.push(cur.join("\n").trim());
             }
+
+            // 各ブロックの章タイトルを抽出
             const chapterTitles = chapterBlocks.map((b) => {
-              const m = b.match(/第\d+章[^\n]*/);
-              return m ? m[0].replace(/^#+\s*/, "").trim() : b.slice(0, 30);
+              const firstLine = b.split("\n")[0];
+              return firstLine.replace(/^#+\s*/, "").trim();
             });
+
+            // 現在選択中のブロックインデックスを特定
+            const selectedIndex = chapterBlocks.findIndex((b) => inputs[field.name] === b);
 
             return (
               <div key={field.name} style={{ marginBottom: 16 }}>
@@ -1086,6 +1097,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                   {hasError && <span style={{ fontSize: 12, color: "#dc2626", fontWeight: 500 }}>← 選択してください</span>}
                 </div>
                 <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>{field.desc}</div>
+
                 {chapterBlocks.length === 0 ? (
                   <div style={{ fontSize: 13, color: "#888", padding: "10px 12px", background: "#f8f9fb", borderRadius: 6, border: "1px solid rgba(0,0,0,0.08)" }}>
                     STEP7の出力を保存してからここに戻ってください
@@ -1093,19 +1105,16 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     {chapterBlocks.map((block, i) => {
-                      const isSelected = inputs[field.name] === block;
+                      const isSelected = selectedIndex === i;
                       return (
                         <div key={i}
-                          onClick={() => {
-                            // 選択済みをもう一度クリックで解除
-                            handleInputChange(field.name, isSelected ? "" : block);
-                          }}
+                          onClick={() => handleInputChange(field.name, isSelected ? "" : block)}
                           style={{ padding: "10px 14px", borderRadius: 8, border: isSelected ? "2px solid #2563eb" : "1px solid rgba(0,0,0,0.1)", background: isSelected ? "rgba(37,99,235,0.05)" : "#fff", cursor: "pointer", fontSize: 13, color: "#333", transition: "all 0.12s", display: "flex", alignItems: "center", gap: 10 }}>
                           <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, borderRadius: "50%", background: isSelected ? "#2563eb" : "rgba(0,0,0,0.06)", color: isSelected ? "#fff" : "#888", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{i + 1}</span>
                           <span style={{ fontWeight: isSelected ? 600 : 400, flex: 1 }}>{chapterTitles[i]}</span>
                           {isSelected
                             ? <span style={{ fontSize: 11, color: "#2563eb", fontWeight: 600, whiteSpace: "nowrap" }}>✓ 選択中（再クリックで解除）</span>
-                            : <span style={{ fontSize: 11, color: "#aaa", whiteSpace: "nowrap" }}>クリックで選択</span>
+                            : <span style={{ fontSize: 11, color: "#aaa", whiteSpace: "nowrap" }}>クリックで選択・転記</span>
                           }
                         </div>
                       );
