@@ -971,12 +971,21 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           </div>
         )}
 
-        {/* STEP3・STEP5専用：振り分けガイド */}
-        {(step.num === 3 || step.num === 5) && (
+        {/* STEP3専用：振り分けガイド */}
+        {step.num === 3 && (
           <div style={{ fontSize: 12.5, color: "#555", marginBottom: 12, padding: "10px 14px", background: "rgba(124,58,237,0.04)", border: "1px solid rgba(124,58,237,0.15)", borderRadius: 6, lineHeight: 1.8 }}>
             「検索意図仮説」と「狙い目切り口」の欄にある
             <span style={{ fontWeight: 700, color: "#7c3aed" }}>「自動振り分け」</span>
             ボタンを押すと、STEP2の出力から該当箇所を自動で抽出して入力します。
+          </div>
+        )}
+
+        {/* STEP5専用：振り分けガイド */}
+        {step.num === 5 && (
+          <div style={{ fontSize: 12.5, color: "#555", marginBottom: 12, padding: "10px 14px", background: "rgba(124,58,237,0.04)", border: "1px solid rgba(124,58,237,0.15)", borderRadius: 6, lineHeight: 1.8 }}>
+            「検索キーワード1・2」の欄にある
+            <span style={{ fontWeight: 700, color: "#7c3aed" }}>「自動振り分け」</span>
+            ボタンを押すと、STEP2の出力からキーワードを自動で抽出して入力します。
           </div>
         )}
 
@@ -1260,7 +1269,8 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
             resize: "vertical",
             fontFamily: "inherit",
             background: "#fff",
-            lineHeight: 1.7
+            lineHeight: 1.7,
+            minHeight: 220
           }}
         />
         <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
