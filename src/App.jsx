@@ -433,14 +433,22 @@ const SideMenu = ({ currentPage, onNavigate, stepStatuses }) => {
     }}>
       {/* ロゴ */}
       <div style={{ padding: "28px 20px 24px", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-          <div style={{ width: 2, height: 44, background: C.gold, borderRadius: 1, flexShrink: 0 }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14 }}>
+          {/* 書籍アイコン（3本横線） */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, flexShrink: 0 }}>
+            <div style={{ width: 20, height: 2.5, background: C.gold, borderRadius: 1 }} />
+            <div style={{ width: 15, height: 2.5, background: `rgba(184,146,42,0.6)`, borderRadius: 1 }} />
+            <div style={{ width: 18, height: 2.5, background: `rgba(184,146,42,0.35)`, borderRadius: 1 }} />
+          </div>
+          {/* 縦線 */}
+          <div style={{ width: 1.5, height: 42, background: C.gold, flexShrink: 0, opacity: 0.6 }} />
+          {/* テキスト */}
           <div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: "#ffffff", letterSpacing: "0.02em", lineHeight: 1.35 }}>AI出版プロデューサー</div>
-            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.65)", marginTop: 4, letterSpacing: "0.03em" }}>Kindle出版を10ステップで進める</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: "#ffffff", letterSpacing: "0.02em", lineHeight: 1.3, fontFamily: "'Noto Sans JP', sans-serif" }}>AI出版プロデューサー</div>
+            <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.65)", marginTop: 5, letterSpacing: "0.04em", fontFamily: "'Noto Sans JP', sans-serif" }}>Kindle出版を10ステップで進める</div>
           </div>
         </div>
-        <div style={{ height: 1, background: `linear-gradient(to right, ${C.gold}, rgba(184,146,42,0))` }} />
+        <div style={{ height: 1, background: `linear-gradient(to right, ${C.gold}, rgba(184,146,42,0.2), transparent)` }} />
       </div>
 
       {/* ナビゲーション（ベージュ） */}
