@@ -396,16 +396,17 @@ const SideMenu = ({ currentPage, onNavigate, stepStatuses }) => {
       <div key={page} onClick={() => onNavigate(page)}
         style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "9px 14px", marginBottom: 0, cursor: "pointer",
-          background: active ? "rgba(26,46,74,0.1)" : "transparent",
-          color: active ? C.navy : "#3a3a3a",
-          fontWeight: active ? 700 : 500,
-          fontSize: 13, transition: "all 0.12s", lineHeight: 1.3,
-          borderLeft: active ? `3px solid ${C.gold}` : "3px solid transparent",
-          borderBottom: `1px solid rgba(0,0,0,0.06)`,
-          whiteSpace: "nowrap", overflow: "hidden"
+          padding: "9px 18px", cursor: "pointer",
+          background: active ? "rgba(26,46,74,0.08)" : "transparent",
+          color: active ? C.navy : "#3d3d3d",
+          fontWeight: active ? 700 : 400,
+          fontSize: 13, lineHeight: 1.3,
+          borderLeft: active ? `2px solid ${C.gold}` : "2px solid transparent",
+          borderBottom: "1px solid rgba(0,0,0,0.05)",
+          whiteSpace: "nowrap", overflow: "hidden",
+          transition: "background 0.1s, color 0.1s",
         }}>
-        <span style={{ flex: 1, marginRight: 8, overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
+        <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", marginRight: 8 }}>{label}</span>
         {status && <Badge status={status} />}
       </div>
     );
@@ -413,10 +414,10 @@ const SideMenu = ({ currentPage, onNavigate, stepStatuses }) => {
 
   const catLabel = (text) => (
     <div style={{
-      fontSize: 13, fontWeight: 700, color: C.white,
-      letterSpacing: "0.05em", padding: "8px 18px",
+      fontSize: 11, fontWeight: 700, color: C.white,
+      letterSpacing: "0.06em", padding: "7px 18px",
       background: C.navy,
-      marginTop: 4, marginBottom: 2,
+      borderTop: "1px solid rgba(255,255,255,0.06)",
     }}>
       {text}
     </div>
@@ -424,22 +425,27 @@ const SideMenu = ({ currentPage, onNavigate, stepStatuses }) => {
 
   return (
     <div style={{
-      width: 340, minWidth: 340, height: "100vh", overflowY: "auto",
-      background: C.navy, borderRight: "none",
+      width: 300, minWidth: 300, height: "100vh", overflowY: "auto",
+      background: C.navy,
       display: "flex", flexDirection: "column",
-      padding: "0 0 24px 0", boxSizing: "border-box",
-      position: "fixed", left: 0, top: 0, zIndex: 10
+      boxSizing: "border-box",
+      position: "fixed", left: 0, top: 0, zIndex: 10,
     }}>
-      {/* ロゴ部分 */}
-      <div style={{ padding: "36px 24px 28px", borderBottom: `1px solid rgba(255,255,255,0.1)`, marginBottom: 0 }}>
-        <div style={{ fontSize: 19, fontWeight: 700, color: C.white, letterSpacing: "0.03em", lineHeight: 1.4 }}>AI出版プロデューサー</div>
-        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.82)", marginTop: 6, letterSpacing: "0.03em" }}>Kindle出版を10ステップで進める</div>
-        <div style={{ width: 40, height: 2, background: C.gold, marginTop: 16, opacity: 0.9 }} />
+      {/* ロゴ */}
+      <div style={{ padding: "28px 20px 24px", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+          <div style={{ width: 2, height: 44, background: C.gold, borderRadius: 1, flexShrink: 0 }} />
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#ffffff", letterSpacing: "0.02em", lineHeight: 1.35 }}>AI出版プロデューサー</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.65)", marginTop: 4, letterSpacing: "0.03em" }}>Kindle出版を10ステップで進める</div>
+          </div>
+        </div>
+        <div style={{ height: 1, background: `linear-gradient(to right, ${C.gold}, rgba(184,146,42,0))` }} />
       </div>
 
-      {/* ナビゲーション（ベージュ背景エリア） */}
-      <div style={{ flex: 1, background: "#f4f3ef", padding: "0 0 8px" }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: C.white, letterSpacing: "0.05em", padding: "8px 18px", background: C.navy, marginBottom: 2 }}>ホーム</div>
+      {/* ナビゲーション（ベージュ） */}
+      <div style={{ flex: 1, background: "#f4f3ef" }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: C.white, letterSpacing: "0.06em", padding: "7px 18px", background: C.navy }}>ホーム</div>
         {menuItem("ダッシュボード", "home", null)}
         {menuItem("使い方", "guide", null)}
 
@@ -1250,7 +1256,7 @@ export default function App() {
     <div style={{ display: "flex", minHeight: "100vh", fontFamily: "'Noto Sans JP', sans-serif", background: C.bg }}>
       <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       <SideMenu currentPage={page} onNavigate={navigate} stepStatuses={stepStatuses} />
-      <div style={{ marginLeft: 340, flex: 1, padding: "36px 44px", maxWidth: refPanel ? 560 : 820, boxSizing: "border-box", transition: "max-width 0.2s" }}>
+      <div style={{ marginLeft: 300, flex: 1, padding: "36px 44px", maxWidth: refPanel ? 560 : 820, boxSizing: "border-box", transition: "max-width 0.2s" }}>
         {renderPage()}
       </div>
       {refPanel && (
