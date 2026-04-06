@@ -396,11 +396,11 @@ const SideMenu = ({ currentPage, onNavigate, stepStatuses }) => {
       <div key={page} onClick={() => onNavigate(page)}
         style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "9px 14px", marginBottom: 2, borderRadius: 4, cursor: "pointer",
-          background: active ? C.blueLight : "transparent",
-          color: active ? C.navy : C.textSub,
-          fontWeight: active ? 700 : 400,
-          fontSize: 13.5, transition: "all 0.12s", lineHeight: 1.4,
+          padding: "10px 14px", marginBottom: 2, borderRadius: 4, cursor: "pointer",
+          background: active ? "rgba(26,46,74,0.1)" : "transparent",
+          color: active ? C.navy : "#3a3a3a",
+          fontWeight: active ? 700 : 500,
+          fontSize: 14, transition: "all 0.12s", lineHeight: 1.4,
           borderLeft: active ? `3px solid ${C.gold}` : "3px solid transparent"
         }}>
         <span style={{ flex: 1, marginRight: 8 }}>{label}</span>
@@ -410,7 +410,12 @@ const SideMenu = ({ currentPage, onNavigate, stepStatuses }) => {
   };
 
   const catLabel = (text) => (
-    <div style={{ fontSize: 11, fontWeight: 700, color: C.textLight, letterSpacing: "0.08em", padding: "0 14px", marginBottom: 4, marginTop: 20, paddingTop: 16, borderTop: `1px solid ${C.border}`, textTransform: "uppercase" }}>
+    <div style={{
+      fontSize: 13, fontWeight: 700, color: C.white,
+      letterSpacing: "0.05em", padding: "8px 18px",
+      background: C.navy,
+      marginTop: 4, marginBottom: 2,
+    }}>
       {text}
     </div>
   );
@@ -424,15 +429,15 @@ const SideMenu = ({ currentPage, onNavigate, stepStatuses }) => {
       position: "fixed", left: 0, top: 0, zIndex: 10
     }}>
       {/* ロゴ部分 */}
-      <div style={{ padding: "28px 20px 20px", borderBottom: `1px solid rgba(255,255,255,0.08)`, marginBottom: 8 }}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: C.white, letterSpacing: "0.04em" }}>AI出版プロデューサー</div>
-        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", marginTop: 5, letterSpacing: "0.04em" }}>Kindle出版を10ステップで進める</div>
-        <div style={{ width: 32, height: 1.5, background: C.gold, marginTop: 14, opacity: 0.8 }} />
+      <div style={{ padding: "36px 24px 28px", borderBottom: `1px solid rgba(255,255,255,0.1)`, marginBottom: 0 }}>
+        <div style={{ fontSize: 19, fontWeight: 700, color: C.white, letterSpacing: "0.03em", lineHeight: 1.4 }}>AI出版プロデューサー</div>
+        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.82)", marginTop: 6, letterSpacing: "0.03em" }}>Kindle出版を10ステップで進める</div>
+        <div style={{ width: 40, height: 2, background: C.gold, marginTop: 16, opacity: 0.9 }} />
       </div>
 
-      {/* ナビゲーション（白背景エリア） */}
-      <div style={{ flex: 1, background: "#f4f3ef", padding: "16px 8px 8px" }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: C.textLight, letterSpacing: "0.08em", padding: "0 14px", marginBottom: 4, textTransform: "uppercase" }}>ホーム</div>
+      {/* ナビゲーション（ベージュ背景エリア） */}
+      <div style={{ flex: 1, background: "#f4f3ef", padding: "0 0 8px" }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.white, letterSpacing: "0.05em", padding: "8px 18px", background: C.navy, marginBottom: 2 }}>ホーム</div>
         {menuItem("ダッシュボード", "home", null)}
         {menuItem("使い方", "guide", null)}
 
