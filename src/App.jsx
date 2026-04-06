@@ -7,24 +7,24 @@ import { useState, useEffect, useCallback, useRef } from "react";
 const C = {
   navy:       "#1a2e4a",
   navyMid:    "#2a4468",
-  navyLight:  "#f0f4f8",
+  navyLight:  "#e8eef5",
   gold:       "#b8922a",
   goldLight:  "#f0d98a",
   goldPale:   "#fdf6e3",
   white:      "#ffffff",
   bg:         "#f4f3ef",
   surface:    "#ffffff",
-  border:     "#e2ddd6",
-  text:       "#2c2c2c",
-  textSub:    "#666666",
-  textLight:  "#999999",
+  border:     "#d0cac0",
+  text:       "#1a1a1a",
+  textSub:    "#444444",
+  textLight:  "#777777",
   // ステータス
   blue:       "#2a4468",
-  blueLight:  "rgba(42,68,104,0.08)",
-  green:      "#2d7a4f",
-  greenLight: "rgba(45,122,79,0.1)",
-  red:        "#c0392b",
-  redLight:   "rgba(192,57,43,0.08)",
+  blueLight:  "rgba(42,68,104,0.1)",
+  green:      "#1e6b3a",
+  greenLight: "rgba(30,107,58,0.1)",
+  red:        "#b52b1e",
+  redLight:   "rgba(181,43,30,0.08)",
 };
 
 // ============================================================
@@ -396,14 +396,16 @@ const SideMenu = ({ currentPage, onNavigate, stepStatuses }) => {
       <div key={page} onClick={() => onNavigate(page)}
         style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "10px 14px", marginBottom: 2, borderRadius: 4, cursor: "pointer",
+          padding: "9px 14px", marginBottom: 0, cursor: "pointer",
           background: active ? "rgba(26,46,74,0.1)" : "transparent",
           color: active ? C.navy : "#3a3a3a",
           fontWeight: active ? 700 : 500,
-          fontSize: 14, transition: "all 0.12s", lineHeight: 1.4,
-          borderLeft: active ? `3px solid ${C.gold}` : "3px solid transparent"
+          fontSize: 13, transition: "all 0.12s", lineHeight: 1.3,
+          borderLeft: active ? `3px solid ${C.gold}` : "3px solid transparent",
+          borderBottom: `1px solid rgba(0,0,0,0.06)`,
+          whiteSpace: "nowrap", overflow: "hidden"
         }}>
-        <span style={{ flex: 1, marginRight: 8 }}>{label}</span>
+        <span style={{ flex: 1, marginRight: 8, overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
         {status && <Badge status={status} />}
       </div>
     );
@@ -532,7 +534,7 @@ const HomePage = ({ project, stepStatuses, allSteps, onNavigate }) => {
         )}
       </div>
 
-      <Card style={{ background: C.navyLight, border: `1px solid ${C.border}` }}>
+      <Card style={{ background: "#eef2f7", border: "1px solid #c8d4e0" }}>
         <h3 style={{ fontSize: 13, fontWeight: 700, color: C.navyMid, margin: "0 0 10px" }}>このツールの使い方</h3>
         <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: C.textSub, lineHeight: 1.9 }}>
           <li>AI出版プロデューサーは素材を出すツールです</li>
@@ -651,16 +653,16 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
       </div>
 
       {/* 進め方カード */}
-      <Card style={{ marginBottom: 24, background: C.navyLight, border: `1px solid ${C.border}` }}>
+      <Card style={{ marginBottom: 24, background: "#eef2f7", border: `1px solid #c8d4e0` }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: C.navy, marginBottom: 8 }}>このステップの進め方</div>
-        <div style={{ fontSize: 13, color: C.textSub, lineHeight: 2 }}>
+        <div style={{ fontSize: 13.5, color: "#2a2a2a", lineHeight: 2.1 }}>
           {step.type === "chat" ? (
             <><span style={{ fontWeight: 700, color: C.navy }}>①</span> 下の「入力データ」に情報を入力して保存する<br /><span style={{ fontWeight: 700, color: C.navy }}>②</span> 「AIツールを開く」ボタンでツールにアクセスして対話する<br /><span style={{ fontWeight: 700, color: C.navy }}>③</span> 会話結果をコピー →「出力データ」に貼り付けて保存する</>
           ) : (
             <><span style={{ fontWeight: 700, color: C.navy }}>①</span> 下の「入力データ」に情報を入力する{step.inputs.some((f) => f.source) && "（前ステップの出力を貼り付け）"}<br /><span style={{ fontWeight: 700, color: C.navy }}>②</span> 「実行する」ボタンを押す → AIが処理して結果が自動で表示される<br /><span style={{ fontWeight: 700, color: C.navy }}>③</span> 出力内容を確認して保存する</>
           )}
         </div>
-        <div style={{ fontSize: 12, color: C.textLight, marginTop: 8, lineHeight: 1.6 }}>
+        <div style={{ fontSize: 12.5, color: "#555555", marginTop: 8, lineHeight: 1.7 }}>
           出力はそのまま使うことも、自分で修正したり、AIチャット（Claude・ChatGPT等）で整えてから使うこともできます。
         </div>
       </Card>
@@ -722,7 +724,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                     onRef={() => { const s = allSteps?.[2]?.outputText; if (s) onRefPanel({ stepNum: 2, text: s }); else alert("STEP2の出力データがまだ保存されていません。"); }}
                     onAutoFillParsed={handleAutoFillParsed} />
                 </div>
-                <div style={{ fontSize: 12, color: C.textLight, marginBottom: 6 }}>{field.desc}</div>
+                <div style={{ fontSize: 13, color: "#444444", marginBottom: 6 }}>{field.desc}</div>
                 {marketOptions.length === 0 && (
                   <textarea value={inputs[field.name] || ""} onChange={(e) => handleInputChange(field.name, e.target.value)}
                     placeholder="「自動振り分け」ボタンで候補を表示するか、直接入力してください" rows={4}
@@ -759,10 +761,10 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                   onAutoFillParsed={handleAutoFillParsed} />
                 {hasError && <span style={{ fontSize: 12, color: C.red, fontWeight: 500 }}>← 入力してください</span>}
               </div>
-              <div style={{ fontSize: 12, color: C.textLight, marginBottom: 6 }}>{field.desc}</div>
+              <div style={{ fontSize: 13, color: "#444444", marginBottom: 6 }}>{field.desc}</div>
 
               {step.num === 2 && field.name === "amazon_html" && (
-                <div style={{ marginBottom: 10, padding: "12px 14px", background: C.navyLight, border: `1px solid ${C.border}`, borderRadius: 6 }}>
+                <div style={{ marginBottom: 10, padding: "12px 14px", background: "#eef2f7", border: "1px solid #c8d4e0", borderRadius: 6 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, marginBottom: 8 }}>HTMLソースの取得手順</div>
                   <svg width="100%" viewBox="0 0 640 90" xmlns="http://www.w3.org/2000/svg">
                     <defs><marker id="ha" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#555" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></marker></defs>
@@ -826,7 +828,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           <StepBadge num="②" />
           <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>AIで実行する</h2>
         </div>
-        <Card style={{ background: C.navyLight, border: `1px solid ${C.border}` }}>
+        <Card style={{ background: "#eef2f7", border: "1px solid #c8d4e0" }}>
           {step.type === "chat" ? (
             <div>
               <div style={{ fontSize: 13, color: C.textSub, lineHeight: 1.8, marginBottom: 12 }}>
@@ -861,7 +863,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           <StepBadge num="③" />
           <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>出力データ</h2>
         </div>
-        <div style={{ fontSize: 12.5, color: C.textSub, marginBottom: 10, lineHeight: 1.7 }}>
+        <div style={{ fontSize: 13, color: "#444444", marginBottom: 10, lineHeight: 1.8 }}>
           {step.type === "chat" ? <>AIツールの会話結果をコピーして、下の欄に貼り付けてください。{nextStep && ` この出力は次のステップ（STEP${nextStep.num}）の入力になります。`}</> : <>AIの実行結果が自動で表示されます。内容を確認してから保存してください。{nextStep && ` この出力は次のステップ（STEP${nextStep.num}）の入力になります。`}</>}
           <br />出力はそのまま使っても、自分で修正したり、AIチャットで整えてから使うこともできます。
         </div>
@@ -895,7 +897,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
             操作のポイント
           </div>
           {helpOpen && (
-            <Card style={{ background: C.navyLight, border: `1px solid ${C.border}` }}>
+            <Card style={{ background: "#eef2f7", border: "1px solid #c8d4e0" }}>
               <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: C.textSub, lineHeight: 1.9 }}>
                 {step.help.map((h, i) => <li key={i}>{h}</li>)}
               </ul>
@@ -964,7 +966,7 @@ const GuidePage = ({ onNavigate }) => {
   const Section = ({ title, children }) => (
     <div style={{ marginBottom: 20 }}>
       <h2 style={{ fontSize: 14, fontWeight: 700, color: C.navy, marginBottom: 10, paddingLeft: 10, borderLeft: `3px solid ${C.gold}` }}>{title}</h2>
-      <Card style={{ background: C.navyLight, border: `1px solid ${C.border}` }}>
+      <Card style={{ background: "#eef2f7", border: "1px solid #c8d4e0" }}>
         <div style={{ fontSize: 13, color: C.textSub, lineHeight: 1.9 }}>{children}</div>
       </Card>
     </div>
