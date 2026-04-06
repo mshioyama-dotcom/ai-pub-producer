@@ -5,8 +5,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 // ============================================================
 
 const C = {
-  navy:       "#1a2e4a",
-  navyMid:    "#2a4468",
+  navy:       "#243d5c",
+  navyMid:    "#345578",
   navyLight:  "#e8eef5",
   gold:       "#b8922a",
   goldLight:  "#f0d98a",
