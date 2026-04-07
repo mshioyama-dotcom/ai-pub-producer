@@ -833,7 +833,10 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
             <>
               <BtnSecondary onClick={() => {
                 if (validateInputs().length > 0) return;
-                const text = step.inputs.map((f) => `【${f.label}】\n${inputs[f.name] || ""}`).join("\n\n");
+                // フィールドが1つだけの場合は値のみ、複数の場合はラベル付きでコピー
+                const text = step.inputs.length === 1
+                  ? (inputs[step.inputs[0].name] || "")
+                  : step.inputs.map((f) => `【${f.label}】\n${inputs[f.name] || ""}`).join("\n\n");
                 navigator.clipboard.writeText(text); setCopyInputMsg(true); setTimeout(() => setCopyInputMsg(false), 2000);
               }}>入力データをコピー</BtnSecondary>
               {copyInputMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ コピーしました</span>}
