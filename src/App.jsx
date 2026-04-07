@@ -742,7 +742,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
                   <label style={{ fontSize: 13.5, fontWeight: 600, color: C.navy }}>{field.label}</label>
                   <SourceLabel source={field.source} autoFill={field.autoFill} onAutoFill={() => {}}
-                    onRef={() => { const s = allSteps?.[2]?.outputText; if (s) onRefPanel({ stepNum: 2, text: s }); else alert("STEP2の出力データがまだ保存されていません。"); }}
+                    onRef={() => { const s = allSteps?.[2]?.outputText; if (s) onRefPanel({ stepNum: 2, text: s, targetField: "market_report" }); else alert("STEP2の出力データがまだ保存されていません。"); }}
                     onAutoFillParsed={handleAutoFillParsed} />
                 </div>
                 <div style={{ fontSize: 13, color: "#444444", marginBottom: 6 }}>{field.desc}</div>
@@ -776,7 +776,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                   onRef={() => {
                     const srcNum = parseInt(field.source.replace("STEP", ""), 10);
                     const srcOutput = allSteps?.[srcNum]?.outputText;
-                    if (srcOutput) onRefPanel({ stepNum: srcNum, text: srcOutput });
+                    if (srcOutput) onRefPanel({ stepNum: srcNum, text: srcOutput, targetField: field.name });
                     else alert(`STEP${srcNum}の出力データがまだ保存されていません。`);
                   }}
                   onAutoFillParsed={handleAutoFillParsed} />
@@ -808,10 +808,10 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
               )}
 
               {field.type === "text" ? (
-                <input type="text" value={inputs[field.name] || ""} onChange={(e) => handleInputChange(field.name, e.target.value)} placeholder={field.label}
+                <input id={`field-${field.name}`} type="text" value={inputs[field.name] || ""} onChange={(e) => handleInputChange(field.name, e.target.value)} placeholder={field.label}
                   style={{ width: "100%", padding: "10px 12px", fontSize: 14, border: hasError ? `2px solid ${C.red}` : isOverLimit ? `2px solid ${C.gold}` : `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", background: hasError ? "#fef2f2" : C.white }} />
               ) : (
-                <textarea value={inputs[field.name] || ""} onChange={(e) => handleInputChange(field.name, e.target.value)} placeholder={field.label}
+                <textarea id={`field-${field.name}`} value={inputs[field.name] || ""} onChange={(e) => handleInputChange(field.name, e.target.value)} placeholder={field.label}
                   rows={field.name.includes("html") ? 6 : 4}
                   style={{ width: "100%", padding: "10px 12px", fontSize: 14, border: hasError ? `2px solid ${C.red}` : isOverLimit ? `2px solid ${C.gold}` : `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: hasError ? "#fef2f2" : C.white }} />
               )}
@@ -1406,6 +1406,16 @@ export default function App() {
               onClick={() => {
                 const sel = window.getSelection()?.toString();
                 navigator.clipboard.writeText(sel && sel.length > 0 ? sel : refPanel.text);
+                // コピー後に対象フィールドへフォーカス移動
+                if (refPanel.targetField) {
+                  setTimeout(() => {
+                    const target = document.getElementById(`field-${refPanel.targetField}`);
+                    if (target) {
+                      target.focus();
+                      target.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }
+                  }, 100);
+                }
               }}
               style={{ flex: 1, padding: "10px", background: C.navy, color: C.white, border: "none", borderRadius: 3, fontWeight: 700, fontSize: 13, cursor: "pointer" }}
             >
