@@ -430,6 +430,7 @@ const SideMenu = ({ currentPage, onNavigate, stepStatuses }) => {
       display: "flex", flexDirection: "column",
       boxSizing: "border-box",
       position: "fixed", left: 0, top: 0, zIndex: 10,
+      borderRight: `2px solid ${C.gold}`,
     }}>
       {/* ロゴ */}
       <div style={{ padding: "28px 20px 24px", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
