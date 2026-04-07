@@ -862,6 +862,9 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                 style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "12px 28px", background: C.navy, color: C.white, borderRadius: 3, fontWeight: 700, fontSize: 14, textDecoration: "none", letterSpacing: "0.04em" }}>
                 AIツールを開く ↗
               </a>
+              <div style={{ marginTop: 12, padding: "10px 14px", background: C.goldPale, border: `1px solid ${C.goldLight}`, borderRadius: 4, fontSize: 12.5, color: "#7a5c10", lineHeight: 1.8 }}>
+                <span style={{ fontWeight: 700 }}>⚠ Difyの画面について：</span>左側に過去の会話履歴が表示されますが、毎回新しい会話から始めてください。「Start New chat」ボタンを押すと新規会話が始まります。
+              </div>
             </div>
           ) : (
             <div>
@@ -1143,6 +1146,9 @@ const GuidePage = ({ onNavigate }) => {
           <li>② 「入力データをコピー」でコピーして「AIツールを開く」でツールにアクセスし、貼り付けて対話する</li>
           <li>③ 会話結果をコピーして出力データ欄に貼り付け「出力データを保存」を押す</li>
         </ul>
+        <div style={{ marginTop: 10, padding: "10px 14px", background: C.goldPale, border: `1px solid ${C.goldLight}`, borderRadius: 4, fontSize: 12.5, color: "#7a5c10", lineHeight: 1.8 }}>
+          <span style={{ fontWeight: 700 }}>⚠ Difyの画面について：</span>AIツールを開くと左側に過去の会話履歴が表示されます。毎回「Start New chat」ボタンを押して新しい会話から始めてください。前の会話の続きから始めると意図しない結果になることがあります。
+        </div>
         <div style={{ marginTop: 8, fontSize: 12.5, color: "#b8922a", fontWeight: 600 }}>
           ⚠️ 修正した内容が次のステップの土台になります。必ず保存してから次へ進んでください。
         </div>
