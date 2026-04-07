@@ -1239,6 +1239,22 @@ export default function App() {
     });
   }, [allSteps]);
 
+  // スマホ判定
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+
+  // ナビゲート時にスマホメニューを閉じる
+  const navigateAndClose = useCallback(async (p) => {
+    setMenuOpen(false);
+    await navigate(p);
+  }, [navigate]);
+
   if (loading) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "inherit", color: C.textLight }}>
@@ -1248,17 +1264,93 @@ export default function App() {
   }
 
   const renderPage = () => {
-    if (page === "home") return <HomePage project={project} stepStatuses={stepStatuses} allSteps={allSteps} onNavigate={navigate} />;
-    if (page === "guide") return <GuidePage onNavigate={navigate} />;
-    if (page === "saved") return <SavedPage project={project} stepStatuses={stepStatuses} allSteps={allSteps} onNavigate={navigate} />;
+    const nav = isMobile ? navigateAndClose : navigate;
+    if (page === "home") return <HomePage project={project} stepStatuses={stepStatuses} allSteps={allSteps} onNavigate={nav} />;
+    if (page === "guide") return <GuidePage onNavigate={nav} />;
+    if (page === "saved") return <SavedPage project={project} stepStatuses={stepStatuses} allSteps={allSteps} onNavigate={nav} />;
     if (page.startsWith("step_")) {
       const num = parseInt(page.replace("step_", ""), 10);
       const step = STEPS[num - 1];
       const sd = allSteps[num] || defaultStepData(num);
-      return <StepPage step={step} stepData={sd} project={project} onNavigate={navigate} onSaveInput={handleSaveInput} onSaveOutput={handleSaveOutput} onUpdateProject={setProject} onInputChange={handlePendingInputChange} allSteps={allSteps} onRefPanel={setRefPanel} />;
+      return <StepPage step={step} stepData={sd} project={project} onNavigate={nav} onSaveInput={handleSaveInput} onSaveOutput={handleSaveOutput} onUpdateProject={setProject} onInputChange={handlePendingInputChange} allSteps={allSteps} onRefPanel={setRefPanel} />;
     }
-    return <HomePage project={project} stepStatuses={stepStatuses} allSteps={allSteps} onNavigate={navigate} />;
+    return <HomePage project={project} stepStatuses={stepStatuses} allSteps={allSteps} onNavigate={nav} />;
   };
+
+  // ============================================================
+  // スマホ用ヘッダーバー
+  // ============================================================
+  const MobileHeader = () => (
+    <div style={{
+      position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
+      background: C.navy, height: 56,
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      padding: "0 16px", boxSizing: "border-box",
+      borderBottom: `1px solid rgba(255,255,255,0.1)`
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        {/* ハンバーガーボタン */}
+        <button
+          onClick={() => setMenuOpen(!menuOpen)}
+          style={{ background: "none", border: "none", cursor: "pointer", padding: 6, display: "flex", flexDirection: "column", gap: 5 }}
+        >
+          <span style={{ display: "block", width: 22, height: 2, background: menuOpen ? C.gold : C.white, borderRadius: 1, transition: "background 0.2s" }} />
+          <span style={{ display: "block", width: 22, height: 2, background: menuOpen ? C.gold : C.white, borderRadius: 1, transition: "background 0.2s" }} />
+          <span style={{ display: "block", width: 22, height: 2, background: menuOpen ? C.gold : C.white, borderRadius: 1, transition: "background 0.2s" }} />
+        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 3, flexShrink: 0 }}>
+            <div style={{ width: 16, height: 2, background: C.gold, borderRadius: 1 }} />
+            <div style={{ width: 12, height: 2, background: `rgba(184,146,42,0.6)`, borderRadius: 1 }} />
+            <div style={{ width: 14, height: 2, background: `rgba(184,146,42,0.35)`, borderRadius: 1 }} />
+          </div>
+          <div style={{ width: 1.5, height: 28, background: C.gold, opacity: 0.6 }} />
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.white, letterSpacing: "0.02em" }}>AI出版プロデューサー</div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ============================================================
+  // スマホ用ドロワーメニュー
+  // ============================================================
+  const MobileDrawer = () => (
+    <>
+      {/* オーバーレイ */}
+      {menuOpen && (
+        <div
+          onClick={() => setMenuOpen(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 200 }}
+        />
+      )}
+      {/* ドロワー本体 */}
+      <div style={{
+        position: "fixed", top: 56, left: 0, bottom: 0,
+        width: 280, background: C.navy,
+        zIndex: 300, overflowY: "auto",
+        transform: menuOpen ? "translateX(0)" : "translateX(-100%)",
+        transition: "transform 0.25s ease",
+      }}>
+        <SideMenu currentPage={page} onNavigate={navigateAndClose} stepStatuses={stepStatuses} isMobile />
+      </div>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <div style={{ fontFamily: "'Noto Sans JP', sans-serif", background: C.bg, minHeight: "100vh" }}>
+        <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+        <MobileHeader />
+        <MobileDrawer />
+        {/* コンテンツ：ヘッダー分下にずらす */}
+        <div style={{ paddingTop: 56, paddingBottom: 32, boxSizing: "border-box" }}>
+          <div style={{ padding: "20px 16px", maxWidth: 800, margin: "0 auto" }}>
+            {renderPage()}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", fontFamily: "'Noto Sans JP', sans-serif", background: C.bg }}>
