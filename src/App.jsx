@@ -617,14 +617,16 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     setInputs((prev) => { const updated = { ...prev, [name]: value }; onInputChange?.(step.num, updated); return updated; });
     setValidationErrors((prev) => prev.filter((e) => e !== name));
     const field = step.inputs.find((f) => f.name === name);
-    if (field?.maxChars) setCharErrors((prev) => ({ ...prev, [name]: value.length > field.maxChars }));
+    // amazon_htmlは文字数チェック対象外（クリーニング後に大幅に縮小されるため）
+    if (field?.maxChars && name !== "amazon_html") setCharErrors((prev) => ({ ...prev, [name]: value.length > field.maxChars }));
   };
 
   const validateInputs = () => {
     const errors = []; const newCharErrors = {};
     step.inputs.forEach((field) => {
       if (field.required && !(inputs[field.name] || "").trim()) errors.push(field.name);
-      if (field.maxChars && (inputs[field.name] || "").length > field.maxChars) newCharErrors[field.name] = true;
+      // amazon_htmlは文字数チェック対象外
+      if (field.maxChars && field.name !== "amazon_html" && (inputs[field.name] || "").length > field.maxChars) newCharErrors[field.name] = true;
     });
     setValidationErrors(errors); setCharErrors(newCharErrors);
     return errors.length > 0 || Object.keys(newCharErrors).length > 0 ? [...errors, ...Object.keys(newCharErrors)] : [];
@@ -814,7 +816,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                   style={{ width: "100%", padding: "10px 12px", fontSize: 14, border: hasError ? `2px solid ${C.red}` : isOverLimit ? `2px solid ${C.gold}` : `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: hasError ? "#fef2f2" : C.white }} />
               )}
 
-              {field.maxChars && (
+              {field.maxChars && field.name !== "amazon_html" && (
                 <div style={{ fontSize: 11, color: isOverLimit ? C.red : C.textLight, textAlign: "right", marginTop: 3 }}>
                   {currentLen.toLocaleString()} / {field.maxChars.toLocaleString()}文字
                   {isOverLimit && <span style={{ fontWeight: 600, marginLeft: 6 }}>⚠ 上限超過</span>}
