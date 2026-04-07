@@ -1380,21 +1380,42 @@ export default function App() {
       </div>
       {refPanel && (
         <div style={{ position: "sticky", top: 0, width: 320, minWidth: 320, height: "100vh", background: C.white, borderLeft: `1px solid ${C.border}`, display: "flex", flexDirection: "column", padding: 20, boxSizing: "border-box", flexShrink: 0 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
             <span style={{ fontWeight: 700, fontSize: 13, color: C.navy }}>STEP{refPanel.stepNum}の出力（参照）</span>
             <button onClick={() => setRefPanel(null)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: C.textLight, lineHeight: 1, padding: "0 4px" }}>✕</button>
           </div>
-          <div style={{ flex: 1, overflowY: "auto", background: C.navyLight, borderRadius: 4, padding: 12, fontSize: 12.5, color: C.text, lineHeight: 1.7, whiteSpace: "pre-wrap", border: `1px solid ${C.border}`, marginBottom: 12 }}>
-            {refPanel.text}
+          <div style={{ fontSize: 11, color: C.textLight, marginBottom: 8, lineHeight: 1.5 }}>
+            テキストを選択してコピーできます。選択なしで「全文コピー」を押すと全文がコピーされます。
           </div>
-          <button onClick={() => { navigator.clipboard.writeText(refPanel.text); }}
-            style={{ padding: "10px", background: C.navy, color: C.white, border: "none", borderRadius: 3, fontWeight: 700, fontSize: 13, cursor: "pointer", marginBottom: 8 }}>
-            コピー
-          </button>
-          <button onClick={() => setRefPanel(null)}
-            style={{ padding: "8px", background: "transparent", color: C.textLight, border: `1px solid ${C.border}`, borderRadius: 3, fontSize: 13, cursor: "pointer" }}>
-            閉じる
-          </button>
+          <textarea
+            readOnly
+            value={refPanel.text}
+            style={{
+              flex: 1, overflowY: "auto",
+              background: C.navyLight, borderRadius: 4,
+              padding: 12, fontSize: 12.5, color: C.text,
+              lineHeight: 1.7, border: `1px solid ${C.border}`,
+              marginBottom: 12, resize: "none",
+              fontFamily: "'Noto Sans JP', sans-serif",
+              whiteSpace: "pre-wrap", wordBreak: "break-all",
+              cursor: "text",
+            }}
+          />
+          <div style={{ display: "flex", gap: 8, marginBottom: 0 }}>
+            <button
+              onClick={() => {
+                const sel = window.getSelection()?.toString();
+                navigator.clipboard.writeText(sel && sel.length > 0 ? sel : refPanel.text);
+              }}
+              style={{ flex: 1, padding: "10px", background: C.navy, color: C.white, border: "none", borderRadius: 3, fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+            >
+              全文コピー
+            </button>
+            <button onClick={() => setRefPanel(null)}
+              style={{ flex: 1, padding: "10px", background: "transparent", color: C.textLight, border: `1px solid ${C.border}`, borderRadius: 3, fontSize: 13, cursor: "pointer" }}>
+              閉じる
+            </button>
+          </div>
         </div>
       )}
     </div>
