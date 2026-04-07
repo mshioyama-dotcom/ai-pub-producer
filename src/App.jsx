@@ -634,7 +634,9 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   };
 
   const handleSaveOutput = async () => {
-    await onSaveOutput(step.num, outputText); setSaveOutputMsg(true); setTimeout(() => setSaveOutputMsg(false), 2000);
+    await onSaveOutput(step.num, outputText);
+    setSaveOutputMsg("saved");
+    setTimeout(() => setSaveOutputMsg(false), 2000);
   };
 
   const handleRunDify = async () => {
@@ -886,7 +888,19 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           style={{ width: "100%", padding: "12px 14px", fontSize: 14, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.7, minHeight: 220 }} />
         <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
           <BtnPrimary onClick={handleSaveOutput}>出力データを保存</BtnPrimary>
-          {saveOutputMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました</span>}
+          {saveOutputMsg === "saved" && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました</span>}
+          <BtnSecondary
+            onClick={() => {
+              if (!outputText) return;
+              navigator.clipboard.writeText(outputText);
+              setSaveOutputMsg("copy");
+              setTimeout(() => setSaveOutputMsg(false), 2000);
+            }}
+            style={{ fontSize: 13 }}
+          >
+            出力をコピー
+          </BtnSecondary>
+          {saveOutputMsg === "copy" && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ コピーしました</span>}
           {nextStep && (
             <BtnSecondary onClick={() => onNavigate(`step_${nextStep.num}`)}
               style={{ background: C.greenLight, color: C.green, border: `1px solid rgba(45,122,79,0.25)` }}>
