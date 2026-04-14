@@ -782,37 +782,57 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
               </div>
               <div style={{ fontSize: 13, color: "#444444", marginBottom: 6 }}>{field.desc}</div>
 
-              {/* ① STEP2 amazon_html: HTML取得手順 + KindleストアURL表示 */}
+              {/* STEP2 amazon_html: HTML取得手順図解 */}
               {step.num === 2 && field.name === "amazon_html" && (
                 <div style={{ marginBottom: 10, padding: "12px 14px", background: "#eef2f7", border: "1px solid #c8d4e0", borderRadius: 6 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, marginBottom: 8 }}>HTMLソースの取得手順</div>
-                  <svg width="100%" viewBox="0 0 640 90" xmlns="http://www.w3.org/2000/svg">
-                    <defs><marker id="ha" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#555" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></marker></defs>
-                    {[
-                      { x: 10, label: "①Amazon", sub: "Kindleストアで検索" },
-                      { x: 170, label: "②右クリック", sub: "ページのソースを表示" },
-                      { x: 330, label: "③全選択コピー", sub: "Ctrl+A → Ctrl+C" },
-                      { x: 490, label: "④ここに貼付", sub: "「実行する」を押す" },
-                    ].map((s, i) => (
-                      <g key={i}>
-                        <rect x={s.x} y={10} width={130} height={50} rx={6} fill="#edf2f8" stroke="#2a4468" strokeWidth={0.5}/>
-                        <text fontFamily="sans-serif" fontSize={12} fontWeight="bold" fill="#1a2e4a" x={s.x + 65} y={33} textAnchor="middle">{s.label}</text>
-                        <text fontFamily="sans-serif" fontSize={10} fill="#2a4468" x={s.x + 65} y={50} textAnchor="middle">{s.sub}</text>
-                        {i < 3 && <line x1={s.x + 130} y1={35} x2={s.x + 150} y2={35} stroke="#555" strokeWidth={1.5} markerEnd="url(#ha)"/>}
-                      </g>
-                    ))}
+                  <svg width="100%" viewBox="0 0 680 300" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                      <marker id="ha" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M2 1L8 5L2 9" fill="none" stroke="#555" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </marker>
+                    </defs>
+                    {/* 上段：①②③ */}
+                    {/* ① Amazonを開く */}
+                    <rect x="20" y="30" width="112" height="64" rx="8" fill="#edf2f8" stroke="#2a4468" strokeWidth="0.5"/>
+                    <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#1a2e4a" x="76" y="54" textAnchor="middle" dominantBaseline="central">①</text>
+                    <text fontFamily="sans-serif" fontSize="11" fill="#2a4468" x="76" y="74" textAnchor="middle" dominantBaseline="central">Amazonを開く</text>
+                    <line x1="132" y1="62" x2="150" y2="62" stroke="#555" strokeWidth="1.5" markerEnd="url(#ha)"/>
+                    {/* ② Kindleストアに切替 */}
+                    <rect x="154" y="30" width="112" height="64" rx="8" fill="#edf2f8" stroke="#2a4468" strokeWidth="0.5"/>
+                    <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#1a2e4a" x="210" y="54" textAnchor="middle" dominantBaseline="central">②</text>
+                    <text fontFamily="sans-serif" fontSize="11" fill="#2a4468" x="210" y="74" textAnchor="middle" dominantBaseline="central">Kindleストアに切替</text>
+                    <line x1="266" y1="62" x2="284" y2="62" stroke="#555" strokeWidth="1.5" markerEnd="url(#ha)"/>
+                    {/* ②補足 */}
+                    <line x1="210" y1="94" x2="210" y2="110" stroke="#aaa" strokeWidth="0.5" strokeDasharray="4 3"/>
+                    <rect x="140" y="114" width="140" height="56" rx="6" fill="none" stroke="#b0bcc8" strokeWidth="0.5" strokeDasharray="4 3"/>
+                    <text fontFamily="sans-serif" fontSize="10" fill="#445566" x="210" y="135" textAnchor="middle" dominantBaseline="central">検索バー左端の「▼」をクリック</text>
+                    <text fontFamily="sans-serif" fontSize="10" fill="#445566" x="210" y="155" textAnchor="middle" dominantBaseline="central">→「Kindleストア」を選択</text>
+                    {/* ③ キーワード検索 */}
+                    <rect x="288" y="30" width="112" height="64" rx="8" fill="#edf2f8" stroke="#2a4468" strokeWidth="0.5"/>
+                    <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#1a2e4a" x="344" y="54" textAnchor="middle" dominantBaseline="central">③</text>
+                    <text fontFamily="sans-serif" fontSize="11" fill="#2a4468" x="344" y="74" textAnchor="middle" dominantBaseline="central">キーワード2語で検索</text>
+                    {/* ③→④ Uターン矢印 */}
+                    <path d="M400 62 L430 62 L430 210 L400 210" fill="none" stroke="#555" strokeWidth="1.5" markerEnd="url(#ha)"/>
+                    {/* 下段：④⑤⑥（右→左） */}
+                    {/* ④ ソースを表示 */}
+                    <rect x="288" y="178" width="112" height="64" rx="8" fill="#e4f2ec" stroke="#1e6b3a" strokeWidth="0.5"/>
+                    <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#1a4a2e" x="344" y="198" textAnchor="middle" dominantBaseline="central">④</text>
+                    <text fontFamily="sans-serif" fontSize="11" fill="#1e6b3a" x="344" y="216" textAnchor="middle" dominantBaseline="central">右クリック→</text>
+                    <text fontFamily="sans-serif" fontSize="11" fill="#1e6b3a" x="344" y="232" textAnchor="middle" dominantBaseline="central">ソースを表示</text>
+                    <line x1="288" y1="210" x2="270" y2="210" stroke="#555" strokeWidth="1.5" markerEnd="url(#ha)"/>
+                    {/* ⑤ 全選択コピー→貼付 */}
+                    <rect x="154" y="178" width="112" height="64" rx="8" fill="#e4f2ec" stroke="#1e6b3a" strokeWidth="0.5"/>
+                    <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#1a4a2e" x="210" y="198" textAnchor="middle" dominantBaseline="central">⑤</text>
+                    <text fontFamily="sans-serif" fontSize="11" fill="#1e6b3a" x="210" y="216" textAnchor="middle" dominantBaseline="central">Ctrl+A → Ctrl+C</text>
+                    <text fontFamily="sans-serif" fontSize="11" fill="#1e6b3a" x="210" y="232" textAnchor="middle" dominantBaseline="central">ここに貼付</text>
+                    <line x1="154" y1="210" x2="136" y2="210" stroke="#555" strokeWidth="1.5" markerEnd="url(#ha)"/>
+                    {/* ⑥ 実行する */}
+                    <rect x="20" y="178" width="112" height="64" rx="8" fill="#e4f2ec" stroke="#1e6b3a" strokeWidth="0.5"/>
+                    <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#1a4a2e" x="76" y="198" textAnchor="middle" dominantBaseline="central">⑥</text>
+                    <text fontFamily="sans-serif" fontSize="11" fill="#1e6b3a" x="76" y="216" textAnchor="middle" dominantBaseline="central">「実行する」</text>
+                    <text fontFamily="sans-serif" fontSize="11" fill="#1e6b3a" x="76" y="232" textAnchor="middle" dominantBaseline="central">を押す</text>
                   </svg>
-                  {/* ① AmazonのKindleストアURLをテキストで表示 */}
-                  <div style={{ marginTop: 10, padding: "8px 12px", background: C.white, border: `1px solid ${C.border}`, borderRadius: 4 }}>
-                    <div style={{ fontSize: 11.5, fontWeight: 700, color: C.navy, marginBottom: 4 }}>KindleストアのURL（ブラウザに貼り付けて開いてください）</div>
-                    <div style={{ fontSize: 12, color: C.navyMid, fontFamily: "monospace", wordBreak: "break-all", userSelect: "all", letterSpacing: "0.02em" }}>
-                      https://www.amazon.co.jp/s?i=digital-text
-                    </div>
-                    <div style={{ fontSize: 11, color: C.textLight, marginTop: 4 }}>
-                      ※ 開いたらキーワード2語を入力して検索 → ソースを取得してください
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 11.5, color: C.textLight, marginTop: 6 }}>貼り付け後は「実行する」を押すだけ。自動でクリーニングしてAIに渡します。</div>
                 </div>
               )}
 
