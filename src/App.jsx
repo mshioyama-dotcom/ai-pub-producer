@@ -103,8 +103,8 @@ const STEPS = [
     inputs: [
       { name: "keyword1", label: "検索キーワード1", desc: "確定した1語目", source: "STEP2", required: true, type: "text", autoFill: false, maxChars: 256 },
       { name: "keyword2", label: "検索キーワード2", desc: "確定した2語目", source: "STEP2", required: true, type: "text", autoFill: false, maxChars: 256 },
-      { name: "blueprint_text", label: "読者・価値設計のアウトプット", desc: "読者・価値設計の出力を全文貼り付け", source: "STEP3", required: true, type: "textarea", autoFill: true, maxChars: 2048 },
-      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "エピソードインタビューの出力を全文貼り付け", source: "STEP4", required: true, type: "textarea", autoFill: true, maxChars: 2048 }
+      { name: "blueprint_text", label: "読者・価値設計のアウトプット", desc: "読者・価値設計の出力を全文貼り付け", source: "STEP3", required: true, type: "textarea", autoFill: true, maxChars: 5000 },
+      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "エピソードインタビューの出力を全文貼り付け", source: "STEP4", required: true, type: "textarea", autoFill: true, maxChars: 5000 }
     ],
     outputTitle: "タイトル案",
     help: [
@@ -119,8 +119,8 @@ const STEPS = [
     category: "執筆設計", type: "workflow",
     url: "https://udify.app/workflow/tcqNIyr8wpCBAJhb",
     inputs: [
-      { name: "blueprint_text", label: "読者・価値設計のアウトプット", desc: "読者・価値設計の出力を全文貼り付け", source: "STEP3", required: true, type: "textarea", autoFill: true, maxChars: 2048 },
-      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "エピソードインタビューの出力を全文貼り付け", source: "STEP4", required: true, type: "textarea", autoFill: true, maxChars: 2048 }
+      { name: "blueprint_text", label: "読者・価値設計のアウトプット", desc: "読者・価値設計の出力を全文貼り付け", source: "STEP3", required: true, type: "textarea", autoFill: true, maxChars: 5000 },
+      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "エピソードインタビューの出力を全文貼り付け", source: "STEP4", required: true, type: "textarea", autoFill: true, maxChars: 5000 }
     ],
     outputTitle: "完成目次",
     help: [
@@ -166,12 +166,12 @@ const STEPS = [
     url: "https://udify.app/workflow/lRAWtZGuVL4bqHM9",
     inputs: [
       { name: "detailed_plot_text", label: "詳細プロット作成のアウトプット（1章分）", desc: "詳細プロット作成の出力を貼り付け", source: "STEP8", required: true, type: "textarea", autoFill: true, maxChars: 5000 },
-      { name: "target_heading", label: "執筆対象の見出し", desc: "「参照」ボタンで詳細プロットを表示し、書きたい項の見出しをコピーして貼り付けてください", source: "STEP8", required: true, type: "text", autoFill: false, maxChars: 256 },
+      { name: "target_heading", label: "執筆対象の見出し", desc: "詳細プロットの各項には①②③の番号付き見出しがあります。書きたい項の見出し1つ（例：「① 〇〇のポイント」）をそのままコピーして貼り付けてください", source: "STEP8", required: true, type: "text", autoFill: false, maxChars: 256 },
       { name: "past_writing_text", label: "著者の過去の執筆データ（任意）", desc: "文体参考の過去原稿（最大4000字）", source: null, required: false, type: "textarea", maxChars: 4000 }
     ],
     outputTitle: "生成された本文",
     help: [
-      "1項ずつ処理します。「参照」ボタンで詳細プロットを表示し、書きたい項の①②③の見出しをコピーして貼り付けてください",
+      "1項ずつ処理します。「参照」ボタンで詳細プロットを表示し、書きたい項の見出し（①②③のいずれか1つ）をそのままコピーして貼り付けてください",
       "文体を変えたい場合は、出力をAIチャットに貼り付けて修正を指示してください"
     ]
   },
@@ -617,7 +617,6 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     setInputs((prev) => { const updated = { ...prev, [name]: value }; onInputChange?.(step.num, updated); return updated; });
     setValidationErrors((prev) => prev.filter((e) => e !== name));
     const field = step.inputs.find((f) => f.name === name);
-    // amazon_htmlは文字数チェック対象外（クリーニング後に大幅に縮小されるため）
     if (field?.maxChars && name !== "amazon_html") setCharErrors((prev) => ({ ...prev, [name]: value.length > field.maxChars }));
   };
 
@@ -625,7 +624,6 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     const errors = []; const newCharErrors = {};
     step.inputs.forEach((field) => {
       if (field.required && !(inputs[field.name] || "").trim()) errors.push(field.name);
-      // amazon_htmlは文字数チェック対象外
       if (field.maxChars && field.name !== "amazon_html" && (inputs[field.name] || "").length > field.maxChars) newCharErrors[field.name] = true;
     });
     setValidationErrors(errors); setCharErrors(newCharErrors);
@@ -784,6 +782,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
               </div>
               <div style={{ fontSize: 13, color: "#444444", marginBottom: 6 }}>{field.desc}</div>
 
+              {/* ① STEP2 amazon_html: HTML取得手順 + KindleストアURL表示 */}
               {step.num === 2 && field.name === "amazon_html" && (
                 <div style={{ marginBottom: 10, padding: "12px 14px", background: "#eef2f7", border: "1px solid #c8d4e0", borderRadius: 6 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, marginBottom: 8 }}>HTMLソースの取得手順</div>
@@ -803,6 +802,16 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                       </g>
                     ))}
                   </svg>
+                  {/* ① AmazonのKindleストアURLをテキストで表示 */}
+                  <div style={{ marginTop: 10, padding: "8px 12px", background: C.white, border: `1px solid ${C.border}`, borderRadius: 4 }}>
+                    <div style={{ fontSize: 11.5, fontWeight: 700, color: C.navy, marginBottom: 4 }}>KindleストアのURL（ブラウザに貼り付けて開いてください）</div>
+                    <div style={{ fontSize: 12, color: C.navyMid, fontFamily: "monospace", wordBreak: "break-all", userSelect: "all", letterSpacing: "0.02em" }}>
+                      https://www.amazon.co.jp/s?i=digital-text
+                    </div>
+                    <div style={{ fontSize: 11, color: C.textLight, marginTop: 4 }}>
+                      ※ 開いたらキーワード2語を入力して検索 → ソースを取得してください
+                    </div>
+                  </div>
                   <div style={{ fontSize: 11.5, color: C.textLight, marginTop: 6 }}>貼り付け後は「実行する」を押すだけ。自動でクリーニングしてAIに渡します。</div>
                 </div>
               )}
@@ -833,7 +842,6 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
             <>
               <BtnSecondary onClick={() => {
                 if (validateInputs().length > 0) return;
-                // フィールドが1つだけの場合は値のみ、複数の場合はラベル付きでコピー
                 const text = step.inputs.length === 1
                   ? (inputs[step.inputs[0].name] || "")
                   : step.inputs.map((f) => `【${f.label}】\n${inputs[f.name] || ""}`).join("\n\n");
@@ -1163,9 +1171,8 @@ const GuidePage = ({ onNavigate }) => {
 
       <Section title="市場勝率診断のHTML取得方法">
         <ol style={{ margin: 0, paddingLeft: 18 }}>
-          <li>Amazonのトップページを開く</li>
-          <li>検索バー左のカテゴリを「Kindleストア」に切り替える</li>
-          <li>キーワード2語を入力して検索</li>
+          <li>下のURLをブラウザで開く：<br /><span style={{ fontFamily: "monospace", fontSize: 12, color: C.navyMid, userSelect: "all" }}>https://www.amazon.co.jp/s?i=digital-text</span></li>
+          <li style={{ marginTop: 6 }}>検索バーにキーワード2語を入力して検索</li>
           <li>検索結果ページで右クリック→「ページのソースを表示」</li>
           <li>Ctrl+A → Ctrl+C で全選択コピー</li>
           <li>STEP2の入力欄に貼り付けて「実行する」を押す</li>
@@ -1415,7 +1422,6 @@ export default function App() {
               onClick={() => {
                 const sel = window.getSelection()?.toString();
                 navigator.clipboard.writeText(sel && sel.length > 0 ? sel : refPanel.text);
-                // コピー後に対象フィールドへフォーカス移動
                 if (refPanel.targetField) {
                   setTimeout(() => {
                     const target = document.getElementById(`field-${refPanel.targetField}`);
