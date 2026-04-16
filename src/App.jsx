@@ -969,33 +969,38 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                 </div>
               </div>
               {/* 出力コピー＆会話リセット */}
-              <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                <button
-                  onClick={() => {
-                    const lastAI = [...chatMessages].reverse().find((m) => m.role === "assistant");
-                    if (lastAI) {
-                      setOutputText(lastAI.content);
-                      setChatCopyMsg(true);
-                      setTimeout(() => setChatCopyMsg(false), 2000);
-                    }
-                  }}
-                  disabled={!chatMessages.some((m) => m.role === "assistant")}
-                  style={{
-                    fontSize: 12, fontWeight: 700,
-                    color: chatMessages.some((m) => m.role === "assistant") ? C.white : C.textLight,
-                    background: chatMessages.some((m) => m.role === "assistant") ? C.navy : "rgba(0,0,0,0.06)",
-                    border: "none", borderRadius: 3, padding: "6px 14px", cursor: chatMessages.some((m) => m.role === "assistant") ? "pointer" : "default"
-                  }}
-                >
-                  最後の回答を出力データへ
-                </button>
-                {chatCopyMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 出力データに転記しました</span>}
-                <button
-                  onClick={() => { setChatMessages([]); setChatConversationId(""); setChatError(""); setChatInput(""); }}
-                  style={{ fontSize: 12, color: C.textLight, background: "none", border: `1px solid ${C.border}`, borderRadius: 3, padding: "4px 10px", cursor: "pointer" }}
-                >
-                  会話をリセット
-                </button>
+              <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <button
+                    onClick={() => {
+                      const lastAI = [...chatMessages].reverse().find((m) => m.role === "assistant");
+                      if (lastAI) {
+                        setOutputText(lastAI.content);
+                        setChatCopyMsg(true);
+                        setTimeout(() => setChatCopyMsg(false), 2000);
+                      }
+                    }}
+                    disabled={!chatMessages.some((m) => m.role === "assistant")}
+                    style={{
+                      fontSize: 13, fontWeight: 700,
+                      color: chatMessages.some((m) => m.role === "assistant") ? C.white : C.textLight,
+                      background: chatMessages.some((m) => m.role === "assistant") ? C.gold : "rgba(0,0,0,0.06)",
+                      border: "none", borderRadius: 3, padding: "8px 18px", cursor: chatMessages.some((m) => m.role === "assistant") ? "pointer" : "default"
+                    }}
+                  >
+                    ↓ 最後の回答を出力データへ転記
+                  </button>
+                  {chatCopyMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 転記しました</span>}
+                </div>
+                <div>
+                  <button
+                    onClick={() => { setChatMessages([]); setChatConversationId(""); setChatError(""); setChatInput(""); }}
+                    style={{ fontSize: 12, color: C.textLight, background: "none", border: `1px solid ${C.border}`, borderRadius: 3, padding: "4px 10px", cursor: "pointer" }}
+                  >
+                    会話をリセット
+                  </button>
+                  <span style={{ fontSize: 11.5, color: C.textLight, marginLeft: 8 }}>新しいテーマで試すときはリセットしてください</span>
+                </div>
               </div>
             </div>
           ) : (
