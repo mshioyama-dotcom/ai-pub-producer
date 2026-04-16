@@ -605,6 +605,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   const [chatConversationId, setChatConversationId] = useState("");
   const [chatError, setChatError] = useState("");
   const chatBottomRef = useRef(null);
+  const chatAreaRef = useRef(null);
   const [marketOptions, setMarketOptions] = useState([]);
   const [selectedMarket, setSelectedMarket] = useState(null);
 
@@ -679,7 +680,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
       else {
         if (data.conversation_id) setChatConversationId(data.conversation_id);
         setChatMessages((prev) => [...prev, { role: "assistant", content: data.answer }]);
-        setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+        setTimeout(() => { if (chatAreaRef.current) chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight; }, 50);
       }
     } catch (e) { setChatError("通信エラーが発生しました。時間をおいて再度お試しください。"); }
     finally { setChatLoading(false); }
@@ -906,7 +907,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
               {/* チャットUI */}
               <div style={{ border: `1px solid ${C.border}`, borderRadius: 6, overflow: "hidden", background: C.white }}>
                 {/* メッセージ一覧 */}
-                <div style={{ height: 340, overflowY: "auto", padding: "16px 14px", display: "flex", flexDirection: "column", gap: 10, background: C.navyLight }}>
+                <div ref={chatAreaRef} style={{ height: 340, overflowY: "auto", padding: "16px 14px", display: "flex", flexDirection: "column", gap: 10, background: C.navyLight }}>
                   {chatMessages.length === 0 && (
                     <div style={{ fontSize: 13, color: C.textLight, textAlign: "center", marginTop: 60 }}>
                       メッセージを入力して送信してください
