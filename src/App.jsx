@@ -435,15 +435,12 @@ const SideMenu = ({ currentPage, onNavigate, stepStatuses }) => {
       {/* ロゴ */}
       <div style={{ padding: "28px 20px 24px", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14 }}>
-          {/* 書籍アイコン（3本横線） */}
           <div style={{ display: "flex", flexDirection: "column", gap: 4, flexShrink: 0 }}>
             <div style={{ width: 20, height: 2.5, background: C.gold, borderRadius: 1 }} />
             <div style={{ width: 15, height: 2.5, background: `rgba(184,146,42,0.6)`, borderRadius: 1 }} />
             <div style={{ width: 18, height: 2.5, background: `rgba(184,146,42,0.35)`, borderRadius: 1 }} />
           </div>
-          {/* 縦線 */}
           <div style={{ width: 1.5, height: 42, background: C.gold, flexShrink: 0, opacity: 0.6 }} />
-          {/* テキスト */}
           <div>
             <div style={{ fontSize: 20, fontWeight: 700, color: "#ffffff", letterSpacing: "0.02em", lineHeight: 1.3, fontFamily: "'Noto Sans JP', sans-serif" }}>AI出版プロデューサー</div>
             <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.65)", marginTop: 5, letterSpacing: "0.04em", fontFamily: "'Noto Sans JP', sans-serif" }}>Kindle出版を10ステップで進める</div>
@@ -601,6 +598,13 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   const [charErrors, setCharErrors] = useState({});
   const [isRunning, setIsRunning] = useState(false);
   const [runError, setRunError] = useState("");
+  // チャット型（STEP1・4）用
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatConversationId, setChatConversationId] = useState("");
+  const [chatError, setChatError] = useState("");
+  const chatBottomRef = useRef(null);
   const [marketOptions, setMarketOptions] = useState([]);
   const [selectedMarket, setSelectedMarket] = useState(null);
 
@@ -608,6 +612,8 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     setInputs(stepData.inputData || {}); setOutputText(stepData.outputText || "");
     setHelpOpen(false); setValidationErrors([]); setCharErrors({}); setRunError("");
     setMarketOptions([]); setSelectedMarket(null);
+    setChatMessages([]); setChatInput(""); setChatLoading(false);
+    setChatConversationId(""); setChatError("");
   }, [step.num]);
 
   const prevStep = step.num > 1 ? STEPS[step.num - 2] : null;
@@ -655,6 +661,30 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     finally { setIsRunning(false); }
   };
 
+  const handleChatSend = async () => {
+    const text = chatInput.trim();
+    if (!text || chatLoading) return;
+    setChatInput("");
+    setChatError("");
+    setChatMessages((prev) => [...prev, { role: "user", content: text }]);
+    setChatLoading(true);
+    try {
+      const response = await fetch("/api/dify-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stepNum: step.num, message: text, conversation_id: chatConversationId }),
+      });
+      const data = await response.json();
+      if (!response.ok) { setChatError(data.error || "送信に失敗しました"); }
+      else {
+        if (data.conversation_id) setChatConversationId(data.conversation_id);
+        setChatMessages((prev) => [...prev, { role: "assistant", content: data.answer }]);
+        setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+      }
+    } catch (e) { setChatError("通信エラーが発生しました。時間をおいて再度お試しください。"); }
+    finally { setChatLoading(false); }
+  };
+
   return (
     <div>
       {/* ヘッダー */}
@@ -676,7 +706,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         <div style={{ fontSize: 13, fontWeight: 700, color: C.navy, marginBottom: 8 }}>このステップの進め方</div>
         <div style={{ fontSize: 13.5, color: "#2a2a2a", lineHeight: 2.1 }}>
           {step.type === "chat" ? (
-            <><span style={{ fontWeight: 700, color: C.navy }}>①</span> 下の「入力データ」に情報を入力して保存する<br /><span style={{ fontWeight: 700, color: C.navy }}>②</span> 「AIツールを開く」ボタンでツールにアクセスして対話する<br /><span style={{ fontWeight: 700, color: C.navy }}>③</span> 会話結果をコピー →「出力データ」に貼り付けて保存する</>
+            <><span style={{ fontWeight: 700, color: C.navy }}>①</span> 下の「入力データ」に情報を入力して保存する<br /><span style={{ fontWeight: 700, color: C.navy }}>②</span> チャット欄でAIと対話する（このページを離れずに会話できます）<br /><span style={{ fontWeight: 700, color: C.navy }}>③</span> 会話が終わったら結果をコピー →「出力データ」に貼り付けて保存する</>
           ) : (
             <><span style={{ fontWeight: 700, color: C.navy }}>①</span> 下の「入力データ」に情報を入力する{step.inputs.some((f) => f.source) && "（前ステップの出力を貼り付け）"}<br /><span style={{ fontWeight: 700, color: C.navy }}>②</span> 「実行する」ボタンを押す → AIが処理して結果が自動で表示される<br /><span style={{ fontWeight: 700, color: C.navy }}>③</span> 出力内容を確認して保存する</>
           )}
@@ -792,42 +822,32 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                         <path d="M2 1L8 5L2 9" fill="none" stroke="#555" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                       </marker>
                     </defs>
-                    {/* 上段：①②③ */}
-                    {/* ① Amazonを開く */}
                     <rect x="20" y="30" width="112" height="64" rx="8" fill="#edf2f8" stroke="#2a4468" strokeWidth="0.5"/>
                     <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#1a2e4a" x="76" y="54" textAnchor="middle" dominantBaseline="central">①</text>
                     <text fontFamily="sans-serif" fontSize="11" fill="#2a4468" x="76" y="74" textAnchor="middle" dominantBaseline="central">Amazonを開く</text>
                     <line x1="132" y1="62" x2="150" y2="62" stroke="#555" strokeWidth="1.5" markerEnd="url(#ha)"/>
-                    {/* ② Kindleストアに切替 */}
                     <rect x="154" y="30" width="112" height="64" rx="8" fill="#edf2f8" stroke="#2a4468" strokeWidth="0.5"/>
                     <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#1a2e4a" x="210" y="54" textAnchor="middle" dominantBaseline="central">②</text>
                     <text fontFamily="sans-serif" fontSize="11" fill="#2a4468" x="210" y="74" textAnchor="middle" dominantBaseline="central">Kindleストアに切替</text>
                     <line x1="266" y1="62" x2="284" y2="62" stroke="#555" strokeWidth="1.5" markerEnd="url(#ha)"/>
-                    {/* ②補足 */}
                     <line x1="210" y1="94" x2="210" y2="110" stroke="#aaa" strokeWidth="0.5" strokeDasharray="4 3"/>
                     <rect x="140" y="114" width="140" height="56" rx="6" fill="none" stroke="#b0bcc8" strokeWidth="0.5" strokeDasharray="4 3"/>
                     <text fontFamily="sans-serif" fontSize="10" fill="#445566" x="210" y="135" textAnchor="middle" dominantBaseline="central">検索バー左端の「▼」をクリック</text>
                     <text fontFamily="sans-serif" fontSize="10" fill="#445566" x="210" y="155" textAnchor="middle" dominantBaseline="central">→「Kindleストア」を選択</text>
-                    {/* ③ キーワード検索 */}
                     <rect x="288" y="30" width="112" height="64" rx="8" fill="#edf2f8" stroke="#2a4468" strokeWidth="0.5"/>
                     <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#1a2e4a" x="344" y="54" textAnchor="middle" dominantBaseline="central">③</text>
                     <text fontFamily="sans-serif" fontSize="11" fill="#2a4468" x="344" y="74" textAnchor="middle" dominantBaseline="central">キーワード2語で検索</text>
-                    {/* ③→④ Uターン矢印 */}
                     <path d="M400 62 L430 62 L430 210 L400 210" fill="none" stroke="#555" strokeWidth="1.5" markerEnd="url(#ha)"/>
-                    {/* 下段：④⑤⑥（右→左） */}
-                    {/* ④ ソースを表示 */}
                     <rect x="288" y="178" width="112" height="64" rx="8" fill="#e4f2ec" stroke="#1e6b3a" strokeWidth="0.5"/>
                     <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#1a4a2e" x="344" y="198" textAnchor="middle" dominantBaseline="central">④</text>
                     <text fontFamily="sans-serif" fontSize="11" fill="#1e6b3a" x="344" y="216" textAnchor="middle" dominantBaseline="central">右クリック→</text>
                     <text fontFamily="sans-serif" fontSize="11" fill="#1e6b3a" x="344" y="232" textAnchor="middle" dominantBaseline="central">ソースを表示</text>
                     <line x1="288" y1="210" x2="270" y2="210" stroke="#555" strokeWidth="1.5" markerEnd="url(#ha)"/>
-                    {/* ⑤ 全選択コピー→貼付 */}
                     <rect x="154" y="178" width="112" height="64" rx="8" fill="#e4f2ec" stroke="#1e6b3a" strokeWidth="0.5"/>
                     <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#1a4a2e" x="210" y="198" textAnchor="middle" dominantBaseline="central">⑤</text>
                     <text fontFamily="sans-serif" fontSize="11" fill="#1e6b3a" x="210" y="216" textAnchor="middle" dominantBaseline="central">Ctrl+A → Ctrl+C</text>
                     <text fontFamily="sans-serif" fontSize="11" fill="#1e6b3a" x="210" y="232" textAnchor="middle" dominantBaseline="central">ここに貼付</text>
                     <line x1="154" y1="210" x2="136" y2="210" stroke="#555" strokeWidth="1.5" markerEnd="url(#ha)"/>
-                    {/* ⑥ 実行する */}
                     <rect x="20" y="178" width="112" height="64" rx="8" fill="#e4f2ec" stroke="#1e6b3a" strokeWidth="0.5"/>
                     <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#1a4a2e" x="76" y="198" textAnchor="middle" dominantBaseline="central">⑥</text>
                     <text fontFamily="sans-serif" fontSize="11" fill="#1e6b3a" x="76" y="216" textAnchor="middle" dominantBaseline="central">「実行する」</text>
@@ -858,19 +878,6 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
           <BtnPrimary onClick={handleSaveInput}>入力データを保存</BtnPrimary>
           {saveInputMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました</span>}
-          {step.type === "chat" && (
-            <>
-              <BtnSecondary onClick={() => {
-                if (validateInputs().length > 0) return;
-                const text = step.inputs.length === 1
-                  ? (inputs[step.inputs[0].name] || "")
-                  : step.inputs.map((f) => `【${f.label}】\n${inputs[f.name] || ""}`).join("\n\n");
-                navigator.clipboard.writeText(text); setCopyInputMsg(true); setTimeout(() => setCopyInputMsg(false), 2000);
-              }}>入力データをコピー</BtnSecondary>
-              {copyInputMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ コピーしました</span>}
-              <span style={{ fontSize: 12, color: C.textLight }}>※ コピーしてAIツールに貼り付けてください</span>
-            </>
-          )}
         </div>
       </div>
 
@@ -884,14 +891,80 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           {step.type === "chat" ? (
             <div>
               <div style={{ fontSize: 13, color: C.textSub, lineHeight: 1.8, marginBottom: 12 }}>
-                このステップは対話型です。下のボタンからAIツールを開いて会話してください。入力データ欄の内容をコピーしてからツールに貼り付けてください。
+                入力データを保存したら、下のチャット欄でAIと対話してください。このページを離れずに会話できます。
               </div>
-              <a href={step.url} target="_blank" rel="noopener noreferrer"
-                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "12px 28px", background: C.navy, color: C.white, borderRadius: 3, fontWeight: 700, fontSize: 14, textDecoration: "none", letterSpacing: "0.04em" }}>
-                AIツールを開く ↗
-              </a>
-              <div style={{ marginTop: 12, padding: "10px 14px", background: C.goldPale, border: `1px solid ${C.goldLight}`, borderRadius: 4, fontSize: 12.5, color: "#7a5c10", lineHeight: 1.8 }}>
-                <span style={{ fontWeight: 700 }}>⚠ Difyの画面について：</span>左側に過去の会話履歴が表示されますが、毎回新しい会話から始めてください。「Start New chat」ボタンを押すと新規会話が始まります。
+              {/* チャットUI */}
+              <div style={{ border: `1px solid ${C.border}`, borderRadius: 6, overflow: "hidden", background: C.white }}>
+                {/* メッセージ一覧 */}
+                <div style={{ height: 340, overflowY: "auto", padding: "16px 14px", display: "flex", flexDirection: "column", gap: 10, background: C.navyLight }}>
+                  {chatMessages.length === 0 && (
+                    <div style={{ fontSize: 13, color: C.textLight, textAlign: "center", marginTop: 60 }}>
+                      メッセージを入力して送信してください
+                    </div>
+                  )}
+                  {chatMessages.map((msg, i) => (
+                    <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: msg.role === "user" ? "flex-end" : "flex-start" }}>
+                      <div style={{ fontSize: 11, color: C.textLight, marginBottom: 3, paddingLeft: msg.role === "user" ? 0 : 4, paddingRight: msg.role === "user" ? 4 : 0 }}>
+                        {msg.role === "user" ? "あなた" : "AI"}
+                      </div>
+                      <div style={{
+                        maxWidth: "82%", padding: "10px 14px", borderRadius: msg.role === "user" ? "12px 12px 3px 12px" : "12px 12px 12px 3px",
+                        background: msg.role === "user" ? C.navy : C.white,
+                        color: msg.role === "user" ? C.white : C.text,
+                        fontSize: 13.5, lineHeight: 1.75, whiteSpace: "pre-wrap", wordBreak: "break-word",
+                        border: msg.role === "user" ? "none" : `1px solid ${C.border}`,
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.07)"
+                      }}>
+                        {msg.content}
+                      </div>
+                    </div>
+                  ))}
+                  {chatLoading && (
+                    <div style={{ display: "flex", alignItems: "flex-start" }}>
+                      <div style={{ padding: "10px 16px", borderRadius: "12px 12px 12px 3px", background: C.white, border: `1px solid ${C.border}`, fontSize: 13, color: C.textLight }}>
+                        考え中...
+                      </div>
+                    </div>
+                  )}
+                  <div ref={chatBottomRef} />
+                </div>
+                {/* エラー表示 */}
+                {chatError && (
+                  <div style={{ padding: "8px 14px", background: "#fef2f2", borderTop: `1px solid rgba(192,57,43,0.2)`, fontSize: 12.5, color: C.red }}>{chatError}</div>
+                )}
+                {/* 入力エリア */}
+                <div style={{ display: "flex", gap: 0, borderTop: `1px solid ${C.border}`, background: C.white }}>
+                  <textarea
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                        e.preventDefault();
+                        handleChatSend();
+                      }
+                    }}
+                    placeholder="メッセージを入力（Ctrl+Enterで送信）"
+                    rows={3}
+                    style={{ flex: 1, padding: "12px 14px", fontSize: 13.5, border: "none", outline: "none", resize: "none", fontFamily: "inherit", lineHeight: 1.65, boxSizing: "border-box" }}
+                  />
+                  <button
+                    onClick={handleChatSend}
+                    disabled={chatLoading || !chatInput.trim()}
+                    style={{ width: 80, background: chatLoading || !chatInput.trim() ? "#ccc" : C.navy, color: C.white, border: "none", fontWeight: 700, fontSize: 13, cursor: chatLoading || !chatInput.trim() ? "default" : "pointer", flexShrink: 0, letterSpacing: "0.02em" }}
+                  >
+                    送信
+                  </button>
+                </div>
+              </div>
+              {/* 会話リセット */}
+              <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center" }}>
+                <button
+                  onClick={() => { setChatMessages([]); setChatConversationId(""); setChatError(""); setChatInput(""); }}
+                  style={{ fontSize: 12, color: C.textLight, background: "none", border: `1px solid ${C.border}`, borderRadius: 3, padding: "4px 10px", cursor: "pointer" }}
+                >
+                  会話をリセット
+                </button>
+                <span style={{ fontSize: 11.5, color: C.textLight }}>新しいテーマで試すときはリセットしてください</span>
               </div>
             </div>
           ) : (
@@ -919,11 +992,11 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>出力データ</h2>
         </div>
         <div style={{ fontSize: 13, color: "#444444", marginBottom: 10, lineHeight: 1.8 }}>
-          {step.type === "chat" ? <>AIツールの会話結果をコピーして、下の欄に貼り付けてください。{nextStep && ` この出力は次のステップ（STEP${nextStep.num}）の入力になります。`}</> : <>AIの実行結果が自動で表示されます。内容を確認してから保存してください。{nextStep && ` この出力は次のステップ（STEP${nextStep.num}）の入力になります。`}</>}
+          {step.type === "chat" ? <>チャットの会話から得た結果をコピーして、下の欄に貼り付けてください。{nextStep && ` この出力は次のステップ（STEP${nextStep.num}）の入力になります。`}</> : <>AIの実行結果が自動で表示されます。内容を確認してから保存してください。{nextStep && ` この出力は次のステップ（STEP${nextStep.num}）の入力になります。`}</>}
           <br />出力はそのまま使っても、自分で修正したり、AIチャットで整えてから使うこともできます。
         </div>
         <textarea value={outputText} onChange={(e) => setOutputText(e.target.value)}
-          placeholder={step.type === "chat" ? "AIツールの会話結果をここに貼り付けてください" : "実行するボタンを押すと結果が自動で表示されます"} rows={10}
+          placeholder={step.type === "chat" ? "チャットで得た結果をここに貼り付けてください" : "実行するボタンを押すと結果が自動で表示されます"} rows={10}
           style={{ width: "100%", padding: "12px 14px", fontSize: 14, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.7, minHeight: 220 }} />
         <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
           <BtnPrimary onClick={handleSaveOutput}>出力データを保存</BtnPrimary>
@@ -1171,12 +1244,9 @@ const GuidePage = ({ onNavigate }) => {
       <Section title="操作方法（チャット型：STEP1・4）">
         <ul style={{ margin: 0, paddingLeft: 18 }}>
           <li>① 入力データ欄に情報を入力して「入力データを保存」を押す</li>
-          <li>② 「入力データをコピー」でコピーして「AIツールを開く」でツールにアクセスし、貼り付けて対話する</li>
-          <li>③ 会話結果をコピーして出力データ欄に貼り付け「出力データを保存」を押す</li>
+          <li>② チャット欄にメッセージを入力してAIと対話する（ページを離れずに会話できます）</li>
+          <li>③ 会話で得た結果を出力データ欄に貼り付けて「出力データを保存」を押す</li>
         </ul>
-        <div style={{ marginTop: 10, padding: "10px 14px", background: C.goldPale, border: `1px solid ${C.goldLight}`, borderRadius: 4, fontSize: 12.5, color: "#7a5c10", lineHeight: 1.8 }}>
-          <span style={{ fontWeight: 700 }}>⚠ Difyの画面について：</span>AIツールを開くと左側に過去の会話履歴が表示されます。毎回「Start New chat」ボタンを押して新しい会話から始めてください。前の会話の続きから始めると意図しない結果になることがあります。
-        </div>
         <div style={{ marginTop: 8, fontSize: 12.5, color: "#b8922a", fontWeight: 600 }}>
           ⚠️ 修正した内容が次のステップの土台になります。必ず保存してから次へ進んでください。
         </div>
@@ -1344,7 +1414,6 @@ export default function App() {
       borderBottom: `1px solid rgba(255,255,255,0.1)`
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        {/* ハンバーガーボタン */}
         <button
           onClick={() => setMenuOpen(!menuOpen)}
           style={{ background: "none", border: "none", cursor: "pointer", padding: 6, display: "flex", flexDirection: "column", gap: 5 }}
@@ -1371,14 +1440,12 @@ export default function App() {
   // ============================================================
   const MobileDrawer = () => (
     <>
-      {/* オーバーレイ */}
       {menuOpen && (
         <div
           onClick={() => setMenuOpen(false)}
           style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 200 }}
         />
       )}
-      {/* ドロワー本体 */}
       <div style={{
         position: "fixed", top: 56, left: 0, bottom: 0,
         width: 280, background: C.navy,
@@ -1397,7 +1464,6 @@ export default function App() {
         <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
         <MobileHeader />
         <MobileDrawer />
-        {/* コンテンツ：ヘッダー分下にずらす */}
         <div style={{ paddingTop: 56, paddingBottom: 32, boxSizing: "border-box" }}>
           <div style={{ padding: "20px 16px", maxWidth: 800, margin: "0 auto" }}>
             {renderPage()}
