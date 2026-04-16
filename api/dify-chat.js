@@ -27,13 +27,13 @@ export default async function handler(req, res) {
   try {
     const body = {
       query: message,
-      response_mode: "blocking",
+      response_mode: "streaming",
       user: "ai-pub-producer-user",
       inputs: {},
     };
     if (conversation_id) body.conversation_id = conversation_id;
 
-    const response = await fetch(`${DIFY_API_BASE}/chat-messages`, {
+    const difyRes = await fetch(`${DIFY_API_BASE}/chat-messages`, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
@@ -42,15 +42,38 @@ export default async function handler(req, res) {
       body: JSON.stringify(body),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      return res.status(response.status).json({ error: `Dify API error: ${errorText}` });
+    if (!difyRes.ok) {
+      const errorText = await difyRes.text();
+      return res.status(difyRes.status).json({ error: `Dify API error: ${errorText}` });
     }
 
-    const data = await response.json();
+    // SSEストリームを受け取り、answer を結合して返す
+    const text = await difyRes.text();
+    const lines = text.split("\n");
+
+    let answer = "";
+    let returnedConversationId = "";
+
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const jsonStr = line.slice(6).trim();
+      if (jsonStr === "[DONE]") break;
+      try {
+        const data = JSON.parse(jsonStr);
+        if (data.event === "agent_message" || data.event === "message") {
+          answer += data.answer || "";
+        }
+        if (data.conversation_id) {
+          returnedConversationId = data.conversation_id;
+        }
+      } catch {
+        // パース失敗行はスキップ
+      }
+    }
+
     return res.status(200).json({
-      answer: data.answer || "",
-      conversation_id: data.conversation_id || "",
+      answer,
+      conversation_id: returnedConversationId,
     });
 
   } catch (error) {
