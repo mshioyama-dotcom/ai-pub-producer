@@ -878,6 +878,16 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
           <BtnPrimary onClick={handleSaveInput}>入力データを保存</BtnPrimary>
           {saveInputMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました</span>}
+          {step.type === "chat" && (
+            <BtnSecondary onClick={() => {
+              const text = step.inputs.length === 1
+                ? (inputs[step.inputs[0].name] || "")
+                : step.inputs.map((f) => `【${f.label}】\n${inputs[f.name] || ""}`).join("\n\n");
+              if (text.trim()) setChatInput(text);
+            }} style={{ fontSize: 13 }}>
+              チャットに転記
+            </BtnSecondary>
+          )}
         </div>
       </div>
 
@@ -938,12 +948,12 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                      if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
                         handleChatSend();
                       }
                     }}
-                    placeholder="メッセージを入力（Ctrl+Enterで送信）"
+                    placeholder="メッセージを入力（Enterで送信 / Shift+Enterで改行）"
                     rows={3}
                     style={{ flex: 1, padding: "12px 14px", fontSize: 13.5, border: "none", outline: "none", resize: "none", fontFamily: "inherit", lineHeight: 1.65, boxSizing: "border-box" }}
                   />
