@@ -606,6 +606,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   const [chatError, setChatError] = useState("");
   const chatBottomRef = useRef(null);
   const [chatCopyMsg, setChatCopyMsg] = useState(false);
+  const [chatTransferMsg, setChatTransferMsg] = useState(false);
   const chatAreaRef = useRef(null);
   const [marketOptions, setMarketOptions] = useState([]);
   const [selectedMarket, setSelectedMarket] = useState(null);
@@ -615,7 +616,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     setHelpOpen(false); setValidationErrors([]); setCharErrors({}); setRunError("");
     setMarketOptions([]); setSelectedMarket(null);
     setChatMessages([]); setChatInput(""); setChatLoading(false);
-    setChatConversationId(""); setChatError(""); setChatCopyMsg(false);
+    setChatConversationId(""); setChatError(""); setChatCopyMsg(false); setChatTransferMsg(false);
   }, [step.num]);
 
   const prevStep = step.num > 1 ? STEPS[step.num - 2] : null;
@@ -881,14 +882,38 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           <BtnPrimary onClick={handleSaveInput}>入力データを保存</BtnPrimary>
           {saveInputMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました</span>}
           {step.type === "chat" && (
-            <BtnSecondary onClick={() => {
-              const text = step.inputs.length === 1
-                ? (inputs[step.inputs[0].name] || "")
-                : step.inputs.map((f) => `【${f.label}】\n${inputs[f.name] || ""}`).join("\n\n");
-              if (text.trim()) setChatInput(text);
-            }} style={{ fontSize: 13 }}>
-              チャットに転記
-            </BtnSecondary>
+            <>
+              <BtnSecondary onClick={async () => {
+                const text = step.inputs.length === 1
+                  ? (inputs[step.inputs[0].name] || "")
+                  : step.inputs.map((f) => `【${f.label}】\n${inputs[f.name] || ""}`).join("\n\n");
+                if (!text.trim()) return;
+                setChatTransferMsg(true);
+                setTimeout(() => setChatTransferMsg(false), 2500);
+                // 入力データをそのままDifyに送信して最初の質問を引き出す
+                setChatError("");
+                setChatMessages((prev) => [...prev, { role: "user", content: text }]);
+                setChatLoading(true);
+                try {
+                  const response = await fetch("/api/dify-chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ stepNum: step.num, message: text, conversation_id: chatConversationId }),
+                  });
+                  const data = await response.json();
+                  if (!response.ok) { setChatError(data.error || "送信に失敗しました"); }
+                  else {
+                    if (data.conversation_id) setChatConversationId(data.conversation_id);
+                    setChatMessages((prev) => [...prev, { role: "assistant", content: data.answer }]);
+                    setTimeout(() => { if (chatAreaRef.current) chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight; }, 50);
+                  }
+                } catch (e) { setChatError("通信エラーが発生しました。時間をおいて再度お試しください。"); }
+                finally { setChatLoading(false); }
+              }} style={{ fontSize: 13 }}>
+                チャットに転記して開始
+              </BtnSecondary>
+              {chatTransferMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ チャットに転記しました</span>}
+            </>
           )}
         </div>
       </div>
