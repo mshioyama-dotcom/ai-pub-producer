@@ -607,6 +607,8 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   const chatBottomRef = useRef(null);
   const [chatCopyMsg, setChatCopyMsg] = useState(false);
   const [chatTransferMsg, setChatTransferMsg] = useState(false);
+  const [chatSelectOptions, setChatSelectOptions] = useState([]);
+  const [chatSelectMsg, setChatSelectMsg] = useState(false);
   const chatAreaRef = useRef(null);
   const [marketOptions, setMarketOptions] = useState([]);
   const [selectedMarket, setSelectedMarket] = useState(null);
@@ -616,7 +618,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     setHelpOpen(false); setValidationErrors([]); setCharErrors({}); setRunError("");
     setMarketOptions([]); setSelectedMarket(null);
     setChatMessages([]); setChatInput(""); setChatLoading(false);
-    setChatConversationId(""); setChatError(""); setChatCopyMsg(false); setChatTransferMsg(false);
+    setChatConversationId(""); setChatError(""); setChatCopyMsg(false); setChatTransferMsg(false); setChatSelectOptions([]); setChatSelectMsg(false);
   }, [step.num]);
 
   const prevStep = step.num > 1 ? STEPS[step.num - 2] : null;
@@ -999,7 +1001,14 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                   <button
                     onClick={() => {
                       const lastAI = [...chatMessages].reverse().find((m) => m.role === "assistant");
-                      if (lastAI) {
+                      if (!lastAI) return;
+                      // 行ごとに分割して候補を抽出（×や空行・説明文を除く）
+                      const lines = lastAI.content.split("\n").map((l) => l.trim()).filter(Boolean);
+                      const candidates = lines.filter((l) => l.includes("×") || l.includes("x") || l.includes("X"));
+                      if (candidates.length > 1) {
+                        setChatSelectOptions(candidates);
+                      } else {
+                        // 候補が1つ以下ならそのまま転記
                         setOutputText(lastAI.content);
                         setChatCopyMsg(true);
                         setTimeout(() => setChatCopyMsg(false), 2000);
@@ -1016,6 +1025,30 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                     ↓ 最後の回答を出力データへ転記
                   </button>
                   {chatCopyMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 転記しました</span>}
+                  {/* 候補選択UI */}
+                  {chatSelectOptions.length > 0 && (
+                    <div style={{ marginTop: 10, padding: "12px 14px", background: C.goldPale, border: `1px solid ${C.goldLight}`, borderRadius: 6, width: "100%", boxSizing: "border-box" }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: C.navy, marginBottom: 8 }}>出力データに転記するキーワードを1つ選んでください</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {chatSelectOptions.map((opt, i) => (
+                          <button key={i} onClick={() => {
+                            setOutputText(opt);
+                            setChatSelectOptions([]);
+                            setChatSelectMsg(true);
+                            setTimeout(() => setChatSelectMsg(false), 2000);
+                          }}
+                            style={{ textAlign: "left", padding: "8px 14px", background: C.white, border: `1px solid ${C.border}`, borderRadius: 4, fontSize: 13.5, fontWeight: 600, color: C.navy, cursor: "pointer" }}>
+                            {opt}
+                          </button>
+                        ))}
+                        <button onClick={() => setChatSelectOptions([])}
+                          style={{ textAlign: "left", padding: "4px 8px", background: "none", border: "none", fontSize: 12, color: C.textLight, cursor: "pointer" }}>
+                          キャンセル
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {chatSelectMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 転記しました</span>}
                 </div>
                 <div>
                   <button
