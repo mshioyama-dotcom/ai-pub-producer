@@ -367,8 +367,8 @@ const BtnSecondary = ({ children, onClick, style }) => (
   </button>
 );
 
-const Card = ({ children, style }) => (
-  <div style={{ background: C.white, borderRadius: 6, border: `1px solid ${C.border}`, padding: 20, ...style }}>
+const Card = ({ children, style, onClick }) => (
+  <div onClick={onClick} style={{ background: C.white, borderRadius: 6, border: `1px solid ${C.border}`, padding: 20, ...style }}>
     {children}
   </div>
 );
@@ -482,6 +482,9 @@ const HomePage = ({ project, stepStatuses, allSteps, onNavigate }) => {
   const lastUpdated = project.lastUpdatedStep;
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
+  // ========== 修正1：スキップ入口カード用のホバー状態 ==========
+  const [hoveredStartCard, setHoveredStartCard] = useState(null);
+
   return (
     <div>
       <div style={{ marginBottom: 28 }}>
@@ -507,6 +510,84 @@ const HomePage = ({ project, stepStatuses, allSteps, onNavigate }) => {
           </div>
         </Card>
       </div>
+
+      {/* ========== 修正1：始め方を選ぶ（新規追加セクション） ========== */}
+      <div style={{ marginBottom: 28 }}>
+        <h2 style={{ fontSize: 14, fontWeight: 700, color: C.navy, marginBottom: 12, letterSpacing: "0.03em" }}>始め方を選ぶ</h2>
+        <div style={{ fontSize: 12.5, color: C.textSub, marginBottom: 12, lineHeight: 1.7 }}>
+          初めて使う方は「ゼロから始める」を選んでください。すでに狙う2語キーワードが決まっている方は、STEP1をスキップしてSTEP2から始められます。
+        </div>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          {/* 通常フロー */}
+          <Card
+            style={{
+              flex: "1 1 280px", minWidth: 0, cursor: "pointer",
+              borderTop: `3px solid ${C.navy}`,
+              transition: "box-shadow 0.15s, transform 0.15s",
+              boxShadow: hoveredStartCard === "A" ? "0 4px 12px rgba(36,61,92,0.15)" : "none",
+              transform: hoveredStartCard === "A" ? "translateY(-2px)" : "translateY(0)"
+            }}
+            onClick={() => onNavigate("step_1")}
+          >
+            <div
+              onMouseEnter={() => setHoveredStartCard("A")}
+              onMouseLeave={() => setHoveredStartCard(null)}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                <span style={{
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  width: 32, height: 32, borderRadius: 4, background: C.navy, color: C.white,
+                  fontSize: 14, fontWeight: 700
+                }}>A</span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: C.navy }}>
+                  ゼロから始める
+                </span>
+              </div>
+              <div style={{ fontSize: 13, color: C.textSub, lineHeight: 1.8, marginBottom: 10 }}>
+                テーマは決まっているが、狙うキーワードはまだ決めていない方。AIとの対話で2語キーワードを見つけます。
+              </div>
+              <div style={{ fontSize: 12, color: C.gold, fontWeight: 600 }}>
+                → STEP1 テーマ発見インタビューへ
+              </div>
+            </div>
+          </Card>
+
+          {/* スキップフロー */}
+          <Card
+            style={{
+              flex: "1 1 280px", minWidth: 0, cursor: "pointer",
+              borderTop: `3px solid ${C.gold}`,
+              transition: "box-shadow 0.15s, transform 0.15s",
+              boxShadow: hoveredStartCard === "B" ? "0 4px 12px rgba(184,146,42,0.2)" : "none",
+              transform: hoveredStartCard === "B" ? "translateY(-2px)" : "translateY(0)"
+            }}
+            onClick={() => onNavigate("step_2")}
+          >
+            <div
+              onMouseEnter={() => setHoveredStartCard("B")}
+              onMouseLeave={() => setHoveredStartCard(null)}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                <span style={{
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  width: 32, height: 32, borderRadius: 4, background: C.gold, color: C.white,
+                  fontSize: 14, fontWeight: 700
+                }}>B</span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: C.navy }}>
+                  キーワードが決まっている
+                </span>
+              </div>
+              <div style={{ fontSize: 13, color: C.textSub, lineHeight: 1.8, marginBottom: 10 }}>
+                狙う2語キーワードがすでに明確な方。STEP1をスキップして、市場勝率診断から始められます。
+              </div>
+              <div style={{ fontSize: 12, color: C.gold, fontWeight: 600 }}>
+                → STEP2 市場勝率診断へ
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
+      {/* ========== 修正1 ここまで ========== */}
 
       <div style={{ marginBottom: 28 }}>
         <h2 style={{ fontSize: 14, fontWeight: 700, color: C.navy, marginBottom: 12, letterSpacing: "0.03em" }}>進行中のステップ</h2>
@@ -705,6 +786,44 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         </div>
       </div>
       <div style={{ height: 1, background: `linear-gradient(to right, ${C.gold}, ${C.goldLight}, transparent)`, width: "100%", opacity: 0.9, marginBottom: 20 }} />
+
+      {/* ========== 修正2：STEP1にスキップ案内を追加 ========== */}
+      {step.num === 1 && (
+        <Card style={{
+          marginBottom: 16,
+          background: C.goldPale,
+          border: `1px solid ${C.goldLight}`
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 220 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.navy, marginBottom: 4 }}>
+                すでにキーワードが決まっている方へ
+              </div>
+              <div style={{ fontSize: 12.5, color: C.textSub, lineHeight: 1.7 }}>
+                狙う2語キーワードが明確な場合は、STEP1をスキップしてSTEP2から始められます。
+              </div>
+            </div>
+            <button
+              onClick={() => onNavigate("step_2")}
+              style={{
+                fontSize: 12.5,
+                background: C.gold,
+                color: C.white,
+                border: "none",
+                borderRadius: 3,
+                padding: "9px 18px",
+                fontWeight: 600,
+                cursor: "pointer",
+                flexShrink: 0,
+                letterSpacing: "0.02em"
+              }}
+            >
+              STEP2から始める →
+            </button>
+          </div>
+        </Card>
+      )}
+      {/* ========== 修正2 ここまで ========== */}
 
       {/* 進め方カード */}
       <Card style={{ marginBottom: 24, background: "#eef2f7", border: `1px solid #c8d4e0` }}>
@@ -1320,12 +1439,36 @@ const GuidePage = ({ onNavigate }) => {
         </ul>
       </Section>
 
-      <Section title="操作方法（ワークフロー型：STEP2・3・5〜10）">
+      {/* ========== 修正3：GuidePageに「始め方を選ぶ」セクション追加 ========== */}
+      <Section title="始め方を選ぶ（2つの入口）">
+        <div style={{ marginBottom: 8 }}>
+          <span style={{ fontWeight: 700, color: C.navy }}>A：ゼロから始める</span>
+          <ul style={{ margin: "4px 0 12px", paddingLeft: 18 }}>
+            <li>テーマは決まっているが、狙うキーワードは決めていない方向け</li>
+            <li>STEP1のテーマ発見インタビューで、AIとの対話を通じて2語キーワードを見つけます</li>
+            <li>初めてKindle出版する方は、こちらを推奨します</li>
+          </ul>
+        </div>
+        <div>
+          <span style={{ fontWeight: 700, color: C.gold }}>B：キーワードが決まっている</span>
+          <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+            <li>狙う2語キーワードがすでに明確な方向け</li>
+            <li>STEP1をスキップして、STEP2（市場勝率診断）から直接始められます</li>
+            <li>ダッシュボードまたはSTEP1画面の上部にある「STEP2から始める」ボタンから入れます</li>
+          </ul>
+        </div>
+        <div style={{ marginTop: 10, padding: "8px 12px", background: C.goldPale, border: `1px solid ${C.goldLight}`, borderRadius: 4, fontSize: 12.5, lineHeight: 1.7, color: C.textSub }}>
+          どちらを選んでも、STEP2以降の流れは共通です。途中で入口を変えたくなった場合は、左メニューから直接目的のSTEPに移動できます。
+        </div>
+      </Section>
+      {/* ========== 修正3 ここまで ========== */}
+
+      <Section title="操作方法（ワークフロー型:STEP2・3・5〜10）">
         <ul style={{ margin: 0, paddingLeft: 18 }}>
           <li>① 入力データ欄に情報を入力する。前のSTEPの出力を使う欄には「自動転記」「参照」「自動振り分け」ボタンが表示される</li>
-          <li style={{ marginTop: 4 }}><span style={{ fontWeight: 700 }}>自動転記（ネイビー）</span>：押すと前のSTEPの出力が自動で入力欄に入る</li>
-          <li style={{ marginTop: 4 }}><span style={{ fontWeight: 700 }}>参照（薄ネイビー）</span>：押すと画面右側に前のSTEPの出力が表示され、見ながら手入力できる</li>
-          <li style={{ marginTop: 4 }}><span style={{ fontWeight: 700 }}>自動振り分け（ゴールド）</span>：STEP3専用。押すとSTEP2の出力から該当箇所を自動で抽出して入力する</li>
+          <li style={{ marginTop: 4 }}><span style={{ fontWeight: 700 }}>自動転記（ネイビー）</span>:押すと前のSTEPの出力が自動で入力欄に入る</li>
+          <li style={{ marginTop: 4 }}><span style={{ fontWeight: 700 }}>参照（薄ネイビー）</span>:押すと画面右側に前のSTEPの出力が表示され、見ながら手入力できる</li>
+          <li style={{ marginTop: 4 }}><span style={{ fontWeight: 700 }}>自動振り分け（ゴールド）</span>:STEP3専用。押すとSTEP2の出力から該当箇所を自動で抽出して入力する</li>
           <li style={{ marginTop: 8 }}>入力が終わったら「入力データを保存」を押す</li>
           <li>② 「実行する」ボタンを押すとAIが自動で処理し、結果が出力欄に表示される</li>
           <li>③ 内容を確認・修正して「出力データを保存」を押す</li>
@@ -1335,7 +1478,7 @@ const GuidePage = ({ onNavigate }) => {
         </div>
       </Section>
 
-      <Section title="操作方法（チャット型：STEP1・4）">
+      <Section title="操作方法（チャット型:STEP1・4）">
         <ul style={{ margin: 0, paddingLeft: 18 }}>
           <li>① 入力データ欄に情報を入力して「入力データを保存」を押す</li>
           <li>② 「チャットに転記して開始」を押すと入力データがそのまま送信され、AIから最初の質問が届く</li>
@@ -1357,7 +1500,7 @@ const GuidePage = ({ onNavigate }) => {
 
       <Section title="市場勝率診断のHTML取得方法">
         <ol style={{ margin: 0, paddingLeft: 18 }}>
-          <li>下のURLをブラウザで開く：<br /><span style={{ fontFamily: "monospace", fontSize: 12, color: C.navyMid, userSelect: "all" }}>https://www.amazon.co.jp/s?i=digital-text</span></li>
+          <li>下のURLをブラウザで開く:<br /><span style={{ fontFamily: "monospace", fontSize: 12, color: C.navyMid, userSelect: "all" }}>https://www.amazon.co.jp/s?i=digital-text</span></li>
           <li style={{ marginTop: 6 }}>検索バーにキーワード2語を入力して検索</li>
           <li>検索結果ページで右クリック→「ページのソースを表示」</li>
           <li>Ctrl+A → Ctrl+C で全選択コピー</li>
