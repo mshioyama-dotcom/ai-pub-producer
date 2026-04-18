@@ -167,13 +167,13 @@ const STEPS = [
     url: "https://udify.app/workflow/lRAWtZGuVL4bqHM9",
     inputs: [
       { name: "detailed_plot_text", label: "詳細プロット作成のアウトプット（1章分）", desc: "詳細プロット作成の出力を貼り付け", source: "STEP8", required: true, type: "textarea", autoFill: true, maxChars: 5000 },
-      { name: "target_heading", label: "執筆対象の見出し（1項のみ）", desc: "今回の実行で執筆する1項を選びます。下の「STEP8から見出しを抽出」ボタンを押すと、STEP8の詳細プロットから見出し候補（①②③...）を自動抽出して一覧表示します。1つクリックで選べます。", source: "STEP8", required: true, type: "text", autoFill: false, maxChars: 256 },
+      { name: "target_section", label: "執筆対象の節（1節分）", desc: "今回の実行で執筆する1節を選びます。下の「STEP8から節を抽出」ボタンを押すと、節候補を一覧表示します。1つ選ぶと、その節に含まれる全ての項（①②③...）を連続で生成します。", source: "STEP8", required: true, type: "text", autoFill: false, maxChars: 256 },
       { name: "past_writing_text", label: "著者の過去の執筆データ（任意）", desc: "文体参考の過去原稿（最大4000字）", source: null, required: false, type: "textarea", maxChars: 4000 }
     ],
     outputTitle: "生成された本文",
     help: [
-      "1項ずつ処理します。見出し欄の「STEP8から見出しを抽出」ボタンで一覧表示→クリックで選択できます",
-      "手動でコピペしたい場合は、入力欄に直接書き込むこともできます",
+      "1節ずつ処理します。選んだ節の配下の項（①②③...）を連続で生成し、1つの節として連結表示します",
+      "途中でエラーが出た場合は、生成途中の結果を破棄してもう一度「実行する」を押してください",
       "文体を変えたい場合は、出力をAIチャットに貼り付けて修正を指示してください"
     ]
   },
@@ -287,23 +287,43 @@ function parseStep2Output(text) {
   return { keyword1, keyword2, intent: intentMatch ? intentMatch[1].trim() : "", markets };
 }
 
-// STEP8出力から①②③...で始まる見出し行を抽出
-function extractHeadings(text) {
+// STEP8出力から節 (1)(2)(3) とその配下の項①②③を構造化して抽出
+// 返り値: [{ sectionTitle: "(1) xxx", items: ["① ...", "② ..."] }, ...]
+function extractSections(text) {
   if (!text || typeof text !== "string") return [];
-  const headings = [];
-  const seen = new Set();
+  const sections = [];
   const lines = text.split("\n");
-  // ①〜⑳までサポート（① = \u2460 〜 ⑳ = \u2473）
-  const headingRegex = /^[\u2460-\u2473][\s　]?.{2,100}$/;
+  // 節: (1) xxx、(2) xxx ...
+  const sectionRegex = /^\([0-9]+\)[\s　]*.+$/;
+  // 項: ①②③...⑳
+  const itemRegex = /^[\u2460-\u2473][\s　]?.{2,100}$/;
+
+  let currentSection = null;
   for (const rawLine of lines) {
     const line = rawLine.trim();
     if (!line) continue;
-    if (!headingRegex.test(line)) continue;
-    if (seen.has(line)) continue;
-    seen.add(line);
-    headings.push(line);
+
+    if (sectionRegex.test(line)) {
+      // 新しい節を開始
+      if (currentSection) sections.push(currentSection);
+      currentSection = { sectionTitle: line, items: [] };
+    } else if (itemRegex.test(line)) {
+      // 現在の節に項を追加
+      if (currentSection) {
+        // 重複防止
+        if (!currentSection.items.includes(line)) {
+          currentSection.items.push(line);
+        }
+      } else {
+        // 節がまだ見つかってない場合、暗黙の節を作る
+        currentSection = { sectionTitle: "（節見出しなし）", items: [line] };
+      }
+    }
   }
-  return headings;
+  if (currentSection) sections.push(currentSection);
+
+  // 項が1つもない節は除外
+  return sections.filter((s) => s.items.length > 0);
 }
 
 // ============================================================
@@ -356,33 +376,47 @@ const MarketReportSelector = ({ options, selected, onSelect, onReselect, value, 
   );
 };
 
-// STEP9用：見出し選択コンポーネント
-// STEP8の詳細プロット出力から「①②③...」で始まる行を抽出してボタン選択式で表示
-const HeadingSelector = ({ options, selected, onSelect, onReselect }) => {
-  if (!options || options.length === 0) return null;
-  if (selected !== null) {
+// STEP9用：節選択コンポーネント
+// STEP8の詳細プロット出力から節(1)(2)(3)...を抽出してボタン選択式で表示
+// 各節の配下の項数も表示
+const SectionSelector = ({ sections, selected, onSelect, onReselect }) => {
+  if (!sections || sections.length === 0) return null;
+  if (selected !== null && sections[selected]) {
+    const sec = sections[selected];
     return (
-      <div style={{ marginTop: 8, padding: "10px 14px", background: C.greenLight, borderRadius: 4, border: `1px solid rgba(30,107,58,0.25)` }}>
-        <div style={{ fontSize: 12, color: C.green, marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span style={{ fontWeight: 600 }}>✓ 選択中の見出し</span>
+      <div style={{ marginTop: 8, padding: "12px 14px", background: C.greenLight, borderRadius: 4, border: `1px solid rgba(30,107,58,0.25)` }}>
+        <div style={{ fontSize: 12, color: C.green, marginBottom: 6, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{ fontWeight: 600 }}>✓ 選択中の節（{sec.items.length}項を一括生成）</span>
           <button onClick={onReselect} style={{ fontSize: 11, color: C.gold, background: "none", border: "none", cursor: "pointer", fontWeight: 600, padding: 0, textDecoration: "underline" }}>
             選び直す
           </button>
         </div>
-        <div style={{ fontSize: 13, color: C.text, fontWeight: 600, lineHeight: 1.6 }}>{options[selected]}</div>
+        <div style={{ fontSize: 13.5, color: C.text, fontWeight: 700, lineHeight: 1.6, marginBottom: 6 }}>
+          {sec.sectionTitle}
+        </div>
+        <div style={{ fontSize: 12, color: C.textSub, lineHeight: 1.8 }}>
+          {sec.items.map((item, i) => (
+            <div key={i} style={{ paddingLeft: 8 }}>{item}</div>
+          ))}
+        </div>
       </div>
     );
   }
   return (
     <div style={{ marginTop: 8 }}>
       <div style={{ fontSize: 12, color: C.gold, fontWeight: 600, marginBottom: 8 }}>
-        執筆する見出しを1つ選んでください（{options.length}件の見出しを検出）
+        執筆する節を1つ選んでください（{sections.length}節を検出）
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 300, overflowY: "auto", padding: 2 }}>
-        {options.map((opt, i) => (
-          <div key={i} onClick={() => onSelect(i, opt)}
-            style={{ padding: "10px 14px", borderRadius: 4, border: `1px solid ${C.border}`, background: C.white, cursor: "pointer", fontSize: 13, color: C.text, lineHeight: 1.6, transition: "all 0.12s" }}>
-            {opt}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 360, overflowY: "auto", padding: 2 }}>
+        {sections.map((sec, i) => (
+          <div key={i} onClick={() => onSelect(i, sec)}
+            style={{ padding: "10px 14px", borderRadius: 4, border: `1px solid ${C.border}`, background: C.white, cursor: "pointer", transition: "all 0.12s" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.navy, marginBottom: 4, lineHeight: 1.5 }}>
+              {sec.sectionTitle}
+            </div>
+            <div style={{ fontSize: 11, color: C.textLight }}>
+              {sec.items.length}項を一括生成 ／ 実行時間の目安：{Math.ceil(sec.items.length * 0.7)}〜{sec.items.length}分程度
+            </div>
           </div>
         ))}
       </div>
@@ -931,15 +965,17 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   const chatAreaRef = useRef(null);
   const [marketOptions, setMarketOptions] = useState([]);
   const [selectedMarket, setSelectedMarket] = useState(null);
-  // STEP9用：見出し選択
-  const [headingOptions, setHeadingOptions] = useState([]);
-  const [selectedHeading, setSelectedHeading] = useState(null);
+  // STEP9用：節選択と一括実行
+  const [sectionOptions, setSectionOptions] = useState([]);
+  const [selectedSection, setSelectedSection] = useState(null);
+  const [sectionProgress, setSectionProgress] = useState(null);
+    // { total: 5, current: 2, currentItemName: "...", results: [...] }
 
   useEffect(() => {
     setInputs(stepData.inputData || {}); setOutputText(stepData.outputText || "");
     setHelpOpen(false); setValidationErrors([]); setCharErrors({}); setRunError("");
     setMarketOptions([]); setSelectedMarket(null);
-    setHeadingOptions([]); setSelectedHeading(null);
+    setSectionOptions([]); setSelectedSection(null); setSectionProgress(null);
     setChatMessages([]); setChatInput(""); setChatLoading(false);
     setChatConversationId(""); setChatError(""); setChatCopyMsg(false); setChatTransferMsg(false); setChatSelectOptions([]); setChatSelectMsg(false);
   }, [step.num]);
@@ -978,6 +1014,76 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   const handleRunDify = async () => {
     if (validateInputs().length > 0) return;
     setIsRunning(true); setRunError("");
+
+    // STEP9：節一括実行（項を順次ループしてDifyに投げる）
+    if (step.num === 9) {
+      // 選択された節を取得
+      const sectionToRun = selectedSection !== null ? sectionOptions[selectedSection] : null;
+      if (!sectionToRun || !sectionToRun.items || sectionToRun.items.length === 0) {
+        setRunError("節が選択されていないか、節に項が含まれていません。「STEP8から節を抽出」で節を選んでください。");
+        setIsRunning(false);
+        return;
+      }
+
+      const items = sectionToRun.items;
+      const total = items.length;
+      const results = [];
+
+      try {
+        for (let i = 0; i < total; i++) {
+          const currentItem = items[i];
+          // 進捗更新
+          setSectionProgress({
+            total,
+            current: i + 1,
+            currentItemName: currentItem
+          });
+
+          // 各項ごとにDify APIを呼び出し
+          // Difyに渡すのは target_heading（項単位の既存仕様に合わせる）
+          const execInputs = {
+            detailed_plot_text: inputs.detailed_plot_text || "",
+            target_heading: currentItem,
+            past_writing_text: inputs.past_writing_text || ""
+          };
+
+          const response = await fetch("/api/dify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ stepNum: 9, inputs: execInputs })
+          });
+          const data = await response.json();
+
+          if (!response.ok) {
+            // エラー時：途中までの結果を破棄し、エラー表示
+            const errorMsg = data.error || "不明なエラー";
+            setRunError(`${total}個中${i + 1}個目（${currentItem}）で失敗しました。しばらくしてから再度「実行する」を押してください。（詳細：${errorMsg}）`);
+            setSectionProgress(null);
+            setIsRunning(false);
+            return;
+          }
+          results.push(data.output || "");
+        }
+
+        // 全項成功：連結して出力欄に反映
+        const combined = results.join("\n\n");
+        setOutputText(combined);
+        await onSaveInput(step.num, {
+          detailed_plot_text: inputs.detailed_plot_text || "",
+          target_section: sectionToRun.sectionTitle,
+          past_writing_text: inputs.past_writing_text || ""
+        });
+        setSectionProgress(null);
+      } catch (e) {
+        setRunError(`通信エラーが発生しました。途中までの結果は破棄されました。もう一度「実行する」を押してください。（詳細：${e.message}）`);
+        setSectionProgress(null);
+      } finally {
+        setIsRunning(false);
+      }
+      return;
+    }
+
+    // その他のSTEP（従来通り）
     try {
       let execInputs = { ...inputs };
       if (step.num === 2 && execInputs.amazon_html) { const cleaned = cleanHtmlMinimal(execInputs.amazon_html); if (cleaned) execInputs.amazon_html = cleaned; }
@@ -1155,22 +1261,22 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
             );
           }
 
-          // STEP9 target_heading: 見出し自動抽出＆ボタン選択UI
-          if (field.name === "target_heading") {
-            const hasHeadingErr = validationErrors.includes(field.name);
+          // STEP9 target_section: 節自動抽出＆ボタン選択UI（節一括実行）
+          if (field.name === "target_section") {
+            const hasSectionErr = validationErrors.includes(field.name);
             return (
               <div key={field.name} style={{ marginBottom: 16 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
-                  <label style={{ fontSize: 13.5, fontWeight: 600, color: hasHeadingErr ? C.red : C.navy }}>{field.label}</label>
+                  <label style={{ fontSize: 13.5, fontWeight: 600, color: hasSectionErr ? C.red : C.navy }}>{field.label}</label>
                   {field.required && <RequiredMark />}
                   <SourceLabel source={field.source} autoFill={false}
                     onAutoFill={() => {}}
                     onRef={() => {
                       const s = allSteps?.[8]?.outputText;
-                      if (s) onRefPanel({ stepNum: 8, text: s, targetField: "target_heading" });
+                      if (s) onRefPanel({ stepNum: 8, text: s, targetField: "target_section" });
                       else alert("STEP8の出力データがまだ保存されていません。");
                     }} />
-                  {hasHeadingErr && <span style={{ fontSize: 12, color: C.red, fontWeight: 500 }}>← 選択または入力してください</span>}
+                  {hasSectionErr && <span style={{ fontSize: 12, color: C.red, fontWeight: 500 }}>← 節を選んでください</span>}
                 </div>
                 <div style={{ fontSize: 13, color: "#444444", marginBottom: 8 }}>{field.desc}</div>
 
@@ -1183,14 +1289,14 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                         alert("STEP8の出力データがまだ保存されていません。\nSTEP8で「出力データを保存」を押してから再度お試しください。");
                         return;
                       }
-                      const extracted = extractHeadings(srcOutput);
+                      const extracted = extractSections(srcOutput);
                       if (extracted.length === 0) {
-                        alert("STEP8の出力から①②③...の見出し行を検出できませんでした。\n手動で入力してください。");
+                        alert("STEP8の出力から「(1)(2)(3)...」形式の節を検出できませんでした。\nSTEP8の出力形式を確認してください。");
                         return;
                       }
-                      setHeadingOptions(extracted);
-                      setSelectedHeading(null);
-                      handleInputChange("target_heading", "");
+                      setSectionOptions(extracted);
+                      setSelectedSection(null);
+                      handleInputChange("target_section", "");
                     }}
                     style={{
                       fontSize: 12.5, fontWeight: 600,
@@ -1199,14 +1305,14 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                       padding: "7px 14px", cursor: "pointer"
                     }}
                   >
-                    📋 STEP8から見出しを抽出
+                    📋 STEP8から節を抽出
                   </button>
-                  {headingOptions.length > 0 && (
+                  {sectionOptions.length > 0 && (
                     <button
                       onClick={() => {
-                        setHeadingOptions([]);
-                        setSelectedHeading(null);
-                        handleInputChange("target_heading", "");
+                        setSectionOptions([]);
+                        setSelectedSection(null);
+                        handleInputChange("target_section", "");
                       }}
                       style={{
                         fontSize: 12, color: C.textLight,
@@ -1221,49 +1327,20 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                 </div>
 
                 {/* 抽出結果：ボタン式選択 */}
-                {headingOptions.length > 0 && (
-                  <HeadingSelector
-                    options={headingOptions}
-                    selected={selectedHeading}
-                    onSelect={(i, opt) => {
-                      setSelectedHeading(i);
-                      handleInputChange("target_heading", opt);
+                {sectionOptions.length > 0 && (
+                  <SectionSelector
+                    sections={sectionOptions}
+                    selected={selectedSection}
+                    onSelect={(i, sec) => {
+                      setSelectedSection(i);
+                      handleInputChange("target_section", sec.sectionTitle);
                     }}
                     onReselect={() => {
-                      setSelectedHeading(null);
-                      handleInputChange("target_heading", "");
+                      setSelectedSection(null);
+                      handleInputChange("target_section", "");
                     }}
                   />
                 )}
-
-                {/* 手動入力欄（常時表示、ただし選択済みの場合は値が埋まる） */}
-                <div style={{ marginTop: 10 }}>
-                  <div style={{ fontSize: 12, color: C.textSub, marginBottom: 4 }}>
-                    {headingOptions.length > 0 ? "または手動で入力・編集：" : "手動で入力することもできます："}
-                  </div>
-                  <input
-                    id={`field-${field.name}`}
-                    type="text"
-                    value={inputs[field.name] || ""}
-                    onChange={(e) => {
-                      handleInputChange(field.name, e.target.value);
-                      // 手動編集した場合は選択状態を解除
-                      if (selectedHeading !== null) setSelectedHeading(null);
-                    }}
-                    placeholder="例：③ 「とりあえず作る」が破綻する典型パターン"
-                    style={{
-                      width: "100%", padding: "10px 12px", fontSize: 14,
-                      border: hasHeadingErr ? `2px solid ${C.red}` : `1px solid ${C.border}`,
-                      borderRadius: 4, outline: "none", boxSizing: "border-box",
-                      background: hasHeadingErr ? "#fef2f2" : C.white
-                    }}
-                  />
-                  {field.maxChars && (
-                    <div style={{ fontSize: 11, color: C.textLight, textAlign: "right", marginTop: 3 }}>
-                      {(inputs[field.name] || "").length} / {field.maxChars}文字
-                    </div>
-                  )}
-                </div>
               </div>
             );
           }
@@ -1507,11 +1584,33 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
               {runError && (
                 <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginBottom: 12, fontSize: 13, color: C.red }}>{runError}</div>
               )}
+
+              {/* STEP9 節一括実行中の進捗バー */}
+              {step.num === 9 && sectionProgress && (
+                <div style={{ marginBottom: 12, padding: "12px 14px", background: C.navyLight, border: `1px solid rgba(42,68,104,0.2)`, borderRadius: 4 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, fontSize: 12.5, color: C.navyMid, fontWeight: 600 }}>
+                    <span>節の一括生成中：{sectionProgress.current} / {sectionProgress.total} 項</span>
+                    <span>{Math.round((sectionProgress.current / sectionProgress.total) * 100)}%</span>
+                  </div>
+                  <div style={{ height: 8, background: "rgba(0,0,0,0.08)", borderRadius: 4, overflow: "hidden" }}>
+                    <div style={{
+                      width: `${(sectionProgress.current / sectionProgress.total) * 100}%`,
+                      height: "100%",
+                      background: C.navy,
+                      transition: "width 0.3s ease"
+                    }} />
+                  </div>
+                  <div style={{ marginTop: 8, fontSize: 12, color: C.textSub, lineHeight: 1.6 }}>
+                    ⏳ 生成中：<span style={{ color: C.text, fontWeight: 600 }}>{sectionProgress.currentItemName}</span>
+                  </div>
+                </div>
+              )}
+
               <button onClick={handleRunDify} disabled={isRunning}
                 style={{ padding: "12px 36px", background: isRunning ? "#93c5fd" : C.navy, color: C.white, border: "none", borderRadius: 3, fontWeight: 700, fontSize: 14, cursor: isRunning ? "default" : "pointer", letterSpacing: "0.04em" }}>
-                {isRunning ? "実行中..." : "▶ 実行する"}
+                {isRunning ? (step.num === 9 ? "節を生成中..." : "実行中...") : "▶ 実行する"}
               </button>
-              {isRunning && <span style={{ fontSize: 13, color: C.navyMid, marginLeft: 12 }}>AIが処理しています。少々お待ちください...</span>}
+              {isRunning && step.num !== 9 && <span style={{ fontSize: 13, color: C.navyMid, marginLeft: 12 }}>AIが処理しています。少々お待ちください...</span>}
             </div>
           )}
         </Card>
