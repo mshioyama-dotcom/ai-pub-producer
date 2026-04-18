@@ -2,6 +2,7 @@
 const DIFY_API_BASE = "https://api.dify.ai/v1";
 
 const API_KEYS = {
+  1:  process.env.DIFY_API_KEY_STEP01,
   2:  process.env.DIFY_API_KEY_STEP02,
   3:  process.env.DIFY_API_KEY_STEP03,
   4:  process.env.DIFY_API_KEY_STEP04,
@@ -15,6 +16,9 @@ const API_KEYS = {
 
 function mapInputs(stepNum, inputs) {
   const m = { ...inputs };
+
+  // STEP1: theme をそのまま渡す（変換不要）
+  // 何もしない
 
   if (stepNum === 2) {
     if (m.amazon_html !== undefined) { m.HTML = m.amazon_html; delete m.amazon_html; }
