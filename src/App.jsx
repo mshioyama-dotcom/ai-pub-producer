@@ -391,7 +391,7 @@ const SectionHeading = ({ children }) => (
 // ============================================================
 
 const Step2HtmlHelper = ({ inputs, currentHtml }) => {
-  const [showGuide, setShowGuide] = useState(false);
+  const [showGuide, setShowGuide] = useState(true);
   const kw1 = (inputs.keyword1 || "").trim();
   const kw2 = (inputs.keyword2 || "").trim();
   const canOpenAmazon = kw1.length > 0 && kw2.length > 0;
@@ -488,7 +488,7 @@ const Step2HtmlHelper = ({ inputs, currentHtml }) => {
             transition: "transform 0.15s",
             display: "inline-block"
           }}>▶</span>
-          初めての方：詳しい手順図を見る
+          詳しい手順図
         </div>
         {showGuide && (
           <div style={{ marginTop: 8, padding: "14px 16px", background: "#f4f3ef", border: `1px solid ${C.border}`, borderRadius: 6 }}>
