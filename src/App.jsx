@@ -33,18 +33,19 @@ const C = {
 
 const STEPS = [
   {
-    id: "step_01", num: 1, title: "テーマ発見インタビュー",
-    description: "書きたいテーマをもとに、気になる2語の候補を見つけます",
-    category: "企画設計", type: "chat",
-    url: "https://udify.app/chat/cii6zTpOFc29rvVw",
+    id: "step_01", num: 1, title: "テーマ発見",
+    description: "書きたいテーマから、Amazon Kindleの市場データをもとに2語キーワード候補を抽出します",
+    category: "企画設計", type: "workflow",
+    url: "https://udify.app/workflow/wYCqTyIknfxzl2oh",
     inputs: [
-      { name: "user_chat_input", label: "テーマ・関心領域", desc: "書きたいテーマ、想定読者、読者の悩みなどを会話で伝えてください", source: null, required: true, type: "textarea" }
+      { name: "theme", label: "書きたいテーマ語", desc: "書きたい本のテーマを1語で入力してください。複数のテーマ軸を組み合わせたい場合は、カンマ区切りで入力すると絞り込まれた候補が出ます（例：「FIRE、副業」「投資、節税」）", source: null, required: true, type: "text", maxChars: 64 }
     ],
-    outputTitle: "候補メモ",
+    outputTitle: "キーワード候補",
     help: [
-      "最初から正解を1つに絞る必要はありません",
-      "まず幅広く候補を出してから、しっくりくる方向へ絞っていきます",
-      "「もう少し実務寄りのキーワードが欲しい」と伝えることもできます"
+      "1語だけで入力すると、そのテーマに関連する幅広い候補が出ます（例:「FIRE」）",
+      "複数語をカンマ区切りで入力すると、全ての語に関連する鋭い候補が出ます（例:「FIRE、副業」「投資、節税」）",
+      "書きたい本の軸が複数ある場合は、カンマ区切りで入力する方が意図に合った候補が得られます",
+      "結果がピンとこない場合は、テーマ語を変えて何度でも試せます"
     ]
   },
   {
@@ -544,10 +545,10 @@ const HomePage = ({ project, stepStatuses, allSteps, onNavigate }) => {
                 </span>
               </div>
               <div style={{ fontSize: 13, color: C.textSub, lineHeight: 1.8, marginBottom: 10 }}>
-                テーマは決まっているが、狙うキーワードはまだ決めていない方。AIとの対話で2語キーワードを見つけます。
+                テーマは決まっているが、狙うキーワードはまだ決めていない方。Amazon Kindleの市場データから2語キーワード候補を抽出します。
               </div>
               <div style={{ fontSize: 12, color: C.gold, fontWeight: 600 }}>
-                → STEP1 テーマ発見インタビューへ
+                → STEP1 テーマ発見へ
               </div>
             </div>
           </Card>
@@ -1445,7 +1446,7 @@ const GuidePage = ({ onNavigate }) => {
           <span style={{ fontWeight: 700, color: C.navy }}>A：ゼロから始める</span>
           <ul style={{ margin: "4px 0 12px", paddingLeft: 18 }}>
             <li>テーマは決まっているが、狙うキーワードは決めていない方向け</li>
-            <li>STEP1のテーマ発見インタビューで、AIとの対話を通じて2語キーワードを見つけます</li>
+            <li>STEP1のテーマ発見で、Amazon Kindleの市場データから2語キーワード候補を抽出します</li>
             <li>初めてKindle出版する方は、こちらを推奨します</li>
           </ul>
         </div>
@@ -1463,7 +1464,7 @@ const GuidePage = ({ onNavigate }) => {
       </Section>
       {/* ========== 修正3 ここまで ========== */}
 
-      <Section title="操作方法（ワークフロー型:STEP2・3・5〜10）">
+      <Section title="操作方法（ワークフロー型:STEP1〜3・5〜10）">
         <ul style={{ margin: 0, paddingLeft: 18 }}>
           <li>① 入力データ欄に情報を入力する。前のSTEPの出力を使う欄には「自動転記」「参照」「自動振り分け」ボタンが表示される</li>
           <li style={{ marginTop: 4 }}><span style={{ fontWeight: 700 }}>自動転記（ネイビー）</span>:押すと前のSTEPの出力が自動で入力欄に入る</li>
@@ -1478,7 +1479,7 @@ const GuidePage = ({ onNavigate }) => {
         </div>
       </Section>
 
-      <Section title="操作方法（チャット型:STEP1・4）">
+      <Section title="操作方法（チャット型:STEP4）">
         <ul style={{ margin: 0, paddingLeft: 18 }}>
           <li>① 入力データ欄に情報を入力して「入力データを保存」を押す</li>
           <li>② 「チャットに転記して開始」を押すと入力データがそのまま送信され、AIから最初の質問が届く</li>
