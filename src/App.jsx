@@ -36,7 +36,7 @@ const STEPS = [
     id: "step_01", num: 1, title: "テーマ発見",
     description: "書きたいテーマから、Amazon Kindleの市場データをもとに2語キーワード候補を抽出します",
     category: "企画設計", type: "workflow",
-    url: "https://udify.app/workflow/wYCqTyIknfxzl2oh",
+    url: "https://udify.app/workflow/REPLACE_WITH_NEW_WORKFLOW_URL",
     inputs: [
       { name: "theme", label: "書きたいテーマ語", desc: "書きたい本のテーマを1語で入力してください。複数のテーマ軸を組み合わせたい場合は、カンマ区切りで入力すると絞り込まれた候補が出ます（例：「FIRE、副業」「投資、節税」）", source: null, required: true, type: "text", maxChars: 64 }
     ],
@@ -385,6 +385,187 @@ const SectionHeading = ({ children }) => (
     <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0, letterSpacing: "0.03em" }}>{children}</h2>
   </div>
 );
+
+// ============================================================
+// STEP2 HTML取得ヘルパー（Amazon検索ボタン + 折りたたみ手順図）
+// ============================================================
+
+const Step2HtmlHelper = ({ inputs, currentHtml }) => {
+  const [showGuide, setShowGuide] = useState(false);
+  const kw1 = (inputs.keyword1 || "").trim();
+  const kw2 = (inputs.keyword2 || "").trim();
+  const canOpenAmazon = kw1.length > 0 && kw2.length > 0;
+
+  const handleOpenAmazon = () => {
+    if (!canOpenAmazon) return;
+    // Amazon.co.jp Kindleストア検索URL（i=digital-textでKindleストア固定）
+    const query = encodeURIComponent(`${kw1} ${kw2}`);
+    const url = `https://www.amazon.co.jp/s?i=digital-text&k=${query}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  // HTML判定：data-asin を含むものだけ「貼り付け済み」とみなす
+  const hasHtml = currentHtml.length > 0;
+  const looksLikeHtml = /data-asin|<div|<html|<!DOCTYPE/i.test(currentHtml);
+  const isCleanedFormat = /^\s*<div\s+data-asin/i.test(currentHtml);
+
+  let statusLabel = "";
+  let statusColor = C.textLight;
+  let statusBg = "rgba(0,0,0,0.04)";
+  if (!hasHtml) {
+    statusLabel = "未入力";
+  } else if (isCleanedFormat) {
+    statusLabel = "✓ HTML検知（整形済み）";
+    statusColor = C.green;
+    statusBg = C.greenLight;
+  } else if (looksLikeHtml) {
+    statusLabel = "✓ HTML検知";
+    statusColor = C.green;
+    statusBg = C.greenLight;
+  } else {
+    statusLabel = "⚠ HTMLではない可能性";
+    statusColor = C.gold;
+    statusBg = C.goldPale;
+  }
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      {/* Amazon検索ボタンセクション */}
+      <div style={{
+        padding: "14px 16px",
+        background: canOpenAmazon ? "#eef2f7" : "rgba(0,0,0,0.03)",
+        border: `1px solid ${canOpenAmazon ? "#c8d4e0" : C.border}`,
+        borderRadius: 6,
+        marginBottom: 10
+      }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, marginBottom: 8 }}>
+          Amazon側でやること
+        </div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <button
+            onClick={handleOpenAmazon}
+            disabled={!canOpenAmazon}
+            style={{
+              padding: "9px 18px",
+              background: canOpenAmazon ? C.navy : "rgba(0,0,0,0.1)",
+              color: canOpenAmazon ? C.white : C.textLight,
+              border: "none",
+              borderRadius: 4,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: canOpenAmazon ? "pointer" : "default",
+              letterSpacing: "0.02em",
+              flexShrink: 0
+            }}
+          >
+            🔍 AmazonでKindle検索を開く
+          </button>
+          <div style={{ fontSize: 12, color: C.textSub, flex: 1, minWidth: 200, lineHeight: 1.6 }}>
+            {canOpenAmazon
+              ? <>検索後、ページ上で<strong>右クリック→「ページのソースを表示」→全選択してコピー</strong>してください。</>
+              : <>上の「キーワード1・2」を入力すると、このボタンから検索ページを開けます。</>}
+          </div>
+        </div>
+      </div>
+
+      {/* 折りたたみ式の詳細手順 */}
+      <div style={{ marginBottom: 10 }}>
+        <div
+          onClick={() => setShowGuide(!showGuide)}
+          style={{
+            fontSize: 12.5,
+            color: C.navyMid,
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "4px 0",
+            fontWeight: 600
+          }}
+        >
+          <span style={{
+            transform: showGuide ? "rotate(90deg)" : "rotate(0deg)",
+            transition: "transform 0.15s",
+            display: "inline-block"
+          }}>▶</span>
+          初めての方：詳しい手順図を見る
+        </div>
+        {showGuide && (
+          <div style={{ marginTop: 8, padding: "14px 16px", background: "#f4f3ef", border: `1px solid ${C.border}`, borderRadius: 6 }}>
+            <svg width="100%" viewBox="0 0 680 260" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <marker id="ha2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M2 1L8 5L2 9" fill="none" stroke="#555" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </marker>
+              </defs>
+
+              {/* 左列：Amazon側でやること */}
+              <rect x="10" y="10" width="310" height="240" rx="6" fill="none" stroke="#c8d4e0" strokeWidth="0.5" strokeDasharray="3 3"/>
+              <text fontFamily="sans-serif" fontSize="11" fontWeight="bold" fill="#2a4468" x="20" y="28">Amazon側でやること</text>
+
+              <rect x="30" y="44" width="270" height="50" rx="6" fill="#edf2f8" stroke="#2a4468" strokeWidth="0.5"/>
+              <text fontFamily="sans-serif" fontSize="12" fontWeight="bold" fill="#1a2e4a" x="45" y="65">①</text>
+              <text fontFamily="sans-serif" fontSize="12" fill="#2a4468" x="60" y="65">Kindleストアでキーワード2語を検索</text>
+              <text fontFamily="sans-serif" fontSize="10" fill="#688" x="60" y="82">(上の青いボタンを使うとワンクリックで開けます)</text>
+              <line x1="165" y1="94" x2="165" y2="110" stroke="#555" strokeWidth="1.2" markerEnd="url(#ha2)"/>
+
+              <rect x="30" y="114" width="270" height="50" rx="6" fill="#edf2f8" stroke="#2a4468" strokeWidth="0.5"/>
+              <text fontFamily="sans-serif" fontSize="12" fontWeight="bold" fill="#1a2e4a" x="45" y="134">②</text>
+              <text fontFamily="sans-serif" fontSize="12" fill="#2a4468" x="60" y="134">検索結果ページで右クリック</text>
+              <text fontFamily="sans-serif" fontSize="11" fill="#2a4468" x="60" y="151">→ 「ページのソースを表示」</text>
+              <line x1="165" y1="164" x2="165" y2="180" stroke="#555" strokeWidth="1.2" markerEnd="url(#ha2)"/>
+
+              <rect x="30" y="184" width="270" height="50" rx="6" fill="#edf2f8" stroke="#2a4468" strokeWidth="0.5"/>
+              <text fontFamily="sans-serif" fontSize="12" fontWeight="bold" fill="#1a2e4a" x="45" y="204">③</text>
+              <text fontFamily="sans-serif" fontSize="12" fill="#2a4468" x="60" y="204">Ctrl+A → Ctrl+C で全選択してコピー</text>
+              <text fontFamily="sans-serif" fontSize="10" fill="#688" x="60" y="221">(Macの場合は Cmd+A → Cmd+C)</text>
+
+              {/* 矢印：左列から右列へ */}
+              <line x1="300" y1="209" x2="350" y2="209" stroke="#555" strokeWidth="1.5" markerEnd="url(#ha2)"/>
+
+              {/* 右列：このページでやること */}
+              <rect x="360" y="10" width="310" height="240" rx="6" fill="none" stroke="#c8d4e0" strokeWidth="0.5" strokeDasharray="3 3"/>
+              <text fontFamily="sans-serif" fontSize="11" fontWeight="bold" fill="#1a4a2e" x="370" y="28">このページでやること</text>
+
+              <rect x="380" y="184" width="270" height="50" rx="6" fill="#e4f2ec" stroke="#1e6b3a" strokeWidth="0.5"/>
+              <text fontFamily="sans-serif" fontSize="12" fontWeight="bold" fill="#1a4a2e" x="395" y="204">④</text>
+              <text fontFamily="sans-serif" fontSize="12" fill="#1e6b3a" x="410" y="204">下の欄にCtrl+Vで貼り付け</text>
+              <text fontFamily="sans-serif" fontSize="10" fill="#2d7a4f" x="410" y="221">(貼り付けに少し時間がかかります)</text>
+              <line x1="515" y1="184" x2="515" y2="160" stroke="#555" strokeWidth="1.2" markerEnd="url(#ha2)"/>
+
+              <rect x="380" y="114" width="270" height="50" rx="6" fill="#e4f2ec" stroke="#1e6b3a" strokeWidth="0.5"/>
+              <text fontFamily="sans-serif" fontSize="12" fontWeight="bold" fill="#1a4a2e" x="395" y="134">⑤</text>
+              <text fontFamily="sans-serif" fontSize="12" fill="#1e6b3a" x="410" y="134">「▶ 実行する」ボタンを押す</text>
+              <text fontFamily="sans-serif" fontSize="10" fill="#2d7a4f" x="410" y="151">(自動でクリーニングしてAIに渡します)</text>
+            </svg>
+          </div>
+        )}
+      </div>
+
+      {/* 貼り付け先ラベル */}
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 6,
+        padding: "6px 12px",
+        background: statusBg,
+        borderRadius: 4,
+        border: `1px solid ${hasHtml ? (isCleanedFormat || looksLikeHtml ? "rgba(45,122,79,0.2)" : "rgba(184,146,42,0.3)") : C.border}`
+      }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: C.navy }}>⬇ 下の欄にHTMLを貼り付け</span>
+        <span style={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: statusColor,
+          marginLeft: "auto"
+        }}>
+          {statusLabel}
+        </span>
+      </div>
+    </div>
+  );
+};
 
 // ============================================================
 // 左メニュー
@@ -937,48 +1118,12 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
               </div>
               <div style={{ fontSize: 13, color: "#444444", marginBottom: 6 }}>{field.desc}</div>
 
-              {/* STEP2 amazon_html: HTML取得手順図解 */}
+              {/* STEP2 amazon_html: 改善版UI */}
               {step.num === 2 && field.name === "amazon_html" && (
-                <div style={{ marginBottom: 10, padding: "12px 14px", background: "#eef2f7", border: "1px solid #c8d4e0", borderRadius: 6 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, marginBottom: 8 }}>HTMLソースの取得手順</div>
-                  <svg width="100%" viewBox="0 0 680 300" xmlns="http://www.w3.org/2000/svg">
-                    <defs>
-                      <marker id="ha" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                        <path d="M2 1L8 5L2 9" fill="none" stroke="#555" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                      </marker>
-                    </defs>
-                    <rect x="20" y="30" width="112" height="64" rx="8" fill="#edf2f8" stroke="#2a4468" strokeWidth="0.5"/>
-                    <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#1a2e4a" x="76" y="54" textAnchor="middle" dominantBaseline="central">①</text>
-                    <text fontFamily="sans-serif" fontSize="11" fill="#2a4468" x="76" y="74" textAnchor="middle" dominantBaseline="central">Amazonを開く</text>
-                    <line x1="132" y1="62" x2="150" y2="62" stroke="#555" strokeWidth="1.5" markerEnd="url(#ha)"/>
-                    <rect x="154" y="30" width="112" height="64" rx="8" fill="#edf2f8" stroke="#2a4468" strokeWidth="0.5"/>
-                    <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#1a2e4a" x="210" y="54" textAnchor="middle" dominantBaseline="central">②</text>
-                    <text fontFamily="sans-serif" fontSize="11" fill="#2a4468" x="210" y="74" textAnchor="middle" dominantBaseline="central">Kindleストアに切替</text>
-                    <line x1="266" y1="62" x2="284" y2="62" stroke="#555" strokeWidth="1.5" markerEnd="url(#ha)"/>
-                    <line x1="210" y1="94" x2="210" y2="110" stroke="#aaa" strokeWidth="0.5" strokeDasharray="4 3"/>
-                    <rect x="140" y="114" width="140" height="56" rx="6" fill="none" stroke="#b0bcc8" strokeWidth="0.5" strokeDasharray="4 3"/>
-                    <text fontFamily="sans-serif" fontSize="10" fill="#445566" x="210" y="135" textAnchor="middle" dominantBaseline="central">検索バー左端の「▼」をクリック</text>
-                    <text fontFamily="sans-serif" fontSize="10" fill="#445566" x="210" y="155" textAnchor="middle" dominantBaseline="central">→「Kindleストア」を選択</text>
-                    <rect x="288" y="30" width="112" height="64" rx="8" fill="#edf2f8" stroke="#2a4468" strokeWidth="0.5"/>
-                    <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#1a2e4a" x="344" y="54" textAnchor="middle" dominantBaseline="central">③</text>
-                    <text fontFamily="sans-serif" fontSize="11" fill="#2a4468" x="344" y="74" textAnchor="middle" dominantBaseline="central">キーワード2語で検索</text>
-                    <path d="M400 62 L430 62 L430 210 L400 210" fill="none" stroke="#555" strokeWidth="1.5" markerEnd="url(#ha)"/>
-                    <rect x="288" y="178" width="112" height="64" rx="8" fill="#e4f2ec" stroke="#1e6b3a" strokeWidth="0.5"/>
-                    <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#1a4a2e" x="344" y="198" textAnchor="middle" dominantBaseline="central">④</text>
-                    <text fontFamily="sans-serif" fontSize="11" fill="#1e6b3a" x="344" y="216" textAnchor="middle" dominantBaseline="central">右クリック→</text>
-                    <text fontFamily="sans-serif" fontSize="11" fill="#1e6b3a" x="344" y="232" textAnchor="middle" dominantBaseline="central">ソースを表示</text>
-                    <line x1="288" y1="210" x2="270" y2="210" stroke="#555" strokeWidth="1.5" markerEnd="url(#ha)"/>
-                    <rect x="154" y="178" width="112" height="64" rx="8" fill="#e4f2ec" stroke="#1e6b3a" strokeWidth="0.5"/>
-                    <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#1a4a2e" x="210" y="198" textAnchor="middle" dominantBaseline="central">⑤</text>
-                    <text fontFamily="sans-serif" fontSize="11" fill="#1e6b3a" x="210" y="216" textAnchor="middle" dominantBaseline="central">Ctrl+A → Ctrl+C</text>
-                    <text fontFamily="sans-serif" fontSize="11" fill="#1e6b3a" x="210" y="232" textAnchor="middle" dominantBaseline="central">ここに貼付</text>
-                    <line x1="154" y1="210" x2="136" y2="210" stroke="#555" strokeWidth="1.5" markerEnd="url(#ha)"/>
-                    <rect x="20" y="178" width="112" height="64" rx="8" fill="#e4f2ec" stroke="#1e6b3a" strokeWidth="0.5"/>
-                    <text fontFamily="sans-serif" fontSize="13" fontWeight="bold" fill="#1a4a2e" x="76" y="198" textAnchor="middle" dominantBaseline="central">⑥</text>
-                    <text fontFamily="sans-serif" fontSize="11" fill="#1e6b3a" x="76" y="216" textAnchor="middle" dominantBaseline="central">「実行する」</text>
-                    <text fontFamily="sans-serif" fontSize="11" fill="#1e6b3a" x="76" y="232" textAnchor="middle" dominantBaseline="central">を押す</text>
-                  </svg>
-                </div>
+                <Step2HtmlHelper
+                  inputs={inputs}
+                  currentHtml={inputs.amazon_html || ""}
+                />
               )}
 
               {field.type === "text" ? (
