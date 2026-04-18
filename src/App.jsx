@@ -167,12 +167,13 @@ const STEPS = [
     url: "https://udify.app/workflow/lRAWtZGuVL4bqHM9",
     inputs: [
       { name: "detailed_plot_text", label: "詳細プロット作成のアウトプット（1章分）", desc: "詳細プロット作成の出力を貼り付け", source: "STEP8", required: true, type: "textarea", autoFill: true, maxChars: 5000 },
-      { name: "target_heading", label: "執筆対象の見出し", desc: "詳細プロットの各項には①②③の番号付き見出しがあります。書きたい項の見出し1つ（例：「① 〇〇のポイント」）をそのままコピーして貼り付けてください", source: "STEP8", required: true, type: "text", autoFill: false, maxChars: 256 },
+      { name: "target_heading", label: "執筆対象の見出し（1項のみ）", desc: "今回の実行で執筆する1項を選びます。下の「STEP8から見出しを抽出」ボタンを押すと、STEP8の詳細プロットから見出し候補（①②③...）を自動抽出して一覧表示します。1つクリックで選べます。", source: "STEP8", required: true, type: "text", autoFill: false, maxChars: 256 },
       { name: "past_writing_text", label: "著者の過去の執筆データ（任意）", desc: "文体参考の過去原稿（最大4000字）", source: null, required: false, type: "textarea", maxChars: 4000 }
     ],
     outputTitle: "生成された本文",
     help: [
-      "1項ずつ処理します。「参照」ボタンで詳細プロットを表示し、書きたい項の見出し（①②③のいずれか1つ）をそのままコピーして貼り付けてください",
+      "1項ずつ処理します。見出し欄の「STEP8から見出しを抽出」ボタンで一覧表示→クリックで選択できます",
+      "手動でコピペしたい場合は、入力欄に直接書き込むこともできます",
       "文体を変えたい場合は、出力をAIチャットに貼り付けて修正を指示してください"
     ]
   },
@@ -286,6 +287,25 @@ function parseStep2Output(text) {
   return { keyword1, keyword2, intent: intentMatch ? intentMatch[1].trim() : "", markets };
 }
 
+// STEP8出力から①②③...で始まる見出し行を抽出
+function extractHeadings(text) {
+  if (!text || typeof text !== "string") return [];
+  const headings = [];
+  const seen = new Set();
+  const lines = text.split("\n");
+  // ①〜⑳までサポート（① = \u2460 〜 ⑳ = \u2473）
+  const headingRegex = /^[\u2460-\u2473][\s　]?.{2,100}$/;
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    if (!headingRegex.test(line)) continue;
+    if (seen.has(line)) continue;
+    seen.add(line);
+    headings.push(line);
+  }
+  return headings;
+}
+
 // ============================================================
 // 共通コンポーネント
 // ============================================================
@@ -335,6 +355,42 @@ const MarketReportSelector = ({ options, selected, onSelect, onReselect, value, 
     </div>
   );
 };
+
+// STEP9用：見出し選択コンポーネント
+// STEP8の詳細プロット出力から「①②③...」で始まる行を抽出してボタン選択式で表示
+const HeadingSelector = ({ options, selected, onSelect, onReselect }) => {
+  if (!options || options.length === 0) return null;
+  if (selected !== null) {
+    return (
+      <div style={{ marginTop: 8, padding: "10px 14px", background: C.greenLight, borderRadius: 4, border: `1px solid rgba(30,107,58,0.25)` }}>
+        <div style={{ fontSize: 12, color: C.green, marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{ fontWeight: 600 }}>✓ 選択中の見出し</span>
+          <button onClick={onReselect} style={{ fontSize: 11, color: C.gold, background: "none", border: "none", cursor: "pointer", fontWeight: 600, padding: 0, textDecoration: "underline" }}>
+            選び直す
+          </button>
+        </div>
+        <div style={{ fontSize: 13, color: C.text, fontWeight: 600, lineHeight: 1.6 }}>{options[selected]}</div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ fontSize: 12, color: C.gold, fontWeight: 600, marginBottom: 8 }}>
+        執筆する見出しを1つ選んでください（{options.length}件の見出しを検出）
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 300, overflowY: "auto", padding: 2 }}>
+        {options.map((opt, i) => (
+          <div key={i} onClick={() => onSelect(i, opt)}
+            style={{ padding: "10px 14px", borderRadius: 4, border: `1px solid ${C.border}`, background: C.white, cursor: "pointer", fontSize: 13, color: C.text, lineHeight: 1.6, transition: "all 0.12s" }}>
+            {opt}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+
 
 const SourceLabel = ({ source, autoFill, onAutoFill, onRef, onAutoFillParsed }) =>
   source ? (
@@ -875,11 +931,15 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   const chatAreaRef = useRef(null);
   const [marketOptions, setMarketOptions] = useState([]);
   const [selectedMarket, setSelectedMarket] = useState(null);
+  // STEP9用：見出し選択
+  const [headingOptions, setHeadingOptions] = useState([]);
+  const [selectedHeading, setSelectedHeading] = useState(null);
 
   useEffect(() => {
     setInputs(stepData.inputData || {}); setOutputText(stepData.outputText || "");
     setHelpOpen(false); setValidationErrors([]); setCharErrors({}); setRunError("");
     setMarketOptions([]); setSelectedMarket(null);
+    setHeadingOptions([]); setSelectedHeading(null);
     setChatMessages([]); setChatInput(""); setChatLoading(false);
     setChatConversationId(""); setChatError(""); setChatCopyMsg(false); setChatTransferMsg(false); setChatSelectOptions([]); setChatSelectMsg(false);
   }, [step.num]);
@@ -1091,6 +1151,119 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                     onReselect={() => { setSelectedMarket(null); handleInputChange("market_report", ""); }}
                     value={inputs["market_report"] || ""} onChange={(v) => handleInputChange("market_report", v)} />
                 )}
+              </div>
+            );
+          }
+
+          // STEP9 target_heading: 見出し自動抽出＆ボタン選択UI
+          if (field.name === "target_heading") {
+            const hasHeadingErr = validationErrors.includes(field.name);
+            return (
+              <div key={field.name} style={{ marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
+                  <label style={{ fontSize: 13.5, fontWeight: 600, color: hasHeadingErr ? C.red : C.navy }}>{field.label}</label>
+                  {field.required && <RequiredMark />}
+                  <SourceLabel source={field.source} autoFill={false}
+                    onAutoFill={() => {}}
+                    onRef={() => {
+                      const s = allSteps?.[8]?.outputText;
+                      if (s) onRefPanel({ stepNum: 8, text: s, targetField: "target_heading" });
+                      else alert("STEP8の出力データがまだ保存されていません。");
+                    }} />
+                  {hasHeadingErr && <span style={{ fontSize: 12, color: C.red, fontWeight: 500 }}>← 選択または入力してください</span>}
+                </div>
+                <div style={{ fontSize: 13, color: "#444444", marginBottom: 8 }}>{field.desc}</div>
+
+                {/* 抽出ボタン */}
+                <div style={{ marginBottom: 10 }}>
+                  <button
+                    onClick={() => {
+                      const srcOutput = allSteps?.[8]?.outputText;
+                      if (!srcOutput) {
+                        alert("STEP8の出力データがまだ保存されていません。\nSTEP8で「出力データを保存」を押してから再度お試しください。");
+                        return;
+                      }
+                      const extracted = extractHeadings(srcOutput);
+                      if (extracted.length === 0) {
+                        alert("STEP8の出力から①②③...の見出し行を検出できませんでした。\n手動で入力してください。");
+                        return;
+                      }
+                      setHeadingOptions(extracted);
+                      setSelectedHeading(null);
+                      handleInputChange("target_heading", "");
+                    }}
+                    style={{
+                      fontSize: 12.5, fontWeight: 600,
+                      color: C.white, background: C.gold,
+                      border: "none", borderRadius: 3,
+                      padding: "7px 14px", cursor: "pointer"
+                    }}
+                  >
+                    📋 STEP8から見出しを抽出
+                  </button>
+                  {headingOptions.length > 0 && (
+                    <button
+                      onClick={() => {
+                        setHeadingOptions([]);
+                        setSelectedHeading(null);
+                        handleInputChange("target_heading", "");
+                      }}
+                      style={{
+                        fontSize: 12, color: C.textLight,
+                        background: "none", border: `1px solid ${C.border}`,
+                        borderRadius: 3, padding: "6px 12px",
+                        cursor: "pointer", marginLeft: 8
+                      }}
+                    >
+                      抽出結果をクリア
+                    </button>
+                  )}
+                </div>
+
+                {/* 抽出結果：ボタン式選択 */}
+                {headingOptions.length > 0 && (
+                  <HeadingSelector
+                    options={headingOptions}
+                    selected={selectedHeading}
+                    onSelect={(i, opt) => {
+                      setSelectedHeading(i);
+                      handleInputChange("target_heading", opt);
+                    }}
+                    onReselect={() => {
+                      setSelectedHeading(null);
+                      handleInputChange("target_heading", "");
+                    }}
+                  />
+                )}
+
+                {/* 手動入力欄（常時表示、ただし選択済みの場合は値が埋まる） */}
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ fontSize: 12, color: C.textSub, marginBottom: 4 }}>
+                    {headingOptions.length > 0 ? "または手動で入力・編集：" : "手動で入力することもできます："}
+                  </div>
+                  <input
+                    id={`field-${field.name}`}
+                    type="text"
+                    value={inputs[field.name] || ""}
+                    onChange={(e) => {
+                      handleInputChange(field.name, e.target.value);
+                      // 手動編集した場合は選択状態を解除
+                      if (selectedHeading !== null) setSelectedHeading(null);
+                    }}
+                    placeholder="例：③ 「とりあえず作る」が破綻する典型パターン"
+                    style={{
+                      width: "100%", padding: "10px 12px", fontSize: 14,
+                      border: hasHeadingErr ? `2px solid ${C.red}` : `1px solid ${C.border}`,
+                      borderRadius: 4, outline: "none", boxSizing: "border-box",
+                      background: hasHeadingErr ? "#fef2f2" : C.white
+                    }}
+                  />
+                  {field.maxChars && (
+                    <div style={{ fontSize: 11, color: C.textLight, textAlign: "right", marginTop: 3 }}>
+                      {(inputs[field.name] || "").length} / {field.maxChars}文字
+                    </div>
+                  )}
+                </div>
               </div>
             );
           }
