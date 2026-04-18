@@ -326,6 +326,60 @@ function extractSections(text) {
   return sections.filter((s) => s.items.length > 0);
 }
 
+// STEP9の2つ目以降の項の出力から、章タイトル行と節見出し行を除去
+// （節一括実行時に重複表示されるのを防ぐ）
+// isFirst=true の場合はそのまま返す（最初の項は章・節も出したい）
+function stripChapterSection(output, isFirst) {
+  if (isFirst) return output;
+  if (!output || typeof output !== "string") return output;
+
+  const lines = output.split("\n");
+  const result = [];
+  let removedChapter = false;
+  let removedSection = false;
+  let sawContent = false;
+
+  // 章タイトル：「第〜章」で始まる行
+  const chapterRegex = /^第[0-9零一二三四五六七八九十百]+章/;
+  // 節見出し：「(1)」「(2)」... で始まる行
+  const sectionRegex = /^\([0-9]+\)/;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // 先頭から順に、最初に出てくる章タイトル行を1回だけスキップ
+    if (!sawContent && !removedChapter && chapterRegex.test(trimmed)) {
+      removedChapter = true;
+      continue;
+    }
+
+    // 章タイトル削除後、最初に出てくる節見出し行を1回だけスキップ
+    if (!sawContent && removedChapter && !removedSection && sectionRegex.test(trimmed)) {
+      removedSection = true;
+      continue;
+    }
+
+    // 章・節を削除した直後の空行も除去（読みやすくするため）
+    if (!sawContent && removedChapter && removedSection && !trimmed) {
+      continue;
+    }
+
+    // 章だけあって節がない場合も、章を削除した直後の空行を除去
+    if (!sawContent && removedChapter && !removedSection && !trimmed && result.length === 0) {
+      continue;
+    }
+
+    // 有意なコンテンツが出現したフラグ
+    if (trimmed) sawContent = true;
+    result.push(line);
+  }
+
+  // 章・節が見つからなかった場合は元のまま返す（フォールバック）
+  if (!removedChapter && !removedSection) return output;
+
+  return result.join("\n").replace(/^\n+/, "");
+}
+
 // ============================================================
 // 共通コンポーネント
 // ============================================================
@@ -1065,8 +1119,9 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           results.push(data.output || "");
         }
 
-        // 全項成功：連結して出力欄に反映
-        const combined = results.join("\n\n");
+        // 全項成功：2つ目以降の章・節タイトルを除去してから連結
+        const cleaned = results.map((out, idx) => stripChapterSection(out, idx === 0));
+        const combined = cleaned.join("\n\n");
         setOutputText(combined);
         await onSaveInput(step.num, {
           detailed_plot_text: inputs.detailed_plot_text || "",
