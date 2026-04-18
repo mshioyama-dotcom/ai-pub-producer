@@ -247,8 +247,45 @@ async function saveProject(proj) {
 async function loadStepData(num) {
   try { const raw = localStorage.getItem(STEPS_KEY_PREFIX + num); return raw ? JSON.parse(raw) : null; } catch { return null; }
 }
+
+// ===== DEBUG: サーバーにログを送信する関数 =====
+// fire-and-forget: 送信失敗してもユーザー操作には影響させない
+function sendDebugLog(label, data) {
+  if (typeof window === "undefined") return;
+  // ローカルにも残す
+  if (!window.__DEBUG_LOGS) window.__DEBUG_LOGS = [];
+  const entry = { timestamp: new Date().toLocaleTimeString(), label, data };
+  window.__DEBUG_LOGS.push(entry);
+  console.log(`[DEBUG] ${label}`, data);
+  // サーバーにPOST（awaitしない）
+  try {
+    fetch("/api/debug-log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: window.__DEBUG_SESSION_ID || "unknown",
+        label,
+        data,
+        userAgent: navigator.userAgent || ""
+      })
+    }).catch(() => {}); // 失敗は無視
+  } catch (e) { /* 無視 */ }
+}
+// ===== END DEBUG =====
+
 async function saveStepData(num, data) {
-  try { localStorage.setItem(STEPS_KEY_PREFIX + num, JSON.stringify(data)); } catch (e) { console.error(e); }
+  try {
+    const serialized = JSON.stringify(data);
+    localStorage.setItem(STEPS_KEY_PREFIX + num, serialized);
+    // ===== DEBUG =====
+    const outLen = (data?.outputText || "").length;
+    const serLen = serialized.length;
+    sendDebugLog(`SAVE STEP${num}`, { outputTextLength: outLen, serializedLength: serLen });
+    // ===== END DEBUG =====
+  } catch (e) {
+    console.error(e);
+    sendDebugLog(`SAVE_ERROR STEP${num}`, { error: e.message });
+  }
 }
 async function loadAllSteps() {
   const all = {};
@@ -1149,8 +1186,24 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
       if (step.num === 2 && execInputs.amazon_html) { const cleaned = cleanHtmlMinimal(execInputs.amazon_html); if (cleaned) execInputs.amazon_html = cleaned; }
       const response = await fetch("/api/dify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stepNum: step.num, inputs: execInputs }) });
       const data = await response.json();
+      // ===== DEBUG =====
+      const outLen = (data.output || "").length;
+      const outTail = (data.output || "").slice(-30);
+      sendDebugLog(`RECV STEP${step.num}`, { length: outLen, tail: outTail });
+      // ===== END DEBUG =====
       if (!response.ok) { setRunError(data.error || "実行中にエラーが発生しました。少し時間をおいてからもう一度お試しください。"); }
-      else { setOutputText(data.output || ""); await onSaveInput(step.num, execInputs); }
+      else {
+        setOutputText(data.output || "");
+        await onSaveInput(step.num, execInputs);
+        // ===== DEBUG: 保存後にもう一度確認 =====
+        setTimeout(async () => {
+          const reloaded = await loadStepData(step.num);
+          const savedLen = (reloaded?.outputText || "").length;
+          const savedTail = (reloaded?.outputText || "").slice(-30);
+          sendDebugLog(`STORED STEP${step.num}`, { length: savedLen, tail: savedTail });
+        }, 500);
+        // ===== END DEBUG =====
+      }
     } catch (e) { setRunError("通信エラーが発生しました。インターネット接続を確認して、少し時間をおいてからもう一度お試しください。"); }
     finally { setIsRunning(false); }
   };
@@ -1414,6 +1467,11 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                   onAutoFill={() => {
                     const srcNum = parseInt(field.source.replace("STEP", ""), 10);
                     const srcOutput = allSteps?.[srcNum]?.outputText;
+                    // ===== DEBUG =====
+                    const len = (srcOutput || "").length;
+                    const tail = (srcOutput || "").slice(-30);
+                    sendDebugLog(`AUTOFILL from STEP${srcNum} to STEP${step.num}.${field.name}`, { length: len, tail: tail });
+                    // ===== END DEBUG =====
                     if (srcOutput) handleInputChange(field.name, srcOutput);
                     else alert(`STEP${srcNum}の出力データがまだ保存されていません。`);
                   }}
@@ -2021,12 +2079,31 @@ export default function App() {
   const [allSteps, setAllSteps] = useState({});
   const [loading, setLoading] = useState(true);
 
+  // ===== DEBUG MODE (always on; logs sent to server) =====
+  const DEBUG = true; // 問題調査のため全ユーザーで有効化。後で false に戻す
+  if (typeof window !== "undefined") {
+    window.__DEBUG_LOGS = window.__DEBUG_LOGS || [];
+    // セッションIDを発行（ブラウザごとにユニーク）
+    if (!window.__DEBUG_SESSION_ID) {
+      window.__DEBUG_SESSION_ID = "s_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 7);
+    }
+  }
+  // ===== END DEBUG =====
+
   useEffect(() => {
     (async () => {
       const p = await loadProject();
       if (p) setProject(p); else await saveProject(defaultProject());
       const steps = await loadAllSteps();
       setAllSteps(steps); setLoading(false);
+      if (DEBUG) {
+        const summary = {};
+        for (let i = 1; i <= 10; i++) {
+          const t = steps[i]?.outputText || "";
+          summary[`STEP${i}`] = { length: t.length, tail: t.slice(-30) };
+        }
+        sendDebugLog("INIT loadAllSteps", summary);
+      }
     })();
   }, []);
 

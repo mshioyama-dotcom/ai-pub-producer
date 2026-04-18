@@ -104,6 +104,14 @@ export default async function handler(req, res) {
       || data?.data?.outputs?.result
       || JSON.stringify(data?.data?.outputs || data, null, 2);
 
+    // --- DEBUG LOG (for Vercel logs) ---
+    const rawText = data?.data?.outputs?.text;
+    const rawTextLen = (rawText || "").length;
+    const outputLen = (output || "").length;
+    const rawTextTail = rawText ? String(rawText).slice(-30) : "(empty)";
+    console.log(`[DIFY_DEBUG] STEP${stepNum} rawText.length=${rawTextLen} output.length=${outputLen} tail="${rawTextTail}"`);
+    // --- END DEBUG ---
+
     return res.status(200).json({ output });
 
   } catch (error) {
