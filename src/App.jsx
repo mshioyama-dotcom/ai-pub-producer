@@ -1759,7 +1759,7 @@ export default function App() {
                 }
               }}
               style={{ flex: 1, padding: "10px", background: C.navy, color: C.white, border: "none", borderRadius: 3, fontWeight: 700, fontSize: 13, cursor: "pointer" }}
-            >
+            
               コピー
             </button>
             <button onClick={() => setRefPanel(null)}
