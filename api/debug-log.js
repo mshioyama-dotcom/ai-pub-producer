@@ -1,5 +1,36 @@
-// Vercel Serverless Function - Debug Log Collector (Slack連携版)
+// Vercel Serverless Function - Debug Log Collector (Slack連携版 / プライバシー配慮版)
 // フロントエンドからのデバッグログをSlackに通知する
+// テキスト内容（tail等）は削除し、数値情報のみを通知する
+
+// 許可するキーのホワイトリスト（これ以外は削除）
+const ALLOWED_KEYS = [
+  "step",
+  "action",
+  "length",
+  "outputTextLength",
+  "serializedLength",
+  "rawTextLength",
+  "responseLength",
+  "statusCode",
+  "elapsedMs",
+  "errorCode",
+  "errorType",
+];
+
+function sanitize(data) {
+  if (!data || typeof data !== "object") return {};
+  const clean = {};
+  for (const key of ALLOWED_KEYS) {
+    if (data[key] !== undefined) {
+      clean[key] = data[key];
+    }
+  }
+  // エラーメッセージは80文字までに制限（完全削除だと原因特定できないため）
+  if (data.errorMessage && typeof data.errorMessage === "string") {
+    clean.errorMessage = data.errorMessage.substring(0, 80);
+  }
+  return clean;
+}
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -12,16 +43,19 @@ export default async function handler(req, res) {
   try {
     const { sessionId, label, data, userAgent } = req.body;
 
+    // データをサニタイズ（テキスト内容を削除、数値情報のみ残す）
+    const safeData = sanitize(data);
+
     // Vercel Logs に出力（構造化ログ）
     const timestamp = new Date().toISOString();
-    const logLine = `[CLIENT_DEBUG] ${timestamp} session=${sessionId || "none"} label="${label || "unknown"}" data=${JSON.stringify(data || {})} ua="${(userAgent || "").substring(0, 100)}"`;
+    const logLine = `[CLIENT_DEBUG] ${timestamp} session=${sessionId || "none"} label="${label || "unknown"}" data=${JSON.stringify(safeData)} ua="${(userAgent || "").substring(0, 100)}"`;
     console.log(logLine);
 
     // Slack通知（SLACK_WEBHOOK_URLが設定されている時のみ）
     const slackUrl = process.env.SLACK_WEBHOOK_URL;
     if (slackUrl && label) {
       // INIT loadAllSteps はノイズが多いのでスキップ
-      const skipLabel = label === "INIT" && data?.action === "loadAllSteps";
+      const skipLabel = label === "INIT" && safeData?.action === "loadAllSteps";
 
       if (!skipLabel) {
         // ラベル別の絵文字
@@ -36,7 +70,7 @@ export default async function handler(req, res) {
         const emoji = emojiMap[label] || "📝";
 
         const shortSession = (sessionId || "none").substring(0, 8);
-        const dataStr = JSON.stringify(data || {}, null, 0).substring(0, 800);
+        const dataStr = JSON.stringify(safeData, null, 0).substring(0, 800);
 
         const slackMessage = {
           text: `${emoji} *${label}* \`${shortSession}\`\n\`\`\`${dataStr}\`\`\``,
