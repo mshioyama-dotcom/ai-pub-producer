@@ -757,25 +757,40 @@ const Step2HtmlHelper = ({ inputs, currentHtml }) => {
 // 左メニュー
 // ============================================================
 
-const SideMenu = ({ currentPage, onNavigate, stepStatuses }) => {
-  const menuItem = (label, page, status) => {
+const SideMenu = ({ currentPage, onNavigate, stepStatuses, isTrialMode }) => {
+  const menuItem = (label, page, status, disabled = false) => {
     const active = currentPage === page;
     return (
-      <div key={page} onClick={() => onNavigate(page)}
+      <div key={page} onClick={() => { if (!disabled) onNavigate(page); }}
         style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "9px 18px", cursor: "pointer",
+          padding: "9px 18px",
+          cursor: disabled ? "not-allowed" : "pointer",
           background: active ? "rgba(26,46,74,0.08)" : "transparent",
-          color: active ? C.navy : "#3d3d3d",
+          color: disabled ? "rgba(160,160,160,0.7)" : (active ? C.navy : "#3d3d3d"),
           fontWeight: active ? 700 : 400,
           fontSize: 13, lineHeight: 1.3,
           borderLeft: active ? `2px solid ${C.gold}` : "2px solid transparent",
           borderBottom: "1px solid rgba(0,0,0,0.05)",
           whiteSpace: "nowrap", overflow: "hidden",
+          opacity: disabled ? 0.55 : 1,
           transition: "background 0.1s, color 0.1s",
         }}>
         <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", marginRight: 8 }}>{label}</span>
-        {status && <Badge status={status} />}
+        {disabled ? (
+          <span style={{
+            display: "inline-block", fontSize: 10, fontWeight: 600,
+            padding: "2px 7px", borderRadius: 3,
+            background: "rgba(255,255,255,0.12)",
+            color: "rgba(255,255,255,0.7)",
+            letterSpacing: "0.03em", whiteSpace: "nowrap",
+            border: "1px solid rgba(255,255,255,0.18)"
+          }}>
+            体験版不可
+          </span>
+        ) : (
+          status && <Badge status={status} />
+        )}
       </div>
     );
   };
@@ -828,7 +843,8 @@ const SideMenu = ({ currentPage, onNavigate, stepStatuses }) => {
             {catLabel(cat.label)}
             {cat.steps.map((n) => {
               const s = STEPS[n - 1];
-              return menuItem(`STEP${n}　${s.title}`, `step_${n}`, stepStatuses[n]);
+              const disabled = isTrialMode && n >= 4;
+              return menuItem(`STEP${n}　${s.title}`, `step_${n}`, stepStatuses[n], disabled);
             })}
           </div>
         ))}
@@ -844,7 +860,7 @@ const SideMenu = ({ currentPage, onNavigate, stepStatuses }) => {
 // ホーム画面
 // ============================================================
 
-const HomePage = ({ project, stepStatuses, allSteps, onNavigate }) => {
+const HomePage = ({ project, stepStatuses, allSteps, onNavigate, isTrialMode }) => {
   const completedCount = Object.values(stepStatuses).filter((s) => s === "completed").length;
   const currentStep = project.currentStep || 1;
   const lastUpdated = project.lastUpdatedStep;
@@ -861,6 +877,29 @@ const HomePage = ({ project, stepStatuses, allSteps, onNavigate }) => {
         <p style={{ fontSize: 14, color: C.textSub, margin: "0 0 16px", lineHeight: 1.7 }}>10のツールで、テーマ発見から本文執筆・Amazon掲載まで進めます</p>
         <div style={{ height: 1, background: `linear-gradient(to right, ${C.gold}, ${C.goldLight}, transparent)`, width: "100%", opacity: 0.9 }} />
       </div>
+
+      {/* 体験モードのお知らせバナー */}
+      {isTrialMode && (
+        <Card style={{ marginBottom: 24, background: C.goldPale, border: `1px solid ${C.goldLight}` }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+            <div style={{
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              width: 36, height: 36, borderRadius: 4,
+              background: C.gold, color: C.white,
+              fontSize: 16, fontWeight: 700, flexShrink: 0
+            }}>体験</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.navy, marginBottom: 4 }}>
+                体験版をご利用中です
+              </div>
+              <div style={{ fontSize: 13, color: C.textSub, lineHeight: 1.8 }}>
+                STEP1〜STEP3（テーマ発見・市場勝率診断・企画作成）までをお試しいただけます。STEP3まで進めると、自分が書ける本があるかどうかが見えてきます。<br />
+                すべての機能をご利用になりたい方は、第2期本申込をご検討ください（申込受付：4/27〜5/2）。
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
 
       <div style={{ display: "flex", gap: 12, marginBottom: 28, flexWrap: "nowrap" }}>
         <Card style={{ flex: "1 1 0", minWidth: 0, borderTop: `2px solid ${C.navy}` }}>
@@ -960,21 +999,45 @@ const HomePage = ({ project, stepStatuses, allSteps, onNavigate }) => {
       <div style={{ marginBottom: 28 }}>
         <h2 style={{ fontSize: 14, fontWeight: 700, color: C.navy, marginBottom: 12, letterSpacing: "0.03em" }}>進行中のステップ</h2>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          {STEPS.map((s) => (
-            <div key={s.id} onClick={() => onNavigate(`step_${s.num}`)}
-              style={{ display: "flex", alignItems: "center", padding: "12px 16px", background: C.white, borderRadius: 4, border: `1px solid ${C.border}`, cursor: "pointer", transition: "box-shadow 0.12s" }}>
-              <span style={{
-                display: "inline-flex", alignItems: "center", justifyContent: "center",
-                width: 28, height: 28, borderRadius: 4, fontSize: 12, fontWeight: 700,
-                background: stepStatuses[s.num] === "completed" ? C.greenLight : stepStatuses[s.num] === "in_progress" ? C.blueLight : "rgba(0,0,0,0.04)",
-                color: stepStatuses[s.num] === "completed" ? C.green : stepStatuses[s.num] === "in_progress" ? C.navyMid : C.textLight,
-                marginRight: 14, flexShrink: 0
-              }}>{s.num}</span>
-              <span style={{ flex: 1, fontSize: 13.5, fontWeight: 500, color: C.text }}>{s.title}</span>
-              <Badge status={stepStatuses[s.num]} />
-              <span style={{ marginLeft: 12, fontSize: 12, color: C.gold, fontWeight: 600 }}>開く →</span>
-            </div>
-          ))}
+          {STEPS.map((s) => {
+            const disabled = isTrialMode && s.num >= 4;
+            return (
+              <div key={s.id} onClick={() => { if (!disabled) onNavigate(`step_${s.num}`); }}
+                style={{
+                  display: "flex", alignItems: "center", padding: "12px 16px",
+                  background: C.white, borderRadius: 4,
+                  border: `1px solid ${C.border}`,
+                  cursor: disabled ? "not-allowed" : "pointer",
+                  opacity: disabled ? 0.55 : 1,
+                  transition: "box-shadow 0.12s"
+                }}>
+                <span style={{
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  width: 28, height: 28, borderRadius: 4, fontSize: 12, fontWeight: 700,
+                  background: stepStatuses[s.num] === "completed" ? C.greenLight : stepStatuses[s.num] === "in_progress" ? C.blueLight : "rgba(0,0,0,0.04)",
+                  color: stepStatuses[s.num] === "completed" ? C.green : stepStatuses[s.num] === "in_progress" ? C.navyMid : C.textLight,
+                  marginRight: 14, flexShrink: 0
+                }}>{s.num}</span>
+                <span style={{ flex: 1, fontSize: 13.5, fontWeight: 500, color: C.text }}>{s.title}</span>
+                {disabled ? (
+                  <span style={{
+                    display: "inline-block", fontSize: 10, fontWeight: 600,
+                    padding: "2px 8px", borderRadius: 3,
+                    background: "rgba(184,146,42,0.15)",
+                    color: C.gold,
+                    letterSpacing: "0.03em", whiteSpace: "nowrap"
+                  }}>
+                    体験版不可
+                  </span>
+                ) : (
+                  <>
+                    <Badge status={stepStatuses[s.num]} />
+                    <span style={{ marginLeft: 12, fontSize: 12, color: C.gold, fontWeight: 600 }}>開く →</span>
+                  </>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -2079,6 +2142,10 @@ export default function App() {
   const [allSteps, setAllSteps] = useState({});
   const [loading, setLoading] = useState(true);
 
+  // ===== 体験モード判定（?trial=true の時だけTRUE）=====
+  const isTrialMode = typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("trial") === "true";
+
   // ===== DEBUG MODE (always on; logs sent to server) =====
   const DEBUG = true; // 問題調査のため全ユーザーで有効化。後で false に戻す
   if (typeof window !== "undefined") {
@@ -2118,6 +2185,15 @@ export default function App() {
   }, []);
 
   const navigate = useCallback(async (p) => {
+    // 体験モードガード：STEP4以降への遷移をブロック
+    if (isTrialMode && p.startsWith("step_")) {
+      const num = parseInt(p.replace("step_", ""), 10);
+      if (num >= 4) {
+        alert("この機能は体験版では利用できません。\n\n第2期の本申込後にすべての機能をご利用いただけます。");
+        return;
+      }
+    }
+
     setPendingInputs((pending) => {
       Object.entries(pending).forEach(async ([stepNum, inputs]) => {
         const num = parseInt(stepNum, 10);
@@ -2137,7 +2213,7 @@ export default function App() {
       setProject((prev) => { const updated = { ...prev, currentStep: num }; saveProject(updated); return updated; });
     }
     window.scrollTo?.(0, 0);
-  }, []);
+  }, [isTrialMode]);
 
   const handleSaveInput = useCallback(async (num, inputData) => {
     const existing = allSteps[num] || defaultStepData(num);
@@ -2184,7 +2260,7 @@ export default function App() {
 
   const renderPage = () => {
     const nav = isMobile ? navigateAndClose : navigate;
-    if (page === "home") return <HomePage project={project} stepStatuses={stepStatuses} allSteps={allSteps} onNavigate={nav} />;
+    if (page === "home") return <HomePage project={project} stepStatuses={stepStatuses} allSteps={allSteps} onNavigate={nav} isTrialMode={isTrialMode} />;
     if (page === "guide") return <GuidePage onNavigate={nav} />;
     if (page === "saved") return <SavedPage project={project} stepStatuses={stepStatuses} allSteps={allSteps} onNavigate={nav} />;
     if (page.startsWith("step_")) {
@@ -2193,7 +2269,7 @@ export default function App() {
       const sd = allSteps[num] || defaultStepData(num);
       return <StepPage step={step} stepData={sd} project={project} onNavigate={nav} onSaveInput={handleSaveInput} onSaveOutput={handleSaveOutput} onUpdateProject={setProject} onInputChange={handlePendingInputChange} allSteps={allSteps} onRefPanel={setRefPanel} />;
     }
-    return <HomePage project={project} stepStatuses={stepStatuses} allSteps={allSteps} onNavigate={nav} />;
+    return <HomePage project={project} stepStatuses={stepStatuses} allSteps={allSteps} onNavigate={nav} isTrialMode={isTrialMode} />;
   };
 
   // ============================================================
@@ -2247,7 +2323,7 @@ export default function App() {
         transform: menuOpen ? "translateX(0)" : "translateX(-100%)",
         transition: "transform 0.25s ease",
       }}>
-        <SideMenu currentPage={page} onNavigate={navigateAndClose} stepStatuses={stepStatuses} isMobile />
+        <SideMenu currentPage={page} onNavigate={navigateAndClose} stepStatuses={stepStatuses} isMobile isTrialMode={isTrialMode} />
       </div>
     </>
   );
@@ -2270,7 +2346,7 @@ export default function App() {
   return (
     <div style={{ display: "flex", minHeight: "100vh", fontFamily: "'Noto Sans JP', sans-serif", background: C.bg }}>
       <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-      <SideMenu currentPage={page} onNavigate={navigate} stepStatuses={stepStatuses} />
+      <SideMenu currentPage={page} onNavigate={navigate} stepStatuses={stepStatuses} isTrialMode={isTrialMode} />
       <div style={{ marginLeft: 300, flex: 1, padding: "20px 44px 36px", maxWidth: refPanel ? 560 : 820, boxSizing: "border-box", transition: "max-width 0.2s" }}>
         {renderPage()}
       </div>
