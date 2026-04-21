@@ -2258,6 +2258,31 @@ export default function App() {
     );
   }
 
+  // ===== 体験モード以外は全てブロック =====
+  if (!isTrialMode) {
+    return (
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "center",
+        minHeight: "100vh", padding: "24px",
+        background: C.bg, fontFamily: "inherit", color: C.text,
+      }}>
+        <div style={{
+          maxWidth: 480, width: "100%", padding: "48px 32px",
+          background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12,
+          textAlign: "center", boxShadow: "0 2px 12px rgba(36,61,92,0.06)",
+        }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: C.navy, marginBottom: 16, letterSpacing: "0.02em" }}>
+            このサイトは現在アクセスできません
+          </div>
+          <div style={{ fontSize: 14, color: C.textSub, lineHeight: 1.7 }}>
+            ご不便をおかけしますが、しばらくお待ちください。
+          </div>
+        </div>
+      </div>
+    );
+  }
+  // ===== END ブロック =====
+
   const renderPage = () => {
     const nav = isMobile ? navigateAndClose : navigate;
     if (page === "home") return <HomePage project={project} stepStatuses={stepStatuses} allSteps={allSteps} onNavigate={nav} isTrialMode={isTrialMode} />;
