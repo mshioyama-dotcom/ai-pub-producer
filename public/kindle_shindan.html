@@ -400,6 +400,40 @@
     margin-top: 10px;
   }
 
+
+  .advice-header {
+    font-size: 13px;
+    font-weight: 700;
+    color: #243d5c;
+    letter-spacing: 0.04em;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #243d5c;
+  }
+  .advice-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .advice-item {
+    background: #f0f4f9;
+    border-left: 4px solid #243d5c;
+    border-radius: 0 8px 8px 0;
+    padding: 12px 14px;
+  }
+  .advice-step-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #243d5c;
+    margin-bottom: 6px;
+    letter-spacing: 0.04em;
+  }
+  .advice-step-text {
+    font-size: 13px;
+    color: #444;
+    line-height: 1.75;
+  }
   .retry-btn {
     display: block;
     text-align: center;
@@ -495,35 +529,50 @@ const results = [
   {
     min: 0, max: 3,
     rank: "要見直し",
-    color: "#c0392b",
-    summary: "テーマ・ターゲット・タイトルの設計に見直すべき点が複数あります。今の状態で出版しても売上につながりにくいため、まず優先度の高い箇所から改善することが大切です。",
+    summary: "テーマ・ターゲット・タイトルの設計に見直すべき点が複数あります。今の状態で出版しても売上につながりにくいため、テーマ選びから見直すことが大切です。",
     items: [
-      { type: "ng", text: "市場ニーズの確認から始めると、テーマ選びの精度が一気に上がります" },
-      { type: "ng", text: "ターゲットを一人に絞り直すことで、内容の刺さり方が変わります" },
-      { type: "warn", text: "販促計画を出版前に立てておくことが、初動売上に直結します" },
-    ]
+      { type: "ng", text: "市場ニーズの確認が不足しています" },
+      { type: "ng", text: "ターゲットが曖昧で、内容が刺さりにくい状態です" },
+      { type: "warn", text: "販促計画が不十分です" },
+    ],
+    advice: [
+      { step: "STEP1", label: "テーマ発見インタビュー", text: "今のテーマに縛られず、幅広くキーワード候補を出してみてください。AIとの対話で「気になる2語」を見つけ直すところから始めましょう。" },
+      { step: "STEP2", label: "市場勝率診断", text: "Amazonの実データで市場を診断します。勝率が低ければテーマを変えてSTEP1からやり直せます。データを見てからテーマを確定してください。" },
+      { step: "STEP3", label: "読者・価値設計", text: "ターゲット読者を一人に絞り込みます。「誰のために書くか」を明確にすることで、内容の刺さり方が大きく変わります。" },
+    ],
+    ctaLabel: "STEP1から無料で始める →"
   },
   {
     min: 4, max: 7,
     rank: "あと一歩",
-    color: "#e67e22",
-    summary: "基本的な方向性は悪くありません。ただ、あと1〜2箇所を改善するだけで売上の伸びしろが大きく変わります。何を優先して変えるかを明確にすることが次のステップです。",
+    summary: "基本的な方向性は悪くありません。あと1〜2箇所を改善するだけで売上の伸びしろが大きく変わります。データで裏付けを取りながら精度を上げましょう。",
     items: [
-      { type: "ok", text: "一部の設計はしっかりできています。その強みを活かしましょう" },
-      { type: "warn", text: "ターゲットをさらに絞り込むと、読者に刺さる内容に近づきます" },
-      { type: "warn", text: "タイトルの改善と販促計画の具体化が、売上アップの近道です" },
-    ]
+      { type: "ok", text: "一部の設計はしっかりできています" },
+      { type: "warn", text: "ターゲットをさらに絞り込む余地があります" },
+      { type: "warn", text: "市場データで差別化の切り口を確認できていません" },
+    ],
+    advice: [
+      { step: "STEP1", label: "テーマ発見インタビュー", text: "現在のテーマで進めてOKです。ただし「気になる2語」をデータで確認するためにSTEP1を通してみてください。" },
+      { step: "STEP2", label: "市場勝率診断", text: "ここが最重要です。Amazonの競合データを丁寧に見て、自分の切り口で差別化できるかを確認してください。" },
+      { step: "STEP3", label: "読者・価値設計", text: "ターゲット読者をさらに一人に絞り込みます。章構造も自動で設計されるので、抜けがないか確認してください。" },
+    ],
+    ctaLabel: "STEP1から無料で確認してみる →"
   },
   {
     min: 8, max: 10,
     rank: "準備OK",
-    color: "#27ae60",
-    summary: "売れる本にするための基本設計はできています。あとは精度をさらに上げる段階です。プロの視点で細かい部分を確認することで、売上をより確実なものにできます。",
+    summary: "売れる本にするための基本設計はできています。あとはデータで裏付けを取り、精度をさらに上げる段階です。",
     items: [
-      { type: "ok", text: "市場ニーズの確認ができています。この強みを最大限活かしましょう" },
+      { type: "ok", text: "市場ニーズの確認ができています" },
       { type: "ok", text: "ターゲット設定の方向性は整っています" },
-      { type: "warn", text: "タイトルと販促計画をさらに磨くことで、売上の天井が上がります" },
-    ]
+      { type: "warn", text: "データで裏付けを取るとさらに確実になります" },
+    ],
+    advice: [
+      { step: "STEP1", label: "テーマ発見インタビュー", text: "現在のテーマでそのまま進めてください。AIとの対話で検索キーワードを2語に絞り込みます。" },
+      { step: "STEP2", label: "市場勝率診断", text: "Amazonの実データで設計の裏付けを取ります。勝率が高ければ自信を持って進められます。差別化の切り口も確認しておきましょう。" },
+      { step: "STEP3", label: "読者・価値設計", text: "AIが章構造まで自動設計します。現在の設計と比較して、抜けているポイントがないか確認してください。" },
+    ],
+    ctaLabel: "STEP1〜3を無料で体験する →"
   }
 ];
 
@@ -618,12 +667,19 @@ function showResult() {
           `).join('')}
         </div>
         <div class="divider"></div>
+        <div class="advice-header">AI出版プロデューサー無料体験（STEP1〜3）の使い方</div>
+        <div class="advice-steps">
+          ${result.advice.map(a => `
+            <div class="advice-item">
+              <div class="advice-step-label">${a.step}｜${a.label}</div>
+              <div class="advice-step-text">${a.text}</div>
+            </div>
+          `).join('')}
+        </div>
         <div class="cta-box">
           <div class="cta-badge">無料体験のご案内</div>
-          <div class="cta-title">この診断結果をもとに<br><span>次の1冊を売れる本にする</span><br>具体的な改善策を一緒に考えます</div>
-          <p class="cta-desc">テーマ・市場・ターゲット・タイトルを<br>3ステップで整理し、何をどう変えればいいかを<br>プロと一緒に明確にします。</p>
           <div class="cta-limit">🔥 5名限定 ・ 5月2日（金）まで</div>
-          <a href="https://ai-pub-producer.vercel.app/?trial=true" class="btn-cta">無料体験に申し込む →</a>
+          <a href="https://ai-pub-producer.vercel.app/?trial=true" class="btn-cta">${result.ctaLabel}</a>
           <p class="cta-note">完全無料・申込後すぐにご案内します</p>
         </div>
         <button class="retry-btn" onclick="resetQuiz()">もう一度診断する</button>
