@@ -401,6 +401,39 @@
   }
 
 
+  .empathy-box {
+    background: #fff8ec;
+    border-left: 4px solid #c9a84c;
+    border-radius: 0 8px 8px 0;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  .empathy-text {
+    font-size: 13px;
+    color: #7a5a00;
+    line-height: 1.8;
+    margin: 0;
+  }
+  .solution-box {
+    background: #eef3f9;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+  }
+  .solution-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #243d5c;
+    letter-spacing: 0.1em;
+    margin-bottom: 6px;
+  }
+  .solution-text {
+    font-size: 13px;
+    color: #243d5c;
+    line-height: 1.8;
+    margin: 0;
+    font-weight: 500;
+  }
   .advice-header {
     font-size: 13px;
     font-weight: 700;
@@ -535,26 +568,30 @@ const results = [
       { type: "ng", text: "ターゲットが曖昧で、内容が刺さりにくい状態です" },
       { type: "warn", text: "販促計画が不十分です" },
     ],
+    empathy: "テーマや市場を確認せずに書き始めると、書き終えてから「売れない」と気づくことが多いです。その段階での修正は大きな手戻りになります。",
+    solution: "テーマ・市場・読者の設計を書き始める前に固める必要があります。AI出版プロデューサーのSTEP1〜3を使えば、この3つを順番に整理できます。各STEPでの具体的な進め方はこちらです。",
     advice: [
-      { step: "STEP1", label: "テーマ発見インタビュー", text: "今のテーマに縛られず、幅広くキーワード候補を出してみてください。AIとの対話で「気になる2語」を見つけ直すところから始めましょう。" },
-      { step: "STEP2", label: "市場勝率診断", text: "Amazonの実データで市場を診断します。勝率が低ければテーマを変えてSTEP1からやり直せます。データを見てからテーマを確定してください。" },
-      { step: "STEP3", label: "読者・価値設計", text: "ターゲット読者を一人に絞り込みます。「誰のために書くか」を明確にすることで、内容の刺さり方が大きく変わります。" },
+      { step: "STEP1", label: "テーマ発見インタビュー", text: "今のテーマにこだわらず、AIとの対話でキーワードを広く出し直す" },
+      { step: "STEP2", label: "市場勝率診断", text: "Amazonの実データで市場勝率を確認。勝率が低ければテーマを変えてやり直せる" },
+      { step: "STEP3", label: "読者・価値設計", text: "ターゲット読者を一人に絞り込み、章構造まで自動設計" },
     ],
     ctaLabel: "STEP1から無料で始める →"
   },
   {
     min: 4, max: 7,
     rank: "あと一歩",
-    summary: "基本的な方向性は悪くありません。あと1〜2箇所を改善するだけで売上の伸びしろが大きく変わります。データで裏付けを取りながら精度を上げましょう。",
+    summary: "基本的な方向性は悪くありません。あと1〜2箇所を改善するだけで売上の伸びしろが大きく変わります。",
     items: [
       { type: "ok", text: "一部の設計はしっかりできています" },
       { type: "warn", text: "ターゲットをさらに絞り込む余地があります" },
       { type: "warn", text: "市場データで差別化の切り口を確認できていません" },
     ],
+    empathy: "方向性はあっているのに売れない場合、多くはターゲットのズレか市場データの未確認が原因です。感覚で進めている部分をデータで裏付けるだけで大きく変わります。",
+    solution: "ターゲットの絞り込みと市場データによる差別化の確認が必要です。AI出版プロデューサーのSTEP1〜3を使えば、データをもとに整理できます。各STEPでの具体的な進め方はこちらです。",
     advice: [
-      { step: "STEP1", label: "テーマ発見インタビュー", text: "現在のテーマで進めてOKです。ただし「気になる2語」をデータで確認するためにSTEP1を通してみてください。" },
-      { step: "STEP2", label: "市場勝率診断", text: "ここが最重要です。Amazonの競合データを丁寧に見て、自分の切り口で差別化できるかを確認してください。" },
-      { step: "STEP3", label: "読者・価値設計", text: "ターゲット読者をさらに一人に絞り込みます。章構造も自動で設計されるので、抜けがないか確認してください。" },
+      { step: "STEP1", label: "テーマ発見インタビュー", text: "現在のテーマで進めてOK。AIとの対話で検索キーワードを2語に絞り込む" },
+      { step: "STEP2", label: "市場勝率診断", text: "Amazonの競合データを確認し、差別化の切り口を見つける。ここが最重要" },
+      { step: "STEP3", label: "読者・価値設計", text: "ターゲット読者をさらに一人に絞り込み、章構造の抜けを確認する" },
     ],
     ctaLabel: "STEP1から無料で確認してみる →"
   },
@@ -567,10 +604,12 @@ const results = [
       { type: "ok", text: "ターゲット設定の方向性は整っています" },
       { type: "warn", text: "データで裏付けを取るとさらに確実になります" },
     ],
+    empathy: "設計はできている。でも「本当にこれで大丈夫か」という不安が残る。その不安はデータで裏付けを取ることで消えます。",
+    solution: "設計の裏付けをデータで確認することが必要です。AI出版プロデューサーのSTEP1〜3を使えば、Amazonの実データで検証できます。各STEPでの具体的な進め方はこちらです。",
     advice: [
-      { step: "STEP1", label: "テーマ発見インタビュー", text: "現在のテーマでそのまま進めてください。AIとの対話で検索キーワードを2語に絞り込みます。" },
-      { step: "STEP2", label: "市場勝率診断", text: "Amazonの実データで設計の裏付けを取ります。勝率が高ければ自信を持って進められます。差別化の切り口も確認しておきましょう。" },
-      { step: "STEP3", label: "読者・価値設計", text: "AIが章構造まで自動設計します。現在の設計と比較して、抜けているポイントがないか確認してください。" },
+      { step: "STEP1", label: "テーマ発見インタビュー", text: "現在のテーマでそのまま進める。AIとの対話で検索キーワードを確定する" },
+      { step: "STEP2", label: "市場勝率診断", text: "Amazonの実データで設計の裏付けを取る。勝率が高ければ自信を持って進める" },
+      { step: "STEP3", label: "読者・価値設計", text: "AIが章構造まで自動設計。現在の設計と比較して抜けを確認する" },
     ],
     ctaLabel: "STEP1〜3を無料で体験する →"
   }
@@ -667,7 +706,14 @@ function showResult() {
           `).join('')}
         </div>
         <div class="divider"></div>
-        <div class="advice-header">AI出版プロデューサー無料体験（STEP1〜3）の使い方</div>
+        <div class="empathy-box">
+          <p class="empathy-text">${result.empathy}</p>
+        </div>
+        <div class="solution-box">
+          <div class="solution-label">解決策</div>
+          <p class="solution-text">${result.solution}</p>
+        </div>
+        <div class="advice-header">あなたの診断結果をもとにした使い方</div>
         <div class="advice-steps">
           ${result.advice.map(a => `
             <div class="advice-item">
@@ -677,8 +723,8 @@ function showResult() {
           `).join('')}
         </div>
         <div class="cta-box">
-          <div class="cta-badge">無料体験のご案内</div>
-          <div class="cta-limit">🔥 5名限定 ・ 5月2日（金）まで</div>
+          <div class="cta-badge">無料体験受付中</div>
+          <div class="cta-limit">📅 5月2日（金）まで</div>
           <a href="https://ai-pub-producer.vercel.app/?trial=true" class="btn-cta">${result.ctaLabel}</a>
           <p class="cta-note">完全無料・申込後すぐにご案内します</p>
         </div>
@@ -700,5 +746,3 @@ renderQuestion(0);
 </script>
 </body>
 </html>
-
-
