@@ -222,6 +222,7 @@ const AUTHOR_PROFILE_KEY = "aipub:author_profile";
 const WORK_PROFILE_KEY = "aipub:work_profile_draft";
 const WORK_PROFILE_CONFIRMED_KEY = "aipub:work_profile_confirmed";
 const WORK_PROFILE_STEP2_FULL_KEY = "aipub:work_profile_step2_full";
+const STEP1_PENDING_KEY = "aipub:step1_pending_inputs";
 
 const defaultProject = () => ({
   projectName: "新しい企画",
@@ -293,6 +294,35 @@ async function loadWorkProfileConfirmed() {
 }
 async function saveWorkProfileConfirmed(text) {
   try { localStorage.setItem(WORK_PROFILE_CONFIRMED_KEY, text || ""); } catch (e) { console.error(e); }
+}
+
+const STEP1_FIELD_MAP = {
+  "仮テーマ": "theme",
+  "動機": "motivation",
+  "動機・きっかけ": "motivation",
+  "想定読者": "readerHypothesis",
+  "想定読者の仮説": "readerHypothesis",
+};
+
+function applyToStep1Pending(title, proposal) {
+  if (!title || !proposal) return;
+  const field = STEP1_FIELD_MAP[title.trim()];
+  if (!field) return;
+  try {
+    const existing = JSON.parse(localStorage.getItem(STEP1_PENDING_KEY) || "{}");
+    existing[field] = proposal;
+    localStorage.setItem(STEP1_PENDING_KEY, JSON.stringify(existing));
+  } catch (e) { console.error(e); }
+}
+
+function consumeStep1Pending() {
+  try {
+    const raw = localStorage.getItem(STEP1_PENDING_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    localStorage.removeItem(STEP1_PENDING_KEY);
+    return data;
+  } catch { return null; }
 }
 
 function parseStep1Suggestions(text) {
@@ -1010,6 +1040,22 @@ const Step1Page = ({ savedAuthorProfile, savedWorkProfile, onSaveWorkProfile, on
   const [outputText, setOutputText] = useState(savedWorkProfile || "");
   const [saveMsg, setSaveMsg] = useState(false);
   const [profilePreviewOpen, setProfilePreviewOpen] = useState(false);
+  const [pendingAppliedFields, setPendingAppliedFields] = useState([]);
+
+  // STEP2からの修正提案を起動時に取り込む
+  useEffect(() => {
+    const pending = consumeStep1Pending();
+    if (pending) {
+      const applied = [];
+      if (pending.theme) { setTheme(pending.theme); applied.push("仮テーマ"); }
+      if (pending.motivation) { setMotivation(pending.motivation); applied.push("動機・きっかけ"); }
+      if (pending.readerHypothesis) { setReaderHypothesis(pending.readerHypothesis); applied.push("想定読者の仮説"); }
+      if (applied.length > 0) {
+        setPendingAppliedFields(applied);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const hasAuthorProfile = !!(savedAuthorProfile || "").trim();
 
@@ -1072,6 +1118,21 @@ const Step1Page = ({ savedAuthorProfile, savedWorkProfile, onSaveWorkProfile, on
         </div>
       </div>
       <div style={{ height: 1, background: `linear-gradient(to right, ${C.gold}, ${C.goldLight}, transparent)`, width: "100%", opacity: 0.9, marginBottom: 20 }} />
+
+      {pendingAppliedFields.length > 0 && (
+        <Card style={{ marginBottom: 16, background: "#e7f5ec", border: `1px solid ${C.green}` }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.green, marginBottom: 6 }}>
+            ✨ STEP2の修正提案を反映しました
+          </div>
+          <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.7 }}>
+            反映されたフィールド：<strong>{pendingAppliedFields.join("、")}</strong><br />
+            内容を確認・必要なら微修正してから、下の「書籍プロファイル草案を生成する」をクリックして再生成してください。
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <button onClick={() => setPendingAppliedFields([])} style={{ fontSize: 11.5, padding: "4px 10px", background: "transparent", color: C.textSub, border: `1px solid ${C.border}`, borderRadius: 4, cursor: "pointer" }}>このメッセージを閉じる</button>
+          </div>
+        </Card>
+      )}
 
       <Card style={{ marginBottom: 24, background: hasAuthorProfile ? "#eef7ee" : "#fff7e6", border: `1px solid ${hasAuthorProfile ? "#c8d4c8" : "#e0c8a0"}` }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: C.navy, marginBottom: 8 }}>
@@ -1182,6 +1243,22 @@ const CopyButton = ({ text, label }) => {
   return (
     <button onClick={handleCopy} style={{ padding: "6px 12px", background: copied ? C.green : C.navy, color: C.white, border: "none", borderRadius: 4, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
       {copied ? "✓ コピーしました" : `📋 ${label || "コピー"}`}
+    </button>
+  );
+};
+
+const ApplyToStep1Button = ({ title, proposal }) => {
+  const [applied, setApplied] = useState(false);
+  const field = STEP1_FIELD_MAP[(title || "").trim()];
+  if (!field) return null;
+  const handleApply = () => {
+    applyToStep1Pending(title, proposal);
+    setApplied(true);
+    setTimeout(() => setApplied(false), 2500);
+  };
+  return (
+    <button onClick={handleApply} style={{ padding: "6px 12px", background: applied ? C.green : C.gold, color: C.white, border: "none", borderRadius: 4, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+      {applied ? "✓ STEP1に保留しました" : "✨ STEP1に反映"}
     </button>
   );
 };
@@ -1496,13 +1573,24 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
           <StepBadge num="④" />
           <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>STEP1への修正提案</h2>
           {sections.suggestions && (
-            <button onClick={() => onNavigate("step_1")} style={{ marginLeft: "auto", padding: "6px 14px", background: "#fff8e6", color: C.navy, border: `1px solid #e0c8a0`, borderRadius: 4, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>↩ STEP1に戻る</button>
+            <div style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button onClick={() => {
+                parseStep1Suggestions(sections.suggestions).forEach((item) => {
+                  if (!isUnchanged(item.proposal)) applyToStep1Pending(item.title, item.proposal);
+                });
+                onNavigate("step_1");
+              }} style={{ padding: "8px 14px", background: C.gold, color: C.white, border: "none", borderRadius: 4, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                ✨ 全提案を反映してSTEP1へ
+              </button>
+              <button onClick={() => onNavigate("step_1")} style={{ padding: "8px 14px", background: "#fff", color: C.navy, border: `1px solid ${C.border}`, borderRadius: 4, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>↩ そのままSTEP1へ</button>
+            </div>
           )}
         </div>
         {sections.suggestions ? (
           <div>
             <div style={{ fontSize: 12.5, color: C.textSub, marginBottom: 12, lineHeight: 1.7, padding: "8px 12px", background: "#fff8e6", border: `1px solid #e0c8a0`, borderRadius: 4 }}>
-              各項目の <strong>「📋 提案をコピー」</strong> ボタンを押す → <strong>STEP1に戻る</strong> → 該当の入力欄に貼り付け → <strong>再生成</strong> すると書籍プロファイル草案が進化します。
+              各項目の <strong>「✨ STEP1に反映」</strong> ボタンで個別に保留 → <strong>「↩ そのままSTEP1へ」</strong> でSTEP1ページへ → 自動で入力欄に反映 → <strong>再生成</strong>。<br/>
+              一括反映するなら右上の <strong>「✨ 全提案を反映してSTEP1へ」</strong>。
             </div>
             {parseStep1Suggestions(sections.suggestions).map((item, idx) => {
               const unchanged = isUnchanged(item.proposal);
@@ -1520,8 +1608,9 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
                     <div style={{ fontSize: 13, color: unchanged ? C.textLight : C.text, padding: "8px 10px", background: unchanged ? "rgba(0,0,0,0.03)" : "#fff8e6", border: unchanged ? "none" : `1px solid #e0c8a0`, borderRadius: 4, lineHeight: 1.75, whiteSpace: "pre-wrap", fontWeight: unchanged ? 400 : 500 }}>{item.proposal}</div>
                   </div>
                   {!unchanged && (
-                    <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-                      <CopyButton text={item.proposal} label="提案をコピー" />
+                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+                      <ApplyToStep1Button title={item.title} proposal={item.proposal} />
+                      <CopyButton text={item.proposal} label="クリップボードにコピー" />
                     </div>
                   )}
                   {item.reason && (
