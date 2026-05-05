@@ -73,7 +73,7 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   const { stepNum, inputs } = req.body;
-  if (!stepNum || !inputs) return res.status(400).json({ error: "stepNum and inputs are required" });
+  if (stepNum === undefined || stepNum === null || !inputs) return res.status(400).json({ error: "stepNum and inputs are required" });
 
   const apiKey = API_KEYS[stepNum];
   if (!apiKey) return res.status(400).json({ error: `No API key configured for STEP${stepNum}` });
