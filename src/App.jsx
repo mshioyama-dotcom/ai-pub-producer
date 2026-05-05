@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { extractTextFromFile, buildSourceText, ACCEPTED_EXTENSIONS } from "./utils/extractText";
 
 // ============================================================
@@ -46,20 +46,23 @@ const STEPS = [
     ]
   },
   {
-    id: "step_02", num: 2, title: "市場勝率診断",
-    description: "選んだ2語のキーワードで、Amazon Kindleに実際にどんなライバル本があるかを分析します。競合が少なく需要のある「狙い目」を見つけるのが目的です。",
-    category: "企画設計", type: "workflow",
-    url: "https://udify.app/workflow/x0Ce5PCv2FjEaFs4",
+    id: "step_02", num: 2, title: "市場検証→書籍プロファイル確定",
+    description: "STEP1の書籍プロファイル草案を、Amazon検索結果（最大3軸）で市場検証して、確定版を生成します。STEP1への修正提案も同時に出力します。",
+    category: "企画設計", type: "custom",
+    url: "",
     inputs: [
-      { name: "keyword1", label: "1つ目のキーワード", desc: "STEP1で選んだ候補の1語目を入力します（例：「FIRE」）", source: "STEP1", required: true, type: "text", autoFill: false, maxChars: 256 },
-      { name: "keyword2", label: "2つ目のキーワード", desc: "STEP1で選んだ候補の2語目を入力します（例：「副業」）", source: "STEP1", required: true, type: "text", autoFill: false, maxChars: 256 },
-      { name: "amazon_html", label: "Amazon検索結果のHTMLソース", desc: "AmazonのKindleストアで2語を検索した結果ページのHTMLを貼り付けます。", source: null, required: true, type: "textarea", maxChars: 1000000 }
+      { name: "keyword_theme", label: "主題軸キーワード", desc: "STEP1出力の主題軸（編集可）", source: "STEP1", required: true, type: "text", maxChars: 200 },
+      { name: "html_theme", label: "主題軸 Amazon HTML", desc: "主題軸キーワードでAmazon検索した結果のHTML", source: null, required: true, type: "textarea", maxChars: 300000 },
+      { name: "keyword_reader", label: "読者軸キーワード（任意）", desc: "STEP1出力の読者軸（編集可）", source: "STEP1", required: false, type: "text", maxChars: 200 },
+      { name: "html_reader", label: "読者軸 Amazon HTML（任意）", desc: "読者軸キーワードで検索した結果のHTML", source: null, required: false, type: "textarea", maxChars: 300000 },
+      { name: "keyword_diff", label: "差分軸キーワード（任意）", desc: "STEP1出力の差分軸（編集可）", source: "STEP1", required: false, type: "text", maxChars: 200 },
+      { name: "html_diff", label: "差分軸 Amazon HTML（任意）", desc: "差分軸キーワードで検索した結果のHTML", source: null, required: false, type: "textarea", maxChars: 300000 }
     ],
-    outputTitle: "診断結果",
+    outputTitle: "市場検証結果＋書籍プロファイル確定版",
     help: [
+      "最低1軸（主題軸）必須、推奨は2〜3軸。多いほど精度が上がる",
       "HTMLの取得方法：検索結果ページで右クリック→「ページのソースを表示」→Ctrl+A で全選択→Ctrl+C でコピー",
-      "貼り付けて「実行する」を押すだけ。自動でクリーニングしてAIに渡します",
-      "キーワードを変えて何度でも診断できます。複数の切り口を比較してみてください"
+      "出力には「STEP1修正提案」が含まれます。納得できないときはSTEP1からやり直すことができます"
     ]
   },
   {
@@ -217,6 +220,7 @@ const STORAGE_KEY = "aipub:project";
 const STEPS_KEY_PREFIX = "aipub:step:";
 const AUTHOR_PROFILE_KEY = "aipub:author_profile";
 const WORK_PROFILE_KEY = "aipub:work_profile_draft";
+const WORK_PROFILE_CONFIRMED_KEY = "aipub:work_profile_confirmed";
 
 const defaultProject = () => ({
   projectName: "新しい企画",
@@ -281,6 +285,25 @@ async function loadWorkProfile() {
 }
 async function saveWorkProfile(text) {
   try { localStorage.setItem(WORK_PROFILE_KEY, text || ""); } catch (e) { console.error(e); }
+}
+
+async function loadWorkProfileConfirmed() {
+  try { return localStorage.getItem(WORK_PROFILE_CONFIRMED_KEY) || ""; } catch { return ""; }
+}
+async function saveWorkProfileConfirmed(text) {
+  try { localStorage.setItem(WORK_PROFILE_CONFIRMED_KEY, text || ""); } catch (e) { console.error(e); }
+}
+
+function extractKeywords3Axes(workProfileDraft) {
+  if (!workProfileDraft) return { theme: "", reader: "", diff: "" };
+  const themeMatch = workProfileDraft.match(/[-・]\s*主題軸\s*[:：]\s*(.+)/);
+  const readerMatch = workProfileDraft.match(/[-・]\s*読者軸\s*[:：]\s*(.+)/);
+  const diffMatch = workProfileDraft.match(/[-・]\s*差分軸\s*[:：]\s*(.+)/);
+  return {
+    theme: themeMatch ? themeMatch[1].trim() : "",
+    reader: readerMatch ? readerMatch[1].trim() : "",
+    diff: diffMatch ? diffMatch[1].trim() : "",
+  };
 }
 
 function parseStep2Output(text) {
@@ -1077,6 +1100,207 @@ const Step1Page = ({ savedAuthorProfile, savedWorkProfile, onSaveWorkProfile, on
   );
 };
 
+const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfileConfirmed, onSaveWorkProfileConfirmed, onNavigate }) => {
+  const initialKeywords = useMemo(() => extractKeywords3Axes(savedWorkProfileDraft), [savedWorkProfileDraft]);
+
+  const [keywordTheme, setKeywordTheme] = useState(initialKeywords.theme);
+  const [htmlTheme, setHtmlTheme] = useState("");
+  const [readerExpanded, setReaderExpanded] = useState(false);
+  const [keywordReader, setKeywordReader] = useState(initialKeywords.reader);
+  const [htmlReader, setHtmlReader] = useState("");
+  const [diffExpanded, setDiffExpanded] = useState(false);
+  const [keywordDiff, setKeywordDiff] = useState(initialKeywords.diff);
+  const [htmlDiff, setHtmlDiff] = useState("");
+
+  const [isRunning, setIsRunning] = useState(false);
+  const [runError, setRunError] = useState("");
+  const [outputText, setOutputText] = useState(savedWorkProfileConfirmed || "");
+  const [saveMsg, setSaveMsg] = useState(false);
+  const [authorPreviewOpen, setAuthorPreviewOpen] = useState(false);
+  const [draftPreviewOpen, setDraftPreviewOpen] = useState(false);
+
+  const hasAuthorProfile = !!(savedAuthorProfile || "").trim();
+  const hasDraft = !!(savedWorkProfileDraft || "").trim();
+
+  const handleGenerate = async () => {
+    setRunError("");
+    if (!hasAuthorProfile) {
+      setRunError("先にSTEP0で著者プロファイルを生成してください。");
+      return;
+    }
+    if (!hasDraft) {
+      setRunError("先にSTEP1で書籍プロファイル草案を生成してください。");
+      return;
+    }
+    if (!keywordTheme.trim()) {
+      setRunError("主題軸キーワードを入力してください（必須）。");
+      return;
+    }
+    if (!htmlTheme.trim()) {
+      setRunError("主題軸のAmazon HTMLを貼り付けてください（必須・最低1軸）。");
+      return;
+    }
+    setIsRunning(true);
+    try {
+      const response = await fetch("/api/dify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stepNum: 2,
+          inputs: {
+            author_profile: savedAuthorProfile || "",
+            work_profile_draft: savedWorkProfileDraft || "",
+            keyword_theme: keywordTheme.trim(),
+            html_theme: htmlTheme,
+            keyword_reader: keywordReader.trim(),
+            html_reader: htmlReader,
+            keyword_diff: keywordDiff.trim(),
+            html_diff: htmlDiff,
+          },
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setRunError(data.error || "生成中にエラーが発生しました。少し時間をおいて再度お試しください。");
+      } else {
+        setOutputText(data.output || "");
+      }
+    } catch (e) {
+      setRunError(`通信エラーが発生しました：${e.message}`);
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!outputText.trim()) return;
+    await onSaveWorkProfileConfirmed(outputText);
+    setSaveMsg(true);
+    setTimeout(() => setSaveMsg(false), 2500);
+  };
+
+  const renderAxisSection = (axisLabel, icon, isRequired, keyword, setKeyword, html, setHtml, expanded, setExpanded) => {
+    const isCollapsible = !isRequired;
+    const showContent = isRequired || expanded;
+    return (
+      <div style={{ marginBottom: 16, border: `1px solid ${C.border}`, borderRadius: 4, background: C.white }}>
+        <div onClick={isCollapsible ? () => setExpanded(!expanded) : undefined}
+          style={{ padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: isCollapsible ? "pointer" : "default", borderBottom: showContent ? `1px solid ${C.border}` : "none", background: isRequired ? "#eef2f7" : "#f8f8f8" }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700, color: C.navy }}>
+            {icon} {axisLabel}{isRequired ? " （必須）" : " （任意）"}
+          </div>
+          {isCollapsible && <div style={{ fontSize: 12, color: C.textSub }}>{expanded ? "▲ 閉じる" : "▼ 展開する"}</div>}
+        </div>
+        {showContent && (
+          <div style={{ padding: 14 }}>
+            <label style={{ fontSize: 12.5, fontWeight: 600, color: C.navy }}>キーワード（編集可・自動転記）</label>
+            <input value={keyword} onChange={(e) => setKeyword(e.target.value)}
+              placeholder={isRequired ? "例：ChatGPT 資料作成" : "STEP1出力から自動転記"}
+              style={{ width: "100%", padding: "8px 10px", fontSize: 13, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", marginTop: 4, marginBottom: 10, background: C.white }} />
+            <label style={{ fontSize: 12.5, fontWeight: 600, color: C.navy }}>Amazon検索結果(HTML){isRequired ? "（必須）" : "（任意）"}</label>
+            <textarea value={html} onChange={(e) => setHtml(e.target.value)}
+              placeholder="Amazon検索結果ページの右クリック→「ページのソースを表示」→Ctrl+A→Ctrl+C で全選択コピーして貼り付け"
+              rows={5}
+              style={{ width: "100%", padding: "8px 10px", fontSize: 12, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "monospace", background: C.white, marginTop: 4 }} />
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.gold, marginBottom: 4, letterSpacing: "0.08em" }}>STEP 2</div>
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: C.navy, margin: "0 0 6px", letterSpacing: "-0.01em" }}>市場検証 → 書籍プロファイル確定</h1>
+          <p style={{ fontSize: 13.5, color: C.textSub, margin: 0, lineHeight: 1.7 }}>STEP1の書籍プロファイル草案を、Amazon検索結果（最大3軸）で市場検証して確定版にします。STEP1への修正提案も同時に出力されます。</p>
+        </div>
+      </div>
+      <div style={{ height: 1, background: `linear-gradient(to right, ${C.gold}, ${C.goldLight}, transparent)`, width: "100%", opacity: 0.9, marginBottom: 20 }} />
+
+      <Card style={{ marginBottom: 16, background: hasAuthorProfile ? "#eef7ee" : "#fff7e6", border: `1px solid ${hasAuthorProfile ? "#c8d4c8" : "#e0c8a0"}` }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.navy, marginBottom: 6 }}>
+          📌 著者プロファイル：{hasAuthorProfile ? "✓ 設定済み（自動転記）" : "⚠ 未設定"}
+        </div>
+        {hasAuthorProfile && (
+          <button onClick={() => setAuthorPreviewOpen(!authorPreviewOpen)} style={{ background: "none", border: `1px solid ${C.border}`, padding: "3px 10px", borderRadius: 4, fontSize: 11.5, color: C.navy, cursor: "pointer" }}>
+            {authorPreviewOpen ? "閉じる" : "プレビュー"}
+          </button>
+        )}
+        {authorPreviewOpen && hasAuthorProfile && (
+          <div style={{ marginTop: 8, padding: 10, background: C.white, border: `1px solid ${C.border}`, borderRadius: 4, fontSize: 12, color: "#333", lineHeight: 1.7, whiteSpace: "pre-wrap", maxHeight: 200, overflow: "auto" }}>
+            {savedAuthorProfile}
+          </div>
+        )}
+      </Card>
+
+      <Card style={{ marginBottom: 24, background: hasDraft ? "#eef7ee" : "#fff7e6", border: `1px solid ${hasDraft ? "#c8d4c8" : "#e0c8a0"}` }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.navy, marginBottom: 6 }}>
+          📋 書籍プロファイル草案（STEP1）：{hasDraft ? "✓ 設定済み（自動転記）" : "⚠ 未設定"}
+        </div>
+        {hasDraft ? (
+          <div>
+            <button onClick={() => setDraftPreviewOpen(!draftPreviewOpen)} style={{ background: "none", border: `1px solid ${C.border}`, padding: "3px 10px", borderRadius: 4, fontSize: 11.5, color: C.navy, cursor: "pointer" }}>
+              {draftPreviewOpen ? "閉じる" : "プレビュー"}
+            </button>
+            {draftPreviewOpen && (
+              <div style={{ marginTop: 8, padding: 10, background: C.white, border: `1px solid ${C.border}`, borderRadius: 4, fontSize: 12, color: "#333", lineHeight: 1.7, whiteSpace: "pre-wrap", maxHeight: 200, overflow: "auto" }}>
+                {savedWorkProfileDraft}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div>
+            <BtnPrimary onClick={() => onNavigate("step_1")}>STEP1で書籍プロファイル草案を生成する →</BtnPrimary>
+          </div>
+        )}
+      </Card>
+
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <StepBadge num="①" />
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>検索シードを使ってAmazon検索 → HTMLを貼付</h2>
+        </div>
+        <div style={{ fontSize: 12.5, color: C.textSub, marginBottom: 14, lineHeight: 1.7 }}>
+          各軸のキーワードはSTEP1出力から自動転記されています（編集可）。<br />
+          最低1軸（主題軸）必須、推奨は2〜3軸。多いほど検証精度が上がります。
+        </div>
+        {renderAxisSection("主題軸", "🎯", true, keywordTheme, setKeywordTheme, htmlTheme, setHtmlTheme, true, () => {})}
+        {renderAxisSection("読者軸", "👥", false, keywordReader, setKeywordReader, htmlReader, setHtmlReader, readerExpanded, setReaderExpanded)}
+        {renderAxisSection("差分軸", "🪞", false, keywordDiff, setKeywordDiff, htmlDiff, setHtmlDiff, diffExpanded, setDiffExpanded)}
+      </div>
+
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <StepBadge num="②" />
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>市場検証＋書籍プロファイル確定</h2>
+        </div>
+        <Card style={{ background: "#eef2f7", border: "1px solid #c8d4e0" }}>
+          <div style={{ fontSize: 13, color: C.textSub, marginBottom: 12, lineHeight: 1.8 }}>少なくとも主題軸のHTMLを貼付したら下のボタンを押してください。生成には30秒〜2分ほどかかります。</div>
+          <BtnPrimary onClick={handleGenerate} disabled={isRunning || !hasAuthorProfile || !hasDraft}>{isRunning ? "検証中..." : "▶ 市場検証＋書籍プロファイル確定を実行"}</BtnPrimary>
+          {runError && <div style={{ marginTop: 12, padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, fontSize: 13, color: C.red, whiteSpace: "pre-wrap", lineHeight: 1.7 }}>{runError}</div>}
+        </Card>
+      </div>
+
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <StepBadge num="③" />
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>市場検証結果＋書籍プロファイル確定版</h2>
+        </div>
+        <textarea value={outputText} onChange={(e) => setOutputText(e.target.value)}
+          rows={28}
+          placeholder="ここに市場検証結果と書籍プロファイル確定版が表示されます。手動で編集も可能です。"
+          style={{ width: "100%", padding: "12px 14px", fontSize: 13.5, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.85 }} />
+        <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <BtnPrimary onClick={handleSave} disabled={!outputText.trim()}>書籍プロファイル確定版を保存</BtnPrimary>
+          {saveMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました（STEP3以降で使えます）</span>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutput, onUpdateProject, onInputChange, allSteps, onRefPanel }) => {
   const [inputs, setInputs] = useState(stepData.inputData || {});
   const [outputText, setOutputText] = useState(stepData.outputText || "");
@@ -1680,6 +1904,7 @@ export default function App() {
   const [allSteps, setAllSteps] = useState({});
   const [authorProfile, setAuthorProfile] = useState("");
   const [workProfile, setWorkProfile] = useState("");
+  const [workProfileConfirmed, setWorkProfileConfirmed] = useState("");
   const [loading, setLoading] = useState(true);
 
   if (typeof window !== "undefined") {
@@ -1699,6 +1924,8 @@ export default function App() {
       setAuthorProfile(ap);
       const wp = await loadWorkProfile();
       setWorkProfile(wp);
+      const wpc = await loadWorkProfileConfirmed();
+      setWorkProfileConfirmed(wpc);
       setLoading(false);
       const summary = {};
       for (let i = 1; i <= 10; i++) { const t = steps[i]?.outputText || ""; summary[`STEP${i}`] = { length: t.length, tail: t.slice(-30) }; }
@@ -1714,6 +1941,11 @@ export default function App() {
   const handleSaveWorkProfile = useCallback(async (text) => {
     await saveWorkProfile(text);
     setWorkProfile(text);
+  }, []);
+
+  const handleSaveWorkProfileConfirmed = useCallback(async (text) => {
+    await saveWorkProfileConfirmed(text);
+    setWorkProfileConfirmed(text);
   }, []);
 
   const stepStatuses = {};
@@ -1794,6 +2026,7 @@ export default function App() {
     if (page === "saved") return <SavedPage project={project} stepStatuses={stepStatuses} allSteps={allSteps} onNavigate={nav} />;
     if (page === "step_0") return <Step0Page savedProfile={authorProfile} onSaveProfile={handleSaveAuthorProfile} onNavigate={nav} />;
     if (page === "step_1") return <Step1Page savedAuthorProfile={authorProfile} savedWorkProfile={workProfile} onSaveWorkProfile={handleSaveWorkProfile} onNavigate={nav} />;
+    if (page === "step_2") return <Step2Page savedAuthorProfile={authorProfile} savedWorkProfileDraft={workProfile} savedWorkProfileConfirmed={workProfileConfirmed} onSaveWorkProfileConfirmed={handleSaveWorkProfileConfirmed} onNavigate={nav} />;
     if (page.startsWith("step_")) {
       const num = parseInt(page.replace("step_", ""), 10);
       const step = STEPS[num - 1];

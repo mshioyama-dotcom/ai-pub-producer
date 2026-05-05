@@ -1,0 +1,350 @@
+app:
+  description: 書籍プロファイル草案と著者プロファイルを、Amazonの検索結果（最大3軸）と照合し、市場需要を検証して書籍プロファイル確定版を生成するC案 Phase 1 のSTEP2ワークフロー。STEP1への修正提案も同時に出力する。
+  icon: 🔍
+  icon_background: '#FFEAD5'
+  icon_type: emoji
+  mode: workflow
+  name: STEP2_市場検証_書籍プロファイル確定
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/openai:0.2.10@7ca552fb9e48caa4deddfdef5aa71c200d06d03c26c2e8bb428b3250101b9cb3
+    version: null
+kind: app
+version: 0.6.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        attachment_image_file_size_limit: 2
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        file_upload_limit: 50
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: llm
+      id: 1910000000001-source-1910000000002-target
+      source: '1910000000001'
+      sourceHandle: source
+      target: '1910000000002'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: end
+      id: 1910000000002-source-1910000000003-target
+      source: '1910000000002'
+      sourceHandle: source
+      target: '1910000000003'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: ユーザー入力
+        type: start
+        variables:
+        - default: ''
+          hint: STEP0で生成された著者プロファイル全文（ポータルから自動転記されます）
+          label: 著者プロファイル
+          max_length: 10000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: author_profile
+        - default: ''
+          hint: STEP1で生成された書籍プロファイル草案全文（ポータルから自動転記されます）
+          label: 書籍プロファイル草案
+          max_length: 10000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: work_profile_draft
+        - default: ''
+          hint: 主題軸の検索キーワード（STEP1出力からの自動転記、ユーザによる編集可）。例：「ChatGPT 資料作成」
+          label: 主題軸キーワード（必須）
+          max_length: 200
+          options: []
+          placeholder: ''
+          required: true
+          type: text-input
+          variable: keyword_theme
+        - default: ''
+          hint: 主題軸キーワードでAmazon検索した結果のHTML（必須）
+          label: 主題軸 Amazon HTML（必須）
+          max_length: 300000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: html_theme
+        - default: ''
+          hint: 読者軸の検索キーワード（任意）。例：「会社員 報告書 効率化」
+          label: 読者軸キーワード（任意）
+          max_length: 200
+          options: []
+          placeholder: ''
+          required: false
+          type: text-input
+          variable: keyword_reader
+        - default: ''
+          hint: 読者軸キーワードでAmazon検索した結果のHTML（任意・空欄可）
+          label: 読者軸 Amazon HTML（任意）
+          max_length: 300000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: html_reader
+        - default: ''
+          hint: 差分軸の検索キーワード（任意）。例：「ロングセラー Kindle」
+          label: 差分軸キーワード（任意）
+          max_length: 200
+          options: []
+          placeholder: ''
+          required: false
+          type: text-input
+          variable: keyword_diff
+        - default: ''
+          hint: 差分軸キーワードでAmazon検索した結果のHTML（任意・空欄可）
+          label: 差分軸 Amazon HTML（任意）
+          max_length: 300000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: html_diff
+      height: 350
+      id: '1910000000001'
+      position:
+        x: 80
+        y: 282
+      positionAbsolute:
+        x: 80
+        y: 282
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            enable_stream: false
+            max_tokens: 8192
+            reasoning_effort: low
+            verbosity: medium
+          mode: chat
+          name: gpt-5.2
+          provider: langgenius/openai/openai
+        prompt_template:
+        - id: a1b2c3d4-1910-4001-9000-000000000001
+          role: system
+          text: |
+            あなたは「市場検証エージェント」です。
+            著者プロファイル（普遍）と書籍プロファイル草案（STEP1で生成）を、Amazonの検索結果（1〜3軸）と照合し、書籍の市場需要を検証します。
+            検証結果に基づいて、書籍プロファイルを refine した「確定版」と、STEP1への「修正提案」を出力します。
+
+            ■ 入力
+
+            著者プロファイル（自動転記）：
+            {{#1910000000001.author_profile#}}
+
+            書籍プロファイル草案（STEP1出力・自動転記）：
+            {{#1910000000001.work_profile_draft#}}
+
+            ■ Amazon検索結果（最大3軸）
+
+            【主題軸】（必須）
+            キーワード：{{#1910000000001.keyword_theme#}}
+            HTML：
+            {{#1910000000001.html_theme#}}
+
+            【読者軸】（任意）
+            キーワード：{{#1910000000001.keyword_reader#}}
+            HTML：
+            {{#1910000000001.html_reader#}}
+
+            【差分軸】（任意）
+            キーワード：{{#1910000000001.keyword_diff#}}
+            HTML：
+            {{#1910000000001.html_diff#}}
+
+            ■ 分析の進め方
+
+            1. 各軸のHTMLからAmazonの検索結果（書籍タイトル・著者・売れ筋ランキング・レビュー数・価格帯）を抽出する
+            2. 読者軸・差分軸のHTMLが空欄の場合は「データなし」とみなし、その軸の分析は省略する
+            3. 書籍プロファイル草案の各要素（想定読者・主題×読者・ポジショニング仮説・著者の角度）について、市場データから需要があるかを判定する
+            4. 総合的に勝率（A〜D）を判定し、改善提案をまとめる
+
+            ■ 重要な原則
+
+            - 客観分析（市場像・需要診断・勝率）は中立に書く。著者プロファイル/書籍プロファイルに引きずられない
+            - 改善提案セクションでは、著者プロファイルと書籍プロファイルを踏まえて「この著者にとって意味のある改善」を提案する
+            - STEP1修正提案は「現状」と「提案」の対比形式で書く。フロント側のUIが差分を抽出して表示するため、フォーマットを厳守する
+            - 書籍プロファイル確定版は、草案を市場知見で refine した完成形。STEP3以降の各STEPで参照される最終版
+
+            ■ 出力フォーマット（厳守・マークダウン）
+
+            ## 市場像
+
+            主題軸の市場構造（競合密度・売れ筋傾向・空白地帯）を3〜5行で説明。
+            読者軸・差分軸が提供されていれば、それぞれ同様に分析。
+
+            ## 書籍プロファイル需要診断
+
+            - 想定読者：✓需要あり / △ニッチ / ✕不在　＋ 1行の根拠
+            - 主題×読者：✓需要あり / △競合多数 / ✕実例なし　＋ 1行の根拠
+            - ポジショニング：✓空白あり / △既存と被り / ✕レッドオーシャン　＋ 1行の根拠
+            - 著者の角度：✓類例あり / △未開拓 / ✕実証困難　＋ 1行の根拠
+
+            ## 総合勝率診断
+
+            **評価：A / B / C / D**
+
+            根拠を3〜5行で。「勝てるルート」「避けるべきルート」を含める。
+
+            ## STEP1修正提案
+
+            ### 仮テーマ
+            - 現状: （草案のテキストをそのまま）
+            - 提案: （改善案。変更不要なら「（変更なし）」と書く）
+            - 根拠: （1行）
+
+            ### 動機
+            - 現状: （ユーザー入力をそのまま）
+            - 提案: （変更不要なら「（変更なし）」）
+            - 根拠: （1行）
+
+            ### 想定読者
+            - 現状: （草案のテキスト）
+            - 提案: （改善案または「（変更なし）」）
+            - 根拠: （1行）
+
+            ## 書籍プロファイル確定版
+
+            草案を市場知見で refine した完成版。STEP1の出力フォーマットを踏襲：
+
+            【書籍プロファイル確定版】
+
+            ■ 仮テーマ
+            （refine 後）
+
+            ■ 想定読者
+            （refine 後）
+
+            ■ 著者の角度
+            （refine 後）
+
+            ■ ポジショニング
+            （refine 後・市場の空白地帯を反映）
+
+            ■ 読了後の状態
+            （refine 後）
+
+            ■ 検索キーワード3軸（再選定可）
+            - 主題軸：
+            - 読者軸：
+            - 差分軸：
+        selected: false
+        title: 市場検証＋書籍プロファイル確定
+        type: llm
+        vision:
+          enabled: false
+      height: 88
+      id: '1910000000002'
+      position:
+        x: 561
+        y: 303
+      positionAbsolute:
+        x: 561
+        y: 303
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        outputs:
+        - value_selector:
+          - '1910000000002'
+          - text
+          value_type: string
+          variable: text
+        selected: false
+        title: 出力
+        type: end
+      height: 88
+      id: '1910000000003'
+      position:
+        x: 864
+        y: 303
+      positionAbsolute:
+        x: 864
+        y: 303
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    viewport:
+      x: 0
+      y: 0
+      zoom: 1
+  rag_pipeline_variables: []
