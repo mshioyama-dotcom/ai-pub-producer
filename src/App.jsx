@@ -1218,6 +1218,20 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
       if (newConfirmed) setConfirmedDraft(newConfirmed);
     }
   }, [outputText]);
+  // 旧UIで保存された「全文」が確定版localStorageに入っているケースをマイグレーション
+  useEffect(() => {
+    if (!outputText && confirmedDraft) {
+      const parsed = splitStep2Output(confirmedDraft);
+      if (parsed.market || parsed.suggestions) {
+        setOutputText(confirmedDraft);
+        try { localStorage.setItem(WORK_PROFILE_STEP2_FULL_KEY, confirmedDraft); } catch (e) {}
+        if (parsed.confirmed) {
+          setConfirmedDraft(parsed.confirmed);
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const hasAuthorProfile = !!(savedAuthorProfile || "").trim();
   const hasDraft = !!(savedWorkProfileDraft || "").trim();
