@@ -325,6 +325,22 @@ function consumeStep1Pending() {
   } catch { return null; }
 }
 
+function getAutoInjectedProfiles() {
+  try {
+    if (typeof window === "undefined") return {};
+    const authorProfile = localStorage.getItem(AUTHOR_PROFILE_KEY) || "";
+    const workProfile = localStorage.getItem(WORK_PROFILE_CONFIRMED_KEY)
+      || localStorage.getItem(WORK_PROFILE_KEY)
+      || "";
+    const out = {};
+    if (authorProfile) out.author_profile = authorProfile;
+    if (workProfile) out.work_profile = workProfile;
+    return out;
+  } catch {
+    return {};
+  }
+}
+
 function parseStep1Suggestions(text) {
   if (!text) return [];
   const items = [];
@@ -1613,6 +1629,11 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
                       <CopyButton text={item.proposal} label="クリップボードにコピー" />
                     </div>
                   )}
+                  {unchanged && item.current && (
+                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+                      <CopyButton text={item.current} label="現状をコピー" />
+                    </div>
+                  )}
                   {item.reason && (
                     <div style={{ fontSize: 11.5, color: C.textSub, padding: "6px 10px", background: "rgba(0,0,0,0.02)", borderRadius: 4, lineHeight: 1.65 }}>
                       💡 <strong>根拠：</strong>{item.reason}
@@ -1756,7 +1777,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         for (let i = 0; i < total; i++) {
           const currentItem = items[i];
           setSectionProgress({ total, current: i + 1, currentItemName: currentItem });
-          const response = await fetch("/api/dify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stepNum: 9, inputs: { detailed_plot_text: inputs.detailed_plot_text || "", target_heading: currentItem, past_writing_text: inputs.past_writing_text || "" } }) });
+          const response = await fetch("/api/dify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stepNum: 9, inputs: { ...getAutoInjectedProfiles(), detailed_plot_text: inputs.detailed_plot_text || "", target_heading: currentItem, past_writing_text: inputs.past_writing_text || "" } }) });
           const data = await response.json();
           if (!response.ok) {
             setRunError(`節の生成中にエラーが発生しました。\n\n${total}項目中、${i + 1}項目目（${currentItem}）の生成で失敗しました。途中までの生成結果は破棄されます。\n\n少し時間をおいてから、もう一度「実行する」を押してください。\n\n（エラー詳細：${data.error || "不明なエラー"}）`);
@@ -1777,6 +1798,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     try {
       let execInputs = { ...inputs };
       if (step.num === 2 && execInputs.amazon_html) { const cleaned = cleanHtmlMinimal(execInputs.amazon_html); if (cleaned) execInputs.amazon_html = cleaned; }
+      if (step.num >= 3) { execInputs = { ...getAutoInjectedProfiles(), ...execInputs }; }
       const response = await fetch("/api/dify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stepNum: step.num, inputs: execInputs }) });
       const data = await response.json();
       sendDebugLog(`RECV STEP${step.num}`, { length: (data.output || "").length, tail: (data.output || "").slice(-30) });
@@ -1800,7 +1822,8 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     setChatMessages((prev) => [...prev, { role: "user", content: text }]);
     setChatLoading(true);
     try {
-      const response = await fetch("/api/dify-chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stepNum: step.num, message: text, conversation_id: chatConversationId }) });
+      const chatInputs = chatConversationId ? {} : getAutoInjectedProfiles();
+      const response = await fetch("/api/dify-chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stepNum: step.num, message: text, conversation_id: chatConversationId, inputs: chatInputs }) });
       const data = await response.json();
       if (!response.ok) { setChatError(data.error || "送信に失敗しました"); }
       else {
@@ -2003,7 +2026,8 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                 setChatTransferMsg(true); setTimeout(() => setChatTransferMsg(false), 2500);
                 setChatError(""); setChatMessages((prev) => [...prev, { role: "user", content: text }]); setChatLoading(true);
                 try {
-                  const response = await fetch("/api/dify-chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stepNum: step.num, message: text, conversation_id: chatConversationId }) });
+                  const chatInputs = chatConversationId ? {} : getAutoInjectedProfiles();
+                  const response = await fetch("/api/dify-chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stepNum: step.num, message: text, conversation_id: chatConversationId, inputs: chatInputs }) });
                   const data = await response.json();
                   if (!response.ok) { setChatError(data.error || "送信に失敗しました"); }
                   else { if (data.conversation_id) setChatConversationId(data.conversation_id); setChatMessages((prev) => [...prev, { role: "assistant", content: data.answer }]); setTimeout(() => { if (chatAreaRef.current) chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight; }, 50); }

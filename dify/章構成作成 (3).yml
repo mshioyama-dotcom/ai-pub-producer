@@ -159,7 +159,25 @@ workflow:
           required: true
           type: paragraph
           variable: nterview_notes
-      height: 160
+        - default: ''
+          hint: 著者プロファイル（STEP0出力・自動転記）
+          label: 著者プロファイル
+          max_length: 10000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: author_profile
+        - default: ''
+          hint: 書籍プロファイル（STEP1〜2出力・自動転記）
+          label: 書籍プロファイル
+          max_length: 10000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: work_profile
+      height: 250
       id: '1772945917672'
       position:
         x: -170
@@ -324,7 +342,7 @@ workflow:
         prompt_template:
         - id: ecbddf74-758b-4bb1-9f49-5df56717828e
           role: system
-          text: "# [0. Role]\nあなたは、書籍の特定「1章分」の設計を担当するシニア編集者です。\n他の章には踏み込みすぎず、今処理する章について、読者にとって価値が伝わる具体的な構成案を作成してください。\n\
+          text: "# [Profile Context]\n■ 著者プロファイル（参考情報・自動転記／空欄の場合は無視）\n{{#1772945917672.author_profile#}}\n\n■ 書籍プロファイル（参考情報・自動転記／空欄の場合は無視）\n{{#1772945917672.work_profile#}}\n\n■ プロファイルの扱い\n著者プロファイル・書籍プロファイルが提供されている場合は、著者の角度・読者像・差分を踏まえて出力してください。\nプロファイルが空欄の場合は、他の入力のみを根拠にしてください。\n\n# [0. Role]\nあなたは、書籍の特定「1章分」の設計を担当するシニア編集者です。\n他の章には踏み込みすぎず、今処理する章について、読者にとって価値が伝わる具体的な構成案を作成してください。\n\
             目的は、抽象論ではなく、この章で何を扱い、どんな具体例を出し、読者をどう変えるかが分かる要約を作ることです。\n\n# [1. Rules]\n\
             - 渡された {{#1772952541934.item#}} 内の各節（- で始まる項目）ごとに、必ず具体的な要約を付けてください。\n\
             - 1節あたり **80〜140文字程度** を目安にしてください。長くしすぎないでください。\n- 抽象的な説明だけで終わらせず、その節で扱う具体場面・具体例・読者の変化が分かるようにしてください。\n\

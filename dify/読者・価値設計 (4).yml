@@ -143,7 +143,25 @@ workflow:
           required: false
           type: text-input
           variable: market_report
-      height: 186
+        - default: ''
+          hint: 著者プロファイル（STEP0出力・自動転記）
+          label: 著者プロファイル
+          max_length: 10000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: author_profile
+        - default: ''
+          hint: 書籍プロファイル（STEP1〜2出力・自動転記）
+          label: 書籍プロファイル
+          max_length: 10000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: work_profile
+      height: 280
       id: '1772274449421'
       position:
         x: 80
@@ -198,6 +216,25 @@ workflow:
           text: 'あなたは「出版構造設計エージェント」です。
 
             読者の悩みと解決の道筋を「最短距離の構造」に固定することのみに集中してください。
+
+
+            ■ 著者プロファイル（参考情報・自動転記／空欄の場合は無視）
+
+            {{#1772274449421.author_profile#}}
+
+
+            ■ 書籍プロファイル（参考情報・自動転記／空欄の場合は無視）
+
+            {{#1772274449421.work_profile#}}
+
+
+            ■ プロファイルの扱い
+
+            著者プロファイル・書籍プロファイルが提供されている場合は、著者の角度・読者像・ポジショニング仮説を踏まえて読者設定／課題設定／到達状態／章構造を設計する。
+
+            ただし、プロファイルの内容を説明文として繰り返さず、本の構造として自然な形に変換する。
+
+            プロファイルが空欄の場合は、検索ワード／検索意図／狙い目切り口のみを根拠に設計する。
 
 
             ■ 入力

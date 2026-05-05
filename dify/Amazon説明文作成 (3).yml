@@ -165,15 +165,24 @@ workflow:
           type: paragraph
           variable: toc_text
         - default: ''
-          hint: ''
-          label: 著者プロフィール（任意）
-          max_length: 2000
+          hint: 著者プロファイル（STEP0出力・自動転記／手入力でも可）
+          label: 著者プロファイル（任意）
+          max_length: 10000
           options: []
           placeholder: ''
           required: false
           type: paragraph
           variable: author_profile
-      height: 238
+        - default: ''
+          hint: 書籍プロファイル（STEP1〜2出力・自動転記）
+          label: 書籍プロファイル
+          max_length: 10000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: work_profile
+      height: 280
       id: '1773568684126'
       position:
         x: 80
@@ -221,6 +230,8 @@ workflow:
 
             著者プロフィール（任意）: {{#1773568684126.author_profile#}}
 
+            書籍プロファイル（任意・自動転記）: {{#1773568684126.work_profile#}}
+
             目次: {{#1773568684126.toc_text#}}
 
 
@@ -264,6 +275,8 @@ workflow:
             著者プロフィールがある場合は、著者の立場、実務経験、実績、活動内容などを踏まえて、信頼性の根拠として活用してください。
 
             著者プロフィールが空の場合は、無理に補わず、著者エピソードと他の入力情報だけで整理してください。
+
+            書籍プロファイルがある場合は、ポジショニング仮説・読了後の状態仮説・差分軸を踏まえて、この本ならではの価値・差別化ポイントを抽出してください。書籍プロファイルが空の場合は、他の入力のみを根拠にしてください。
 
             読者価値設計に書かれている想定読者・悩み・読後変化を優先してください。
 

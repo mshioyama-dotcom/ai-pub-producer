@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { stepNum, message, conversation_id } = req.body;
+  const { stepNum, message, conversation_id, inputs } = req.body;
   if (!stepNum || !message) {
     return res.status(400).json({ error: "stepNum and message are required" });
   }
@@ -29,7 +29,7 @@ export default async function handler(req, res) {
       query: message,
       response_mode: "streaming",
       user: "ai-pub-producer-user",
-      inputs: {},
+      inputs: inputs && typeof inputs === "object" ? inputs : {},
     };
     if (conversation_id) body.conversation_id = conversation_id;
 
