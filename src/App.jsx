@@ -30,18 +30,19 @@ const C = {
 const STEPS = [
   {
     id: "step_01", num: 1, title: "テーマ発見",
-    description: "書きたいテーマから、Amazon Kindleで実際に売れている本の市場データを元に、本のタイトルに使えそうなキーワード候補を5つ提案します。ここで選んだ2語が、このあと本全体の軸になります。",
-    category: "企画設計", type: "workflow",
-    url: "https://udify.app/workflow/wYCqTyIknfxzl2oh",
+    description: "仮テーマと著者プロファイルから「書籍プロファイル草案」を生成します。これがSTEP2の市場検証→確定版への入口になります。",
+    category: "企画設計", type: "custom",
+    url: "",
     inputs: [
-      { name: "theme", label: "書きたいテーマ語", desc: "書きたい本のテーマを1語で入力してください。", source: null, required: true, type: "text", maxChars: 64 }
+      { name: "theme", label: "仮テーマ", desc: "書きたい本のテーマを一文で", source: null, required: true, type: "text", maxChars: 200 },
+      { name: "motivation", label: "動機・きっかけ", desc: "なぜ自分がこのテーマを書くのか", source: null, required: true, type: "textarea", maxChars: 1000 },
+      { name: "reader_hypothesis", label: "想定読者の仮説（任意）", desc: "書ける範囲でOK。空欄ならAIが推論", source: null, required: false, type: "textarea", maxChars: 1000 }
     ],
-    outputTitle: "キーワード候補",
+    outputTitle: "書籍プロファイル草案",
     help: [
-      "1語だけで入力すると、そのテーマに関連する幅広い候補が出ます（例：「FIRE」）",
-      "複数の軸を組み合わせたい場合は、カンマ区切りで入力すると絞り込まれた候補になります（例：「FIRE、副業」「投資、節税」）",
-      "結果がピンとこない時は、テーマ語を変えて何度でも試せます",
-      "出た候補から1つ選んで、STEP2へ進みましょう"
+      "仮テーマ・動機・想定読者を入力すると、著者プロファイル（STEP0で生成）と組み合わせて書籍プロファイル草案を生成します",
+      "出力には次のSTEP2で使う「検索キーワード3軸」が含まれます",
+      "STEP2を実行すると、市場知見を反映した書籍プロファイル確定版に進化します"
     ]
   },
   {
@@ -215,6 +216,7 @@ const STATUS_COLORS = {
 const STORAGE_KEY = "aipub:project";
 const STEPS_KEY_PREFIX = "aipub:step:";
 const AUTHOR_PROFILE_KEY = "aipub:author_profile";
+const WORK_PROFILE_KEY = "aipub:work_profile_draft";
 
 const defaultProject = () => ({
   projectName: "新しい企画",
@@ -272,6 +274,13 @@ async function loadAuthorProfile() {
 }
 async function saveAuthorProfile(text) {
   try { localStorage.setItem(AUTHOR_PROFILE_KEY, text || ""); } catch (e) { console.error(e); }
+}
+
+async function loadWorkProfile() {
+  try { return localStorage.getItem(WORK_PROFILE_KEY) || ""; } catch { return ""; }
+}
+async function saveWorkProfile(text) {
+  try { localStorage.setItem(WORK_PROFILE_KEY, text || ""); } catch (e) { console.error(e); }
 }
 
 function parseStep2Output(text) {
@@ -905,6 +914,169 @@ const Step0Page = ({ savedProfile, onSaveProfile, onNavigate }) => {
   );
 };
 
+const Step1Page = ({ savedAuthorProfile, savedWorkProfile, onSaveWorkProfile, onNavigate }) => {
+  const [theme, setTheme] = useState("");
+  const [motivation, setMotivation] = useState("");
+  const [readerHypothesis, setReaderHypothesis] = useState("");
+  const [isRunning, setIsRunning] = useState(false);
+  const [runError, setRunError] = useState("");
+  const [outputText, setOutputText] = useState(savedWorkProfile || "");
+  const [saveMsg, setSaveMsg] = useState(false);
+  const [profilePreviewOpen, setProfilePreviewOpen] = useState(false);
+
+  const hasAuthorProfile = !!(savedAuthorProfile || "").trim();
+
+  const handleGenerate = async () => {
+    setRunError("");
+    if (!hasAuthorProfile) {
+      setRunError("先にSTEP0で著者プロファイルを生成・保存してください。");
+      return;
+    }
+    if (!theme.trim()) {
+      setRunError("仮テーマを入力してください（必須）。");
+      return;
+    }
+    if (!motivation.trim()) {
+      setRunError("動機・きっかけを入力してください（必須）。");
+      return;
+    }
+    setIsRunning(true);
+    try {
+      const response = await fetch("/api/dify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stepNum: 1,
+          inputs: {
+            theme: theme.trim(),
+            motivation: motivation.trim(),
+            reader_hypothesis: readerHypothesis.trim(),
+            author_profile: savedAuthorProfile || "",
+          },
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setRunError(data.error || "生成中にエラーが発生しました。少し時間をおいて再度お試しください。");
+      } else {
+        setOutputText(data.output || "");
+      }
+    } catch (e) {
+      setRunError(`通信エラーが発生しました：${e.message}`);
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!outputText.trim()) return;
+    await onSaveWorkProfile(outputText);
+    setSaveMsg(true);
+    setTimeout(() => setSaveMsg(false), 2500);
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.gold, marginBottom: 4, letterSpacing: "0.08em" }}>STEP 1</div>
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: C.navy, margin: "0 0 6px", letterSpacing: "-0.01em" }}>テーマ発見 → 書籍プロファイル草案</h1>
+          <p style={{ fontSize: 13.5, color: C.textSub, margin: 0, lineHeight: 1.7 }}>仮テーマと著者プロファイルから、本のプロファイル草案を生成します。STEP2で市場検証して確定版に進化させます。</p>
+        </div>
+      </div>
+      <div style={{ height: 1, background: `linear-gradient(to right, ${C.gold}, ${C.goldLight}, transparent)`, width: "100%", opacity: 0.9, marginBottom: 20 }} />
+
+      <Card style={{ marginBottom: 24, background: hasAuthorProfile ? "#eef7ee" : "#fff7e6", border: `1px solid ${hasAuthorProfile ? "#c8d4c8" : "#e0c8a0"}` }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.navy, marginBottom: 8 }}>
+          📌 現在の著者プロファイル：{hasAuthorProfile ? "✓ 設定済み（自動転記されます）" : "⚠ 未設定"}
+        </div>
+        {hasAuthorProfile ? (
+          <div>
+            <div style={{ fontSize: 12.5, color: "#444", lineHeight: 1.7, marginBottom: 8 }}>
+              書籍プロファイル草案の生成時に、著者プロファイルが自動でAIに渡されます。ユーザが手で貼り付ける必要はありません。
+            </div>
+            <button onClick={() => setProfilePreviewOpen(!profilePreviewOpen)} style={{ background: "none", border: `1px solid ${C.border}`, padding: "4px 12px", borderRadius: 4, fontSize: 12, color: C.navy, cursor: "pointer" }}>
+              {profilePreviewOpen ? "閉じる" : "プレビュー表示"}
+            </button>
+            {profilePreviewOpen && (
+              <div style={{ marginTop: 10, padding: 10, background: C.white, border: `1px solid ${C.border}`, borderRadius: 4, fontSize: 12.5, color: "#333", lineHeight: 1.7, whiteSpace: "pre-wrap", maxHeight: 280, overflow: "auto" }}>
+                {savedAuthorProfile}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div>
+            <div style={{ fontSize: 12.5, color: "#444", lineHeight: 1.7, marginBottom: 8 }}>
+              STEP1を使うには、先にSTEP0で著者プロファイルを生成しておく必要があります。
+            </div>
+            <BtnPrimary onClick={() => onNavigate("step_0")}>STEP0で著者プロファイルを生成する →</BtnPrimary>
+          </div>
+        )}
+      </Card>
+
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <StepBadge num="①" />
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>仮テーマと動機を入力する</h2>
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ fontSize: 13.5, fontWeight: 600, color: C.navy }}>仮テーマ（必須）</label>
+          <div style={{ fontSize: 13, color: "#444444", marginBottom: 6 }}>書きたい本のテーマを一文で書いてください。</div>
+          <input value={theme} onChange={(e) => setTheme(e.target.value)}
+            placeholder="例：会社員のためのChatGPT活用術"
+            style={{ width: "100%", padding: "10px 12px", fontSize: 14, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", fontFamily: "inherit", background: C.white }} />
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ fontSize: 13.5, fontWeight: 600, color: C.navy }}>動機・きっかけ（必須）</label>
+          <div style={{ fontSize: 13, color: "#444444", marginBottom: 6 }}>なぜ「自分が」このテーマを書くのか・きっかけ・きっかけを書いてください。著者プロファイルと仮テーマをつなぐ橋渡しの情報です。</div>
+          <textarea value={motivation} onChange={(e) => setMotivation(e.target.value)}
+            placeholder="例：自社で社員研修をした際に「もっと早く知りたかった」と多数言われた。中堅会社員が業務でつまずいているポイントを体系化したい。"
+            rows={4}
+            style={{ width: "100%", padding: "10px 12px", fontSize: 14, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.7 }} />
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ fontSize: 13.5, fontWeight: 600, color: C.navy }}>想定読者の仮説（任意）</label>
+          <div style={{ fontSize: 13, color: "#444444", marginBottom: 6 }}>書ける範囲でOK。空欄ならAIが著者プロファイルと仮テーマから推論します。</div>
+          <textarea value={readerHypothesis} onChange={(e) => setReaderHypothesis(e.target.value)}
+            placeholder="例：30代会社員・忙しくてAIに踏み出せていない人"
+            rows={3}
+            style={{ width: "100%", padding: "10px 12px", fontSize: 14, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.7 }} />
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <StepBadge num="②" />
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>AIで生成する</h2>
+        </div>
+        <Card style={{ background: "#eef2f7", border: "1px solid #c8d4e0" }}>
+          <div style={{ fontSize: 13, color: C.textSub, marginBottom: 12, lineHeight: 1.8 }}>仮テーマと動機を入力したら下のボタンを押してください。生成には30秒〜1分ほどかかります。</div>
+          <BtnPrimary onClick={handleGenerate} disabled={isRunning || !hasAuthorProfile}>{isRunning ? "生成中..." : "▶ 書籍プロファイル草案を生成する"}</BtnPrimary>
+          {runError && <div style={{ marginTop: 12, padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, fontSize: 13, color: C.red, whiteSpace: "pre-wrap", lineHeight: 1.7 }}>{runError}</div>}
+        </Card>
+      </div>
+
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <StepBadge num="③" />
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>生成された書籍プロファイル草案</h2>
+        </div>
+        <textarea value={outputText} onChange={(e) => setOutputText(e.target.value)}
+          rows={20}
+          placeholder="ここに生成された書籍プロファイル草案が表示されます。手動で編集も可能です。"
+          style={{ width: "100%", padding: "12px 14px", fontSize: 13.5, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.85 }} />
+        <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <BtnPrimary onClick={handleSave} disabled={!outputText.trim()}>書籍プロファイル草案を保存</BtnPrimary>
+          {saveMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました（STEP2で使えます）</span>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutput, onUpdateProject, onInputChange, allSteps, onRefPanel }) => {
   const [inputs, setInputs] = useState(stepData.inputData || {});
   const [outputText, setOutputText] = useState(stepData.outputText || "");
@@ -1507,6 +1679,7 @@ export default function App() {
   const [project, setProject] = useState(defaultProject());
   const [allSteps, setAllSteps] = useState({});
   const [authorProfile, setAuthorProfile] = useState("");
+  const [workProfile, setWorkProfile] = useState("");
   const [loading, setLoading] = useState(true);
 
   if (typeof window !== "undefined") {
@@ -1524,6 +1697,8 @@ export default function App() {
       setAllSteps(steps);
       const ap = await loadAuthorProfile();
       setAuthorProfile(ap);
+      const wp = await loadWorkProfile();
+      setWorkProfile(wp);
       setLoading(false);
       const summary = {};
       for (let i = 1; i <= 10; i++) { const t = steps[i]?.outputText || ""; summary[`STEP${i}`] = { length: t.length, tail: t.slice(-30) }; }
@@ -1534,6 +1709,11 @@ export default function App() {
   const handleSaveAuthorProfile = useCallback(async (text) => {
     await saveAuthorProfile(text);
     setAuthorProfile(text);
+  }, []);
+
+  const handleSaveWorkProfile = useCallback(async (text) => {
+    await saveWorkProfile(text);
+    setWorkProfile(text);
   }, []);
 
   const stepStatuses = {};
@@ -1613,6 +1793,7 @@ export default function App() {
     if (page === "guide") return <GuidePage onNavigate={nav} />;
     if (page === "saved") return <SavedPage project={project} stepStatuses={stepStatuses} allSteps={allSteps} onNavigate={nav} />;
     if (page === "step_0") return <Step0Page savedProfile={authorProfile} onSaveProfile={handleSaveAuthorProfile} onNavigate={nav} />;
+    if (page === "step_1") return <Step1Page savedAuthorProfile={authorProfile} savedWorkProfile={workProfile} onSaveWorkProfile={handleSaveWorkProfile} onNavigate={nav} />;
     if (page.startsWith("step_")) {
       const num = parseInt(page.replace("step_", ""), 10);
       const step = STEPS[num - 1];
