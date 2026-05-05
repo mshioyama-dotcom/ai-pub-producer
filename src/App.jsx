@@ -294,6 +294,13 @@ async function saveWorkProfileConfirmed(text) {
   try { localStorage.setItem(WORK_PROFILE_CONFIRMED_KEY, text || ""); } catch (e) { console.error(e); }
 }
 
+function extractMotivation(workProfileDraft) {
+  if (!workProfileDraft) return "";
+  // ■ 動機 セクションを抽出（次の ■ または末尾まで）
+  const match = workProfileDraft.match(/[■]\s*動機[\s\S]*?\n([\s\S]*?)(?=\n\s*[■]|\n\s*##|$)/);
+  return match ? match[1].trim() : "";
+}
+
 function extractKeywords3Axes(workProfileDraft) {
   if (!workProfileDraft) return { theme: "", reader: "", diff: "" };
   // 「、」「,」で区切られた複数候補がある場合は最初のフレーズだけを採用（Amazon検索のため）
@@ -1162,6 +1169,7 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
       const cleanedTheme = (cleanHtmlMinimal(htmlTheme) || htmlTheme).slice(0, 999000);
       const cleanedReader = htmlReader ? (cleanHtmlMinimal(htmlReader) || htmlReader).slice(0, 999000) : "";
       const cleanedDiff = htmlDiff ? (cleanHtmlMinimal(htmlDiff) || htmlDiff).slice(0, 999000) : "";
+      const motivation = extractMotivation(savedWorkProfileDraft);
       const response = await fetch("/api/dify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1170,6 +1178,7 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
           inputs: {
             author_profile: savedAuthorProfile || "",
             work_profile_draft: savedWorkProfileDraft || "",
+            motivation: motivation,
             keyword_theme: keywordTheme.trim(),
             html_theme: cleanedTheme,
             keyword_reader: keywordReader.trim(),
