@@ -296,13 +296,20 @@ async function saveWorkProfileConfirmed(text) {
 
 function extractKeywords3Axes(workProfileDraft) {
   if (!workProfileDraft) return { theme: "", reader: "", diff: "" };
+  // 「、」「,」で区切られた複数候補がある場合は最初のフレーズだけを採用（Amazon検索のため）
+  // **や太字記号も除去
+  const pickFirst = (text) => {
+    if (!text) return "";
+    const cleaned = text.replace(/\*+/g, "").trim();
+    return cleaned.split(/[、,]/)[0].trim();
+  };
   const themeMatch = workProfileDraft.match(/[-・]\s*主題軸\s*[:：]\s*(.+)/);
   const readerMatch = workProfileDraft.match(/[-・]\s*読者軸\s*[:：]\s*(.+)/);
   const diffMatch = workProfileDraft.match(/[-・]\s*差分軸\s*[:：]\s*(.+)/);
   return {
-    theme: themeMatch ? themeMatch[1].trim() : "",
-    reader: readerMatch ? readerMatch[1].trim() : "",
-    diff: diffMatch ? diffMatch[1].trim() : "",
+    theme: themeMatch ? pickFirst(themeMatch[1]) : "",
+    reader: readerMatch ? pickFirst(readerMatch[1]) : "",
+    diff: diffMatch ? pickFirst(diffMatch[1]) : "",
   };
 }
 
