@@ -1118,9 +1118,19 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
   const [saveMsg, setSaveMsg] = useState(false);
   const [authorPreviewOpen, setAuthorPreviewOpen] = useState(false);
   const [draftPreviewOpen, setDraftPreviewOpen] = useState(false);
+  const [procedureOpen, setProcedureOpen] = useState(false);
 
   const hasAuthorProfile = !!(savedAuthorProfile || "").trim();
   const hasDraft = !!(savedWorkProfileDraft || "").trim();
+
+  const getHtmlStatus = (html) => {
+    if (!html) return { label: "未入力", color: C.textLight, bg: "rgba(0,0,0,0.04)" };
+    const isCleanedFormat = /^\s*<div\s+data-asin/i.test(html);
+    const looksLikeHtml = /data-asin|<div|<html|<!DOCTYPE/i.test(html);
+    if (isCleanedFormat) return { label: "✓ HTML検知（整形済み）", color: C.green, bg: C.greenLight };
+    if (looksLikeHtml) return { label: "✓ HTML検知", color: C.green, bg: C.greenLight };
+    return { label: "⚠ HTMLではない可能性", color: C.gold, bg: C.goldPale };
+  };
 
   const handleGenerate = async () => {
     setRunError("");
@@ -1142,6 +1152,9 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
     }
     setIsRunning(true);
     try {
+      const cleanedTheme = (cleanHtmlMinimal(htmlTheme) || htmlTheme).slice(0, 999000);
+      const cleanedReader = htmlReader ? (cleanHtmlMinimal(htmlReader) || htmlReader).slice(0, 999000) : "";
+      const cleanedDiff = htmlDiff ? (cleanHtmlMinimal(htmlDiff) || htmlDiff).slice(0, 999000) : "";
       const response = await fetch("/api/dify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1151,11 +1164,11 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
             author_profile: savedAuthorProfile || "",
             work_profile_draft: savedWorkProfileDraft || "",
             keyword_theme: keywordTheme.trim(),
-            html_theme: htmlTheme,
+            html_theme: cleanedTheme,
             keyword_reader: keywordReader.trim(),
-            html_reader: htmlReader,
+            html_reader: cleanedReader,
             keyword_diff: keywordDiff.trim(),
-            html_diff: htmlDiff,
+            html_diff: cleanedDiff,
           },
         }),
       });
@@ -1212,9 +1225,12 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
                 {canOpenAmazon ? <>開いたページで<strong>右クリック→「ページのソースを表示」→Ctrl+A→Ctrl+C</strong></> : <>上のキーワードを入力すると検索が開けます</>}
               </div>
             </div>
-            <label style={{ fontSize: 12.5, fontWeight: 600, color: C.navy }}>Amazon検索結果(HTML){isRequired ? "（必須）" : "（任意）"}</label>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, padding: "5px 10px", background: getHtmlStatus(html).bg, borderRadius: 4, border: `1px solid rgba(0,0,0,0.06)` }}>
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: C.navy }}>Amazon検索結果(HTML){isRequired ? "（必須）" : "（任意）"}</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: getHtmlStatus(html).color, marginLeft: "auto" }}>{getHtmlStatus(html).label}</span>
+            </div>
             <textarea value={html} onChange={(e) => setHtml(e.target.value)}
-              placeholder="Amazon検索結果ページのHTMLソースを貼り付け"
+              placeholder="上のボタンでAmazon検索 → ページソースを Ctrl+A→Ctrl+C で全選択コピー → ここに Ctrl+V で貼付（実行時に自動で本データだけ抽出されます）"
               rows={5}
               style={{ width: "100%", padding: "8px 10px", fontSize: 12, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "monospace", background: C.white, marginTop: 4 }} />
           </div>
@@ -1280,6 +1296,47 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
         <div style={{ fontSize: 12.5, color: C.textSub, marginBottom: 14, lineHeight: 1.7 }}>
           各軸のキーワードはSTEP1出力から自動転記されています（編集可）。<br />
           最低1軸（主題軸）必須、推奨は2〜3軸。多いほど検証精度が上がります。
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <div onClick={() => setProcedureOpen(!procedureOpen)} style={{ fontSize: 12.5, color: C.navyMid, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 0", fontWeight: 600 }}>
+            <span style={{ transform: procedureOpen ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.15s", display: "inline-block" }}>▶</span>
+            HTMLを取得する詳しい手順
+          </div>
+          {procedureOpen && (
+            <div style={{ marginTop: 8, padding: "14px 16px", background: "#f4f3ef", border: `1px solid ${C.border}`, borderRadius: 6 }}>
+              <svg width="100%" viewBox="0 0 680 260" xmlns="http://www.w3.org/2000/svg">
+                <defs><marker id="ha2_step2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#555" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></marker></defs>
+                <rect x="10" y="10" width="310" height="240" rx="6" fill="none" stroke="#c8d4e0" strokeWidth="0.5" strokeDasharray="3 3"/>
+                <text fontFamily="sans-serif" fontSize="11" fontWeight="bold" fill="#2a4468" x="20" y="28">Amazon側でやること</text>
+                <rect x="30" y="44" width="270" height="50" rx="6" fill="#edf2f8" stroke="#2a4468" strokeWidth="0.5"/>
+                <text fontFamily="sans-serif" fontSize="12" fontWeight="bold" fill="#1a2e4a" x="45" y="65">①</text>
+                <text fontFamily="sans-serif" fontSize="12" fill="#2a4468" x="60" y="65">Kindleストアでキーワードを検索</text>
+                <text fontFamily="sans-serif" fontSize="10" fill="#688" x="60" y="82">(各軸の青いボタンを使うとワンクリックで開けます)</text>
+                <line x1="165" y1="94" x2="165" y2="110" stroke="#555" strokeWidth="1.2" markerEnd="url(#ha2_step2)"/>
+                <rect x="30" y="114" width="270" height="50" rx="6" fill="#edf2f8" stroke="#2a4468" strokeWidth="0.5"/>
+                <text fontFamily="sans-serif" fontSize="12" fontWeight="bold" fill="#1a2e4a" x="45" y="134">②</text>
+                <text fontFamily="sans-serif" fontSize="12" fill="#2a4468" x="60" y="134">検索結果ページで右クリック</text>
+                <text fontFamily="sans-serif" fontSize="11" fill="#2a4468" x="60" y="151">→ 「ページのソースを表示」</text>
+                <line x1="165" y1="164" x2="165" y2="180" stroke="#555" strokeWidth="1.2" markerEnd="url(#ha2_step2)"/>
+                <rect x="30" y="184" width="270" height="50" rx="6" fill="#edf2f8" stroke="#2a4468" strokeWidth="0.5"/>
+                <text fontFamily="sans-serif" fontSize="12" fontWeight="bold" fill="#1a2e4a" x="45" y="204">③</text>
+                <text fontFamily="sans-serif" fontSize="12" fill="#2a4468" x="60" y="204">Ctrl+A → Ctrl+C で全選択コピー</text>
+                <text fontFamily="sans-serif" fontSize="10" fill="#688" x="60" y="221">(Macの場合は Cmd+A → Cmd+C)</text>
+                <line x1="300" y1="209" x2="350" y2="209" stroke="#555" strokeWidth="1.5" markerEnd="url(#ha2_step2)"/>
+                <rect x="360" y="10" width="310" height="240" rx="6" fill="none" stroke="#c8d4e0" strokeWidth="0.5" strokeDasharray="3 3"/>
+                <text fontFamily="sans-serif" fontSize="11" fontWeight="bold" fill="#1a4a2e" x="370" y="28">このページでやること</text>
+                <rect x="380" y="184" width="270" height="50" rx="6" fill="#e4f2ec" stroke="#1e6b3a" strokeWidth="0.5"/>
+                <text fontFamily="sans-serif" fontSize="12" fontWeight="bold" fill="#1a4a2e" x="395" y="204">④</text>
+                <text fontFamily="sans-serif" fontSize="12" fill="#1e6b3a" x="410" y="204">該当する軸のHTML欄にCtrl+Vで貼付</text>
+                <text fontFamily="sans-serif" fontSize="10" fill="#2d7a4f" x="410" y="221">(貼り付けに少し時間がかかります)</text>
+                <line x1="515" y1="184" x2="515" y2="160" stroke="#555" strokeWidth="1.2" markerEnd="url(#ha2_step2)"/>
+                <rect x="380" y="114" width="270" height="50" rx="6" fill="#e4f2ec" stroke="#1e6b3a" strokeWidth="0.5"/>
+                <text fontFamily="sans-serif" fontSize="12" fontWeight="bold" fill="#1a4a2e" x="395" y="134">⑤</text>
+                <text fontFamily="sans-serif" fontSize="12" fill="#1e6b3a" x="410" y="134">必要な軸を全部貼り終えたら実行</text>
+                <text fontFamily="sans-serif" fontSize="10" fill="#2d7a4f" x="410" y="151">(自動でクリーニングしてAIに渡します)</text>
+              </svg>
+            </div>
+          )}
         </div>
         {renderAxisSection("主題軸", "🎯", true, keywordTheme, setKeywordTheme, htmlTheme, setHtmlTheme, true, () => {})}
         {renderAxisSection("読者軸", "👥", false, keywordReader, setKeywordReader, htmlReader, setHtmlReader, readerExpanded, setReaderExpanded)}
