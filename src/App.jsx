@@ -29,7 +29,7 @@ const C = {
 
 const STEPS = [
   {
-    id: "step_01", num: 1, title: "テーマ発見",
+    id: "step_01", num: 1, title: "書籍プロファイル草案",
     description: "仮テーマと著者プロファイルから「書籍プロファイル草案」を生成します。これがSTEP2の市場検証→確定版への入口になります。",
     category: "企画設計", type: "custom",
     url: "",
@@ -416,6 +416,44 @@ function extractKeywords3Axes(workProfileDraft) {
   };
 }
 
+function parseWorkProfileForStep3(workProfile) {
+  const empty = { keyword1: "", keyword2: "", intent: "", markets: [] };
+  if (!workProfile) return empty;
+  // 主題軸キーワード（半角空白区切り→keyword1/keyword2）
+  const axes = extractKeywords3Axes(workProfile);
+  const themePhrase = (axes.theme || "").trim();
+  const themeParts = themePhrase.split(/[\s　]+/).filter(Boolean);
+  const keyword1 = themeParts[0] || "";
+  const keyword2 = themeParts[1] || "";
+  // セクション抽出ヘルパー（■/##/### 等いずれの見出しでも拾う）
+  const sectionOf = (label) => {
+    const re = new RegExp(`(?:^|\\n)\\s*[■#＃]+\\s*${label}\\s*\\n([\\s\\S]*?)(?=\\n\\s*[■#＃]+\\s|\\n\\s*##\\s|$)`);
+    const m = workProfile.match(re);
+    return m ? m[1].trim() : "";
+  };
+  // 想定読者→intent_lock のシード
+  const readerSection = sectionOf("想定読者");
+  const intent = readerSection.split(/\n+/).map((l) => l.trim()).filter((l) => l && !/^[-・*•]\s*$/.test(l))[0] || "";
+  // ポジショニング仮説→market_report 候補
+  const posSection = sectionOf("ポジショニング仮説") || sectionOf("差別化軸") || sectionOf("狙い目切り口") || sectionOf("狙い目の切り口");
+  const markets = [];
+  if (posSection) {
+    const lines = posSection.split("\n").map((l) => l.trim()).filter(Boolean);
+    let current = [];
+    const flush = () => {
+      if (current.length) markets.push(current.join("\n").replace(/^[-・*•\d.\s]+/, "").trim());
+      current = [];
+    };
+    for (const line of lines) {
+      if (/^[-・*•]\s/.test(line) || /^\d+[.\s]/.test(line)) { flush(); current.push(line); }
+      else { current.push(line); }
+    }
+    flush();
+    if (markets.length === 0) markets.push(posSection.trim());
+  }
+  return { keyword1, keyword2, intent, markets };
+}
+
 function parseStep2Output(text) {
   const titleMatch = text.match(/^#[^#].*[:：]\s*(.+?)\s*[×x×]\s*(.+?)\s*$/m);
   const keyword1 = titleMatch ? titleMatch[1].trim() : "";
@@ -755,7 +793,7 @@ const HomePage = ({ project, stepStatuses, allSteps, onNavigate }) => {
       <div style={{ marginBottom: 28 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: C.gold, letterSpacing: "0.08em", marginBottom: 6 }}>DASHBOARD</div>
         <h1 style={{ fontSize: 24, fontWeight: 700, color: C.navy, margin: "0 0 8px", letterSpacing: "-0.01em" }}>AI出版プロデューサー</h1>
-        <p style={{ fontSize: 14, color: C.textSub, margin: "0 0 16px", lineHeight: 1.7 }}>10のツールで、テーマ発見から本文執筆・Amazon掲載まで進めます</p>
+        <p style={{ fontSize: 14, color: C.textSub, margin: "0 0 16px", lineHeight: 1.7 }}>10のツールで、書籍プロファイル設計から本文執筆・Amazon掲載まで進めます</p>
         <div style={{ height: 1, background: `linear-gradient(to right, ${C.gold}, ${C.goldLight}, transparent)`, width: "100%", opacity: 0.9 }} />
       </div>
       <div style={{ display: "flex", gap: 12, marginBottom: 28, flexWrap: "nowrap" }}>
@@ -782,8 +820,8 @@ const HomePage = ({ project, stepStatuses, allSteps, onNavigate }) => {
                 <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: 4, background: C.navy, color: C.white, fontSize: 14, fontWeight: 700 }}>A</span>
                 <span style={{ fontSize: 15, fontWeight: 700, color: C.navy }}>ゼロから始める</span>
               </div>
-              <div style={{ fontSize: 13, color: C.textSub, lineHeight: 1.8, marginBottom: 10 }}>テーマは決まっているが、狙うキーワードはまだ決めていない方。Amazon Kindleの市場データから2語キーワード候補を抽出します。</div>
-              <div style={{ fontSize: 12, color: C.gold, fontWeight: 600 }}>→ STEP1 テーマ発見へ</div>
+              <div style={{ fontSize: 13, color: C.textSub, lineHeight: 1.8, marginBottom: 10 }}>仮テーマと動機を入力すると、著者プロファイル（STEP0）と組み合わせて書籍プロファイル草案を生成し、検索キーワード3軸を抽出します。</div>
+              <div style={{ fontSize: 12, color: C.gold, fontWeight: 600 }}>→ STEP1 書籍プロファイル草案へ</div>
             </div>
           </Card>
           <Card style={{ flex: "1 1 280px", minWidth: 0, cursor: "pointer", borderTop: `3px solid ${C.gold}`, boxShadow: hoveredStartCard === "B" ? "0 4px 12px rgba(184,146,42,0.2)" : "none", transform: hoveredStartCard === "B" ? "translateY(-2px)" : "translateY(0)", transition: "box-shadow 0.15s, transform 0.15s" }} onClick={() => onNavigate("step_2")}>
@@ -792,8 +830,8 @@ const HomePage = ({ project, stepStatuses, allSteps, onNavigate }) => {
                 <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: 4, background: C.gold, color: C.white, fontSize: 14, fontWeight: 700 }}>B</span>
                 <span style={{ fontSize: 15, fontWeight: 700, color: C.navy }}>キーワードが決まっている</span>
               </div>
-              <div style={{ fontSize: 13, color: C.textSub, lineHeight: 1.8, marginBottom: 10 }}>狙う2語キーワードがすでに明確な方。STEP1をスキップして、市場勝率診断から始められます。</div>
-              <div style={{ fontSize: 12, color: C.gold, fontWeight: 600 }}>→ STEP2 市場勝率診断へ</div>
+              <div style={{ fontSize: 13, color: C.textSub, lineHeight: 1.8, marginBottom: 10 }}>主題軸キーワードがすでに明確な方。STEP1をスキップして、市場検証→書籍プロファイル確定から始められます。</div>
+              <div style={{ fontSize: 12, color: C.gold, fontWeight: 600 }}>→ STEP2 市場検証へ</div>
             </div>
           </Card>
         </div>
@@ -1631,6 +1669,7 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
                   )}
                   {unchanged && item.current && (
                     <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+                      <ApplyToStep1Button title={item.title} proposal={item.current} />
                       <CopyButton text={item.current} label="現状をコピー" />
                     </div>
                   )}
@@ -1902,13 +1941,21 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           const isOverLimit = field.maxChars && currentLen > field.maxChars;
           const isStep3ParsedField = (step.num === 3 || step.num === 5) && (field.name === "keyword1" || field.name === "keyword2" || field.name === "intent_lock" || field.name === "market_report");
           const handleAutoFillParsed = isStep3ParsedField ? () => {
-            const srcOutput = allSteps?.[2]?.outputText;
-            if (!srcOutput) { alert("STEP2の出力データがまだ保存されていません。\n\nSTEP2を完了して「出力データを保存」ボタンを押してから、もう一度お試しください。"); return; }
-            const parsed = parseStep2Output(srcOutput);
-            if (field.name === "keyword1") { if (parsed.keyword1) handleInputChange("keyword1", parsed.keyword1); else alert("STEP2の出力から「キーワード1」が見つかりませんでした。手動で入力してください。"); }
-            if (field.name === "keyword2") { if (parsed.keyword2) handleInputChange("keyword2", parsed.keyword2); else alert("STEP2の出力から「キーワード2」が見つかりませんでした。手動で入力してください。"); }
-            if (field.name === "intent_lock") { if (parsed.intent) handleInputChange("intent_lock", parsed.intent); else alert("STEP2の出力から「🎯 検索者の意図（仮説）」の部分が見つかりませんでした。手動でコピーして貼り付けてください。"); }
-            if (field.name === "market_report") { if (parsed.markets && parsed.markets.length > 0) { setMarketOptions(parsed.markets); setSelectedMarket(null); handleInputChange("market_report", ""); } else { alert("STEP2の出力から「狙い目の切り口」が見つかりませんでした。手動でコピーして貼り付けてください。"); } }
+            // 新C案優先：書籍プロファイル確定版 → 草案 から抽出
+            const wp = (typeof window !== "undefined")
+              ? (localStorage.getItem(WORK_PROFILE_CONFIRMED_KEY) || localStorage.getItem(WORK_PROFILE_KEY) || "")
+              : "";
+            let parsed = wp ? parseWorkProfileForStep3(wp) : null;
+            // フォールバック：旧STEP2出力フォーマット
+            if (!parsed || (!parsed.keyword1 && !parsed.intent && (!parsed.markets || parsed.markets.length === 0))) {
+              const srcOutput = allSteps?.[2]?.outputText;
+              if (srcOutput) parsed = parseStep2Output(srcOutput);
+            }
+            if (!parsed) { alert("書籍プロファイル（またはSTEP2出力）が見つかりません。\n\nSTEP2を実行して書籍プロファイル確定版を保存してから、もう一度お試しください。"); return; }
+            if (field.name === "keyword1") { if (parsed.keyword1) handleInputChange("keyword1", parsed.keyword1); else alert("書籍プロファイルから「主題軸キーワード1」が見つかりませんでした。手動で入力してください。"); }
+            if (field.name === "keyword2") { if (parsed.keyword2) handleInputChange("keyword2", parsed.keyword2); else alert("書籍プロファイルから「主題軸キーワード2」が見つかりませんでした。手動で入力してください。"); }
+            if (field.name === "intent_lock") { if (parsed.intent) handleInputChange("intent_lock", parsed.intent); else alert("書籍プロファイルから「想定読者／検索意図」が見つかりませんでした。手動でコピーして貼り付けてください。"); }
+            if (field.name === "market_report") { if (parsed.markets && parsed.markets.length > 0) { setMarketOptions(parsed.markets); setSelectedMarket(null); handleInputChange("market_report", ""); } else { alert("書籍プロファイルから「ポジショニング仮説／狙い目切り口」が見つかりませんでした。手動でコピーして貼り付けてください。"); } }
           } : undefined;
 
           if (field.name === "market_report") {
@@ -2238,15 +2285,15 @@ const GuidePage = ({ onNavigate }) => {
         <div style={{ marginBottom: 8 }}>
           <span style={{ fontWeight: 700, color: C.navy }}>A：ゼロから始める</span>
           <ul style={{ margin: "4px 0 12px", paddingLeft: 18 }}>
-            <li>テーマは決まっているが、狙うキーワードは決めていない方向け</li>
-            <li>STEP1のテーマ発見で、Amazon Kindleの市場データから2語キーワード候補を抽出します</li>
+            <li>仮テーマと動機があり、書籍プロファイルをこれから組み立てたい方向け</li>
+            <li>STEP1で著者プロファイル×仮テーマから書籍プロファイル草案を生成し、検索キーワード3軸を抽出します</li>
           </ul>
         </div>
         <div>
           <span style={{ fontWeight: 700, color: C.gold }}>B：キーワードが決まっている</span>
           <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
-            <li>狙う2語キーワードがすでに明確な方向け</li>
-            <li>STEP1をスキップして、STEP2（市場勝率診断）から直接始められます</li>
+            <li>主題軸キーワードがすでに明確な方向け</li>
+            <li>STEP1をスキップして、STEP2（市場検証→書籍プロファイル確定）から直接始められます</li>
             <li>ダッシュボードまたはSTEP1画面の上部にある「STEP2から始める」ボタンから入れます</li>
           </ul>
         </div>
@@ -2256,7 +2303,7 @@ const GuidePage = ({ onNavigate }) => {
           <li>① 入力データ欄に情報を入力する。「自動転記」「参照」「自動振り分け」ボタンを活用してください</li>
           <li style={{ marginTop: 4 }}><span style={{ fontWeight: 700 }}>自動転記（ネイビー）</span>：押すと前のSTEPの出力が自動で入力欄に入る</li>
           <li style={{ marginTop: 4 }}><span style={{ fontWeight: 700 }}>参照（薄ネイビー）</span>：押すと画面右側に前のSTEPの出力が表示される</li>
-          <li style={{ marginTop: 4 }}><span style={{ fontWeight: 700 }}>自動振り分け（ゴールド）</span>：STEP3専用。STEP2の出力から該当箇所を自動で抽出</li>
+          <li style={{ marginTop: 4 }}><span style={{ fontWeight: 700 }}>自動振り分け（ゴールド）</span>：STEP3専用。書籍プロファイル確定版（または草案）から該当箇所を自動で抽出</li>
           <li style={{ marginTop: 8 }}>② 「実行する」ボタンを押すとAIが自動で処理し、結果が出力欄に表示される</li>
           <li>③ 内容を確認・修正して「出力データを保存」を押す</li>
         </ul>
@@ -2279,14 +2326,14 @@ const GuidePage = ({ onNavigate }) => {
           <li>ブラウザのキャッシュをクリアするとデータが消えるため、大事な出力はコピーして別途保管してください</li>
         </ul>
       </Section>
-      <Section title="市場勝率診断のHTML取得方法">
+      <Section title="STEP2 市場検証のHTML取得方法">
         <ol style={{ margin: 0, paddingLeft: 18 }}>
-          <li>AmazonのKindleストアでキーワード2語を検索</li>
+          <li>AmazonのKindleストアで主題軸キーワードを検索（必要に応じて読者軸・差分軸も）</li>
           <li>検索結果ページで右クリック→「ページのソースを表示」</li>
           <li>Ctrl+A → Ctrl+C で全選択コピー</li>
-          <li>STEP2の入力欄に貼り付けて「実行する」を押す</li>
+          <li>STEP2の各軸の入力欄に貼り付けて「実行する」を押す</li>
         </ol>
-        <div style={{ marginTop: 8, fontSize: 12.5, color: C.textLight }}>「実行する」を押すと自動でクリーニングしてAIに渡します。</div>
+        <div style={{ marginTop: 8, fontSize: 12.5, color: C.textLight }}>「実行する」を押すと自動でクリーニングしてAIに渡します。最低でも主題軸の1軸が必須・読者軸/差分軸は任意。</div>
       </Section>
       <BtnSecondary onClick={() => onNavigate("home")}>ホームへ戻る</BtnSecondary>
     </div>
