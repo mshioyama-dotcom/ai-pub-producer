@@ -221,6 +221,7 @@ const STEPS_KEY_PREFIX = "aipub:step:";
 const AUTHOR_PROFILE_KEY = "aipub:author_profile";
 const WORK_PROFILE_KEY = "aipub:work_profile_draft";
 const WORK_PROFILE_CONFIRMED_KEY = "aipub:work_profile_confirmed";
+const WORK_PROFILE_STEP2_FULL_KEY = "aipub:work_profile_step2_full";
 
 const defaultProject = () => ({
   projectName: "新しい企画",
@@ -1199,7 +1200,9 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
 
   const [isRunning, setIsRunning] = useState(false);
   const [runError, setRunError] = useState("");
-  const [outputText, setOutputText] = useState("");
+  const [outputText, setOutputText] = useState(() => {
+    try { return localStorage.getItem(WORK_PROFILE_STEP2_FULL_KEY) || ""; } catch { return ""; }
+  });
   const [confirmedDraft, setConfirmedDraft] = useState(savedWorkProfileConfirmed || "");
   const [saveMsg, setSaveMsg] = useState(false);
   const [authorPreviewOpen, setAuthorPreviewOpen] = useState(false);
@@ -1279,7 +1282,9 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
       if (!response.ok) {
         setRunError(data.error || "生成中にエラーが発生しました。少し時間をおいて再度お試しください。");
       } else {
-        setOutputText(data.output || "");
+        const out = data.output || "";
+        setOutputText(out);
+        try { localStorage.setItem(WORK_PROFILE_STEP2_FULL_KEY, out); } catch (e) {}
       }
     } catch (e) {
       setRunError(`通信エラーが発生しました：${e.message}`);
