@@ -586,8 +586,9 @@ const SideMenu = ({ currentPage, onNavigate, stepStatuses }) => {
         <div style={{ fontSize: 11, fontWeight: 700, color: C.white, letterSpacing: "0.06em", padding: "7px 18px", background: C.navy }}>ホーム</div>
         {menuItem("ダッシュボード", "home", null)}
         {menuItem("使い方", "guide", null)}
-        {catLabel("著者プロファイル")}
-        {menuItem("STEP0　著者プロファイル", "step_0", null)}
+        {/* STEP0 はC案改修中のため一時的に非表示（コードは保持・phase1ブランチで再設計） */}
+        {/* {catLabel("著者プロファイル")} */}
+        {/* {menuItem("STEP0　著者プロファイル", "step_0", null)} */}
         {CATEGORIES.map((cat) => (
           <div key={cat.label}>
             {catLabel(cat.label)}
