@@ -294,6 +294,33 @@ async function saveWorkProfileConfirmed(text) {
   try { localStorage.setItem(WORK_PROFILE_CONFIRMED_KEY, text || ""); } catch (e) { console.error(e); }
 }
 
+function parseStep1Suggestions(text) {
+  if (!text) return [];
+  const items = [];
+  const blockRegex = /###\s*([^\n]+)\s*\n([\s\S]*?)(?=\n###\s|$)/g;
+  let match;
+  while ((match = blockRegex.exec(text)) !== null) {
+    const title = match[1].trim();
+    const body = match[2].trim();
+    const currentMatch = body.match(/[-・]\s*現状\s*[:：]\s*([\s\S]*?)(?=\n[-・]\s*(?:提案|根拠)\s*[:：]|$)/);
+    const proposalMatch = body.match(/[-・]\s*提案\s*[:：]\s*([\s\S]*?)(?=\n[-・]\s*根拠\s*[:：]|$)/);
+    const reasonMatch = body.match(/[-・]\s*根拠\s*[:：]\s*([\s\S]*?)$/);
+    items.push({
+      title,
+      current: currentMatch ? currentMatch[1].trim() : "",
+      proposal: proposalMatch ? proposalMatch[1].trim() : "",
+      reason: reasonMatch ? reasonMatch[1].trim() : "",
+    });
+  }
+  return items;
+}
+
+function isUnchanged(proposal) {
+  if (!proposal) return true;
+  const normalized = proposal.replace(/[*\s（）()]/g, "");
+  return /変更なし|変更不要|変更なし$/.test(normalized);
+}
+
 function splitStep2Output(text) {
   if (!text) return { market: "", suggestions: "", confirmed: "", competitors: "", raw: text || "" };
   const extract = (heading) => {
@@ -1136,6 +1163,28 @@ const Step1Page = ({ savedAuthorProfile, savedWorkProfile, onSaveWorkProfile, on
   );
 };
 
+const CopyButton = ({ text, label }) => {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(text || "").then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {
+      const ta = document.createElement("textarea");
+      ta.value = text || "";
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch (e) {}
+      document.body.removeChild(ta);
+    });
+  };
+  return (
+    <button onClick={handleCopy} style={{ padding: "6px 12px", background: copied ? C.green : C.navy, color: C.white, border: "none", borderRadius: 4, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+      {copied ? "✓ コピーしました" : `📋 ${label || "コピー"}`}
+    </button>
+  );
+};
+
 const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfileConfirmed, onSaveWorkProfileConfirmed, onNavigate }) => {
   const initialKeywords = useMemo(() => extractKeywords3Axes(savedWorkProfileDraft), [savedWorkProfileDraft]);
 
@@ -1424,15 +1473,47 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
       </div>
 
       <div style={{ marginBottom: 24 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
           <StepBadge num="④" />
-          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>STEP1への修正提案（参考）</h2>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>STEP1への修正提案</h2>
+          {sections.suggestions && (
+            <button onClick={() => onNavigate("step_1")} style={{ marginLeft: "auto", padding: "6px 14px", background: "#fff8e6", color: C.navy, border: `1px solid #e0c8a0`, borderRadius: 4, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>↩ STEP1に戻る</button>
+          )}
         </div>
         {sections.suggestions ? (
-          <Card style={{ background: "#fff8e6", border: `1px solid #e0c8a0` }}>
-            <div style={{ fontSize: 12, color: C.textSub, marginBottom: 8, lineHeight: 1.6 }}>STEP1の入力を修正したくなったときの提案。納得できれば <strong>STEP1に戻って入力フォームに反映 → 再生成</strong> してください。</div>
-            <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordWrap: "break-word", fontFamily: "inherit", fontSize: 13, lineHeight: 1.85, color: C.text }}>{sections.suggestions}</pre>
-          </Card>
+          <div>
+            <div style={{ fontSize: 12.5, color: C.textSub, marginBottom: 12, lineHeight: 1.7, padding: "8px 12px", background: "#fff8e6", border: `1px solid #e0c8a0`, borderRadius: 4 }}>
+              各項目の <strong>「📋 提案をコピー」</strong> ボタンを押す → <strong>STEP1に戻る</strong> → 該当の入力欄に貼り付け → <strong>再生成</strong> すると書籍プロファイル草案が進化します。
+            </div>
+            {parseStep1Suggestions(sections.suggestions).map((item, idx) => {
+              const unchanged = isUnchanged(item.proposal);
+              return (
+                <Card key={idx} style={{ background: C.white, border: `1px solid ${C.border}`, marginBottom: 10 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 700, color: C.navy, marginBottom: 10 }}>📝 {item.title}</div>
+                  {item.current && (
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ fontSize: 11, color: C.textLight, fontWeight: 600, marginBottom: 4, letterSpacing: "0.04em" }}>現状</div>
+                      <div style={{ fontSize: 12.5, color: C.textSub, padding: "8px 10px", background: "rgba(0,0,0,0.03)", borderRadius: 4, lineHeight: 1.75, whiteSpace: "pre-wrap" }}>{item.current}</div>
+                    </div>
+                  )}
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: 11, color: unchanged ? C.textLight : C.gold, fontWeight: 600, marginBottom: 4, letterSpacing: "0.04em" }}>{unchanged ? "提案" : "✨ 提案"}</div>
+                    <div style={{ fontSize: 13, color: unchanged ? C.textLight : C.text, padding: "8px 10px", background: unchanged ? "rgba(0,0,0,0.03)" : "#fff8e6", border: unchanged ? "none" : `1px solid #e0c8a0`, borderRadius: 4, lineHeight: 1.75, whiteSpace: "pre-wrap", fontWeight: unchanged ? 400 : 500 }}>{item.proposal}</div>
+                  </div>
+                  {!unchanged && (
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+                      <CopyButton text={item.proposal} label="提案をコピー" />
+                    </div>
+                  )}
+                  {item.reason && (
+                    <div style={{ fontSize: 11.5, color: C.textSub, padding: "6px 10px", background: "rgba(0,0,0,0.02)", borderRadius: 4, lineHeight: 1.65 }}>
+                      💡 <strong>根拠：</strong>{item.reason}
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
         ) : (
           <div style={{ padding: "20px 16px", textAlign: "center", color: C.textLight, fontSize: 13, background: "#f8f8f8", borderRadius: 4, border: `1px dashed ${C.border}` }}>STEP1への修正提案はSTEP2実行後にここに表示されます</div>
         )}
