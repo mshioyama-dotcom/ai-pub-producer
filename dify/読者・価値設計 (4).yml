@@ -1,0 +1,431 @@
+app:
+  description: ''
+  icon: 🤖
+  icon_background: '#FFEAD5'
+  icon_type: emoji
+  mode: workflow
+  name: 読者・価値設計
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/openai:0.2.10@7ca552fb9e48caa4deddfdef5aa71c200d06d03c26c2e8bb428b3250101b9cb3
+    version: null
+kind: app
+version: 0.6.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        attachment_image_file_size_limit: 2
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        file_upload_limit: 50
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: llm
+      id: 1772274449421-source-1772491408213-target
+      source: '1772274449421'
+      sourceHandle: source
+      target: '1772491408213'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: code
+      id: 1772491408213-source-1772493833362-target
+      source: '1772491408213'
+      sourceHandle: source
+      target: '1772493833362'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: code
+        targetType: end
+      id: 1772493833362-source-1772286184026-target
+      source: '1772493833362'
+      sourceHandle: source
+      target: '1772286184026'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: true
+        title: ユーザー入力
+        type: start
+        variables:
+        - default: ''
+          hint: ''
+          label: 検索キーワード1（必須）
+          max_length: 128
+          options: []
+          placeholder: ''
+          required: true
+          type: text-input
+          variable: keyword1
+        - default: ''
+          hint: ''
+          label: 検索キーワード2（必須）
+          max_length: 256
+          options: []
+          placeholder: ''
+          required: true
+          type: text-input
+          variable: keyword2
+        - default: ''
+          hint: ''
+          label: 検索意図仮説（必須）
+          max_length: 256
+          options: []
+          placeholder: ''
+          required: true
+          type: text-input
+          variable: intent_lock
+        - default: ''
+          hint: ''
+          label: 狙い目切り口（任意）
+          max_length: 256
+          options: []
+          placeholder: ''
+          required: false
+          type: text-input
+          variable: market_report
+      height: 186
+      id: '1772274449421'
+      position:
+        x: 80
+        y: 282
+      positionAbsolute:
+        x: 80
+        y: 282
+      selected: true
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        outputs:
+        - value_selector:
+          - '1772493833362'
+          - structure_report
+          value_type: string
+          variable: text
+        selected: false
+        title: 出力
+        type: end
+      height: 88
+      id: '1772286184026'
+      position:
+        x: 1241
+        y: 303
+      positionAbsolute:
+        x: 1241
+        y: 303
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            enable_stream: false
+            max_tokens: 8192
+            reasoning_effort: low
+            verbosity: medium
+          mode: chat
+          name: gpt-5.2
+          provider: langgenius/openai/openai
+        prompt_template:
+        - id: 7150e7f8-0283-4d10-beca-75352c96d0aa
+          role: system
+          text: 'あなたは「出版構造設計エージェント」です。
+
+            読者の悩みと解決の道筋を「最短距離の構造」に固定することのみに集中してください。
+
+
+            ■ 入力
+
+            検索ワード1：{{#1772274449421.keyword1#}}
+
+            検索ワード2：{{#1772274449421.keyword2#}}
+
+            検索意図：{{#1772274449421.intent_lock#}}
+
+            狙い目切り口（任意）{{#1772274449421.market_report#}}
+
+
+            ■ 狙い目切り口の扱い
+
+            狙い目切り口が空欄または未入力なら、検索ワードと検索意図だけを根拠に設計する。
+
+            狙い目切り口が入力されている場合は、その内容を優先して読者設定・課題設定・到達状態・章構造に反映する。
+
+            ただし、狙い目切り口を説明文として繰り返さず、本の構造として自然な形に変換する。
+
+            狙い目切り口は「テーマを狭く具体化する補助条件」として扱い、構造を広げず絞るために使う。
+
+            狙い目切り口があっても、一般論に広げない。
+
+            ■ 改善要望の扱い
+
+            改善要望が空欄または未入力の場合は、他のルールのみに従って新規生成する。
+
+            改善要望に対して「承知しました」などの応答は不要。出力結果に自然に反映する。
+
+            改善要望の文言をそのまま出力にコピーせず、構造設計として消化した形で反映する。
+
+            （A）前回出力がある場合
+
+            改善要望と前回出力が両方入力されている場合は、以下の手順で出力する。
+
+            手順1：改善要望を読み、どの項目（検索意図・現在地・詰まり・到達点・心理ポイント・章構造・章数）が変更対象かを特定する。
+
+            手順2：変更対象でない項目は、前回出力から該当箇所をそのままコピーして出力する。一字も変えない。
+
+            手順3：変更対象の項目のみを、改善要望の指示に従って修正する。
+
+            手順4：「そのまま」「変えない」「維持」と書かれた要素は一字も変更しない。
+
+            （B）前回出力がない場合
+
+            改善要望はあるが前回出力が空の場合は、改善要望を最優先の設計方針として新規生成する。
+
+            改善要望は、読者設定・課題設定・到達状態・心理ポイント・章構造・章数のいずれにも影響しうる。どの項目に反映すべきかは、改善要望の内容から判断する。
+
+            改善要望が狙い目切り口や絶対ルールのデフォルト値（章数など）と矛盾する場合は、改善要望を優先する。
+
+            ■ 絶対ルール
+
+            解説・装飾・キャッチコピーは一切禁止。
+
+            章数はデフォルト7章。ただし改善要望で章数の指定がある場合はその章数に従う。1章1行。
+
+            指定フォーマットのみ出力し、それ以外の文章は一字も書かない。
+
+            【検索意図】は「〜したいが、〜なので、〜を知りたい」の1文に凝縮する。
+
+            各項目は抽象語を避け、行動・状態・判断が見える言葉で書く。
+
+            {{#market_report#}} がある場合は、章構造全体をその切り口に沿って一貫させる。
+
+            ■ 出力フォーマット
+
+            ┌────────────────────────────┐
+
+            │          読者・価値設計                          │
+
+            ├────────────────────────────┤
+
+            【検索ワード】
+
+            {{#1772274449421.keyword1#}}×{{#1772274449421.keyword2#}}
+
+            ──────────────────────────
+
+            【検索意図（固定）】
+
+            （1文）
+
+            ──────────────────────────
+
+            【読者への提供価値】
+
+            [現在地]（1行）
+
+            ↓
+
+            [詰まり]（1行）
+
+            ↓
+
+            [到達点]（1行）
+
+            ──────────────────────────
+
+            【心理ポイント】
+
+            ・不安：
+
+            ・欲求：
+
+            ・思い込み：
+
+            ・引っかかり：
+
+            ──────────────────────────
+
+            【章構造（デフォルト7章／改善要望で章数変更可）】
+
+            1｜
+
+            2｜
+
+            3｜
+
+            4｜
+
+            5｜
+
+            6｜
+
+            7｜
+
+            （改善要望で章数が指定された場合は、指定された章数分だけ出力する）
+
+            └────────────────────────────┘'
+        selected: false
+        title: 読者・価値設計
+        type: llm
+        vision:
+          enabled: false
+      height: 88
+      id: '1772491408213'
+      position:
+        x: 561
+        y: 303
+      positionAbsolute:
+        x: 561
+        y: 303
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: "import re\nfrom typing import List, Dict, Any\n\n# ============================================================\n\
+          # 1) ユーティリティ関数\n# ============================================================\n\
+          def _pick_block(text: str, label: str) -> str:\n    \"\"\"【label】の直後から、次の【見出し】or\
+          \ 罫線 or 枠線までを取得\"\"\"\n    sep = r'[─━—–\\-―]{3,}'\n    frame = r'[┌├└]'\n\
+          \    end = rf'(?=\\n\\s*【|\\n\\s*{sep}|\\n\\s*{frame}|$)'\n\n    pattern\
+          \ = rf'【\\s*{re.escape(label)}\\s*(?:（[^）]*）)?\\s*】\\s*\\n?([\\s\\S]*?){end}'\n\
+          \    m = re.search(pattern, text)\n    if not m:\n        return \"\"\n\
+          \    content = m.group(1).strip()\n    return re.sub(r'^[\\s↓▼▽]+|[\\s↓▲△]+$',\
+          \ '', content).strip()\n\n\ndef _pick_inline(text: str, label: str) -> str:\n\
+          \    \"\"\"[label] の直後のテキストを1行取得\"\"\"\n    pattern = rf\"\\[\\s*{re.escape(label)}\\\
+          s*\\]\\s*(.*)\"\n    m = re.search(pattern, text)\n    if not m:\n     \
+          \   return \"\"\n    return m.group(1).strip()\n\n\ndef main(draft_text:\
+          \ str, **kwargs) -> Dict[str, Any]:\n    text = draft_text or \"\"\n\n \
+          \   # --- 検索ワード ---\n    kw = _pick_block(text, \"検索ワード\")\n\n    # ---\
+          \ 検索意図 ---\n    it_lock = _pick_block(text, \"検索意図（固定）\")\n    if not it_lock:\n\
+          \        it_lock = _pick_block(text, \"検索意図\")\n\n    # --- 読者への提供価値（現在地\
+          \ / 詰まり / 到達点） ---\n    value_block = _pick_block(text, \"読者への提供価値\")\n\
+          \    bf = _pick_inline(value_block, \"現在地\") if value_block else \"\"\n\
+          \    cp = _pick_inline(value_block, \"詰まり\") if value_block else \"\"\n\
+          \    af = _pick_inline(value_block, \"到達点\") if value_block else \"\"\n\n\
+          \    # 旧フォーマットへのフォールバック\n    if not bf:\n        bf = _pick_block(text,\
+          \ \"読者の現在地（Before）\")\n    if not cp:\n        cp = _pick_block(text, \"\
+          構造的な詰まり（Core Problem）\")\n    if not af:\n        af = _pick_block(text,\
+          \ \"到達状態（After）\")\n\n    # --- 心理ポイント ---\n    ps = _pick_block(text, \"\
+          心理ポイント\")\n\n    # --- 章構造 ---\n    ch = _pick_block(text, \"章構造\")\n\n\
+          \    # 章タイトルの整形（章数可変対応）\n    raw_ch_lines = [l.strip() for l in ch.splitlines()\
+          \ if \"｜\" in l or \"|\" in l]\n    final_ch = []\n\n    for line in raw_ch_lines:\n\
+          \        parts = re.split(r'[｜|]', line, maxsplit=1)\n        title = parts[1].strip()\
+          \ if len(parts) > 1 else line.strip()\n        if title:\n            final_ch.append(title)\n\
+          \n    chapter_count = len(final_ch)\n\n    # ============================================================\n\
+          \    # 2) レポート組み立て\n    # ============================================================\n\
+          \    report = [\n        \"┌────────────────────────────┐\",\n        \"\
+          │          読者・価値設計          │\",\n        \"├────────────────────────────┤\"\
+          ,\n        \"\",\n        f\"【検索ワード】\\n{kw}\",\n        \"\",\n        \"\
+          ──────────────────────\",\n        \"\",\n        f\"【検索意図（固定）】\\n{it_lock}\"\
+          ,\n        \"\",\n        \"──────────────────────\",\n        \"\",\n \
+          \       \"【読者への提供価値】\",\n        f\" [現在地] {bf}\",\n        \"    ↓\",\n\
+          \        f\" [詰まり] {cp}\",\n        \"    ↓\",\n        f\" [到達点] {af}\"\
+          ,\n        \"\",\n        \"──────────────────────\",\n        \"\",\n \
+          \       f\"【心理ポイント】\\n{ps}\",\n        \"\",\n        \"──────────────────────\"\
+          ,\n        \"\",\n        f\"【章構造（{chapter_count}章構成）】\",\n        \"\"\
+          ,\n        *[f\"{i+1}｜{final_ch[i]}\" for i in range(chapter_count)],\n\
+          \        \"\",\n        \"└────────────────────────────┘\"\n    ]\n\n  \
+          \  return {\n        \"structure_report\": \"\\n\".join(report),\n     \
+          \   \"chapter_skeleton\": final_ch\n    }"
+        code_language: python3
+        outputs:
+          chapter_skeleton:
+            children: null
+            type: array[string]
+          structure_report:
+            children: null
+            type: string
+        selected: false
+        title: レポート生成
+        type: code
+        variables:
+        - value_selector:
+          - '1772491408213'
+          - text
+          value_type: string
+          variable: draft_text
+      height: 52
+      id: '1772493833362'
+      position:
+        x: 864
+        y: 303
+      positionAbsolute:
+        x: 864
+        y: 303
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    viewport:
+      x: -10.5
+      y: -99.5
+      zoom: 1
+  rag_pipeline_variables: []

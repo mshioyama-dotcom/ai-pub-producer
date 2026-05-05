@@ -1,0 +1,419 @@
+app:
+  description: ''
+  icon: 🤖
+  icon_background: '#FFEAD5'
+  icon_type: emoji
+  mode: workflow
+  name: タイトル・サブタイトル作成
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/openai:0.2.10@7ca552fb9e48caa4deddfdef5aa71c200d06d03c26c2e8bb428b3250101b9cb3
+    version: null
+kind: app
+version: 0.6.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        attachment_image_file_size_limit: 2
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        file_upload_limit: 50
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: end
+      id: 1772854865893-source-1772355559326-target
+      source: '1772854865893'
+      sourceHandle: source
+      target: '1772355559326'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: start
+        targetType: llm
+      id: 1772343147375-source-1772854865893-target
+      source: '1772343147375'
+      sourceHandle: source
+      target: '1772854865893'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: true
+        title: ユーザー入力
+        type: start
+        variables:
+        - default: ''
+          hint: ''
+          label: 検索キーワード1（必須）
+          max_length: 256
+          options: []
+          placeholder: ''
+          required: true
+          type: text-input
+          variable: kw1
+        - default: ''
+          hint: ''
+          label: 検索キーワード2（必須）
+          max_length: 256
+          options: []
+          placeholder: ''
+          required: true
+          type: text-input
+          variable: kw2
+        - default: ''
+          hint: ''
+          label: 読者・価値設計のアウトプット（必須）
+          max_length: 5000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: theme_output
+        - default: ''
+          hint: ''
+          label: エピソードインタビューのアウトプット（必須）
+          max_length: 5000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: diff_elements
+      height: 186
+      id: '1772343147375'
+      position:
+        x: 80
+        y: 282
+      positionAbsolute:
+        x: 80
+        y: 282
+      selected: true
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        outputs:
+        - value_selector:
+          - '1772854865893'
+          - text
+          value_type: string
+          variable: text
+        selected: false
+        title: 出力
+        type: end
+      height: 88
+      id: '1772355559326'
+      position:
+        x: 1386.6650987100552
+        y: 303
+      positionAbsolute:
+        x: 1386.6650987100552
+        y: 303
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            max_tokens: 2400
+            reasoning_effort: low
+            response_format: text
+            verbosity: medium
+          mode: chat
+          name: gpt-5.2
+          provider: langgenius/openai/openai
+        prompt_template:
+        - id: 8278bf9a-d4f5-4b47-99c0-467b6bc2984d
+          role: system
+          text: 'Role
+
+            あなたはAmazon Kindle向けのタイトル・サブタイトル設計に強い出版プロデューサーです。
+
+            検索性とクリック率の両立を重視しながら、入力情報をもとに、売れ筋でありつつ埋もれにくいタイトル案を設計してください。
+
+            Task
+
+            入力された【Input Data】をもとに、Amazon検索で見つかりやすく、かつ読者が「これは自分の本だ」と感じやすいタイトル案を3つ生成してください。
+
+            SEOだけでなく、読者の痛み、差別化要素、内容との一致を重視してください。
+
+            設計ルール
+
+            【1】基本方針
+
+            kw1とkw2は市場調査済みの確定キーワードです。タイトルとサブタイトルを合わせた中に、kw1とkw2の両方が必ず含まれるようにしてください。これは絶対条件です。言い換えや類義語への置き換えはしないでください。
+
+            配置の優先順位は、メインタイトルに両方入るのが最善、メインタイトルに1語＋サブタイトルに1語が次善です。いずれにしてもタイトル＋サブタイトルの中に2語とも原文のまま含まれていなければなりません。
+
+            ただし、不自然な語順や無理な詰め込みは避けてください。
+
+            メインタイトルは短く、意味が一目で伝わる形を優先してください。
+
+            サブタイトルは、成果・対象読者・差別化の切り口のうち不足している要素を補ってください。
+
+            タイトルとサブタイトルを合わせて長すぎないようにし、スマホ画面でも主要価値が早めに伝わる構成にしてください。
+
+            kw1・kw2を確保した上で、それ以外の語彙選定ではAmazon検索で上位表示されやすい言葉を優先してください。具体的には以下の基準に従ってください。
+
+            ・読者がAmazonの検索窓に実際に打ち込む言葉を最優先で使ってください。著者目線の専門用語や抽象表現よりも、読者が検索に使う平易で具体的な言葉を選んでください。
+
+            ・同じ意味の表現が複数ある場合（例：「資産形成」vs「お金を増やす」、「初心者」vs「入門」vs「はじめての」）、より多くの読者が検索に使いそうな一般的な表現をタイトルまたはサブタイトルに配置し、残りの表現はバックエンドキーワードで補完してください。
+
+            ・kw1とkw2は確定キーワードなので、タイトル・サブタイトル内でできるだけ先頭寄りに配置してください。Amazonの検索アルゴリズムはタイトル内のキーワードを重視するため、後半に埋もれるより前半にある方が有利です。
+
+            ・競合タイトルと完全に同じ語句の並びは避けてください。同じキーワードでも語順や組み合わせを変えることで、検索結果内での差別化と視認性を両立できます。
+
+            ・サブタイトルもAmazon検索の対象になるため、メインタイトルに入りきらなかった重要な検索語はサブタイトルに配置してください。ただし、SEOのためだけにサブタイトルをキーワードの羅列にしないでください。読者に価値が伝わる文として成立させてください。
+
+            バックエンドキーワード（7枠）は、タイトルやサブタイトルに含まれていない関連語・類義語・周辺テーマで埋めてください。Amazonはタイトル・サブタイトルも自動的に検索対象に含めるため、それらと同じ語をバックエンドに入れるのは枠のムダです。
+
+            推奨カテゴリ（3枠）は、以下のルールに従ってください。
+
+            ・KDPで実際に選択可能なカテゴリパスのみ提案してください。存在しないカテゴリや架空のサブカテゴリは絶対に出さないでください。
+
+            ・親カテゴリとそのサブカテゴリを同時に選ばないでください。サブカテゴリに登録すれば親カテゴリにも自動表示されるため、親子重複は枠のムダです。
+
+            ・3つのカテゴリはそれぞれ異なる読者導線を狙ってください。同じ大カテゴリ内で似たサブカテゴリを並べるのではなく、本の内容に合致する範囲で異なるジャンルツリーから選んでください。
+
+            ・内容と無関係なカテゴリは選ばないでください。ランキング上位を狙う目的で無関係なカテゴリを選ぶと、Amazon側に修正される可能性があります。
+
+            ・KDP管理画面のカテゴリとAmazonストア上の表示カテゴリは完全一致しない場合があるため、「あくまで推奨案であり、KDP画面で最も近いものを選択してください」という注記を添えてください。
+
+            【2】差別化の反映
+
+            内容・ストーリーラインと独自エピソード・差別化要素を読み取り、
+
+            よくある総論タイトルではなく、この本ならではの切り口が伝わる案を優先してください。
+
+            特に、読者の痛み、著者の転換点、独自の見方、実践しやすいルールやテンプレがある場合は、それを反映してください。
+
+            ただし、1案の中に差別化要素を詰め込みすぎず、最も強い軸を1つ選んで前面に出してください。
+
+            【3】表現上の注意
+
+            大げさな煽り、誇張、安っぽい宣伝文句は使わないでください。
+
+            「ベストセラー」「1位」「無料」などの不適切表現は使わないでください。
+
+            「〜の方法」「〜の手順」「〜の秘訣」などの弱い表現は、必要がない限り避けてください。
+
+            ただし、無理に言い換えて不自然になるなら使わなくてよいです。
+
+            数字は、入力情報に根拠がある場合のみ使ってください。無理に入れないでください。
+
+            【4】サブタイトルの制約
+
+            サブタイトルは説明を詰め込みすぎず、1つの約束に絞ってください。
+
+            複数のベネフィットを並べすぎないでください。
+
+            章構成の説明に寄りすぎないでください。
+
+            「6章」「7ステップ」などの構成情報は、読者メリットが強まる場合のみ使ってください。
+
+            【5】3案の切り分け
+
+            3案は似た言い換えではなく、役割を明確に分けてください。
+
+            案1：
+
+            検索語直球型
+
+            検索意図に最も素直に応える案。分かりやすさを最優先する。
+
+            案2：
+
+            差別化軸前面型
+
+            著者ならではの切り口を最も強く出す案。今回の最有力候補になりうる案。
+
+            案3：
+
+            ベネフィット訴求型
+
+            読者が得たい状態や感情的ゴールを前面に出す案。やさしいが弱すぎない表現にする。
+
+            【6】改善要望の扱い
+
+            改善要望が空欄または未入力の場合は、設計ルール【1】〜【5】のみに従い、3案を新規生成してください。
+
+            改善要望に対して「承知しました」などの応答は不要です。出力結果に自然に反映してください。
+
+            改善要望が入力されている場合は、以下のルールに従ってください。
+
+            （A）前回出力がある場合の扱い
+
+            改善要望と前回出力が両方入力されている場合は、以下の手順で出力してください。
+
+            手順1：改善要望を読み、どの案のどの要素が変更対象かを特定する。
+
+            手順2：変更対象でない案は、前回出力から該当箇所をそのままコピーして出力する。コンセプト名・メインタイトル・サブタイトル・カテゴリ・バックエンドキーワード・キーワード戦略・心理的トリガーのすべてを一字も変えない。
+
+            手順3：変更対象の案について、改善要望で明示された要素のみを修正する。「そのまま」「変えない」「維持」と書かれた要素は一字も変更しない。
+
+            手順4：修正していない要素（同じ案内の他の項目）も前回出力のまま維持する。
+
+            改善要望が案番号を指定せず全体に適用される内容（例：「全案のサブタイトルを短くして」）の場合は、前回出力の3案すべてに反映してください。
+
+            （B）前回出力がない場合の扱い
+
+            改善要望はあるが前回出力が空の場合は、改善要望を最優先の設計方針として3案を新規生成してください。
+
+            改善要望が設計ルール【1】〜【5】と矛盾する場合は、改善要望を優先してください。
+
+            【7】避けること
+
+            一般論だけのタイトルにしないでください。
+
+            「仕事 メンタル」などの検索語を置いただけの無難なタイトルにしないでください。
+
+            差別化要素を全部盛りにして長くしすぎないでください。
+
+            内容と一致しないタイトルは作らないでください。
+
+            Input Data
+
+            メインキーワード ({{#1772343147375.kw1#}})
+
+            関連キーワード ({{#1772343147375.kw2#}})
+
+            内容・ストーリーライン ({{#1772343147375.theme_output#}})
+
+            独自エピソード・差別化要素 ({{#1772343147375.diff_elements#}})
+
+
+            Output Format
+
+            Markdownで以下の形式に従って、3案出力してください。余計な挨拶は不要です。
+
+            📚 Kindle出版タイトル戦略レポート
+
+            【案1】[コンセプト名]
+
+            ■ 1. タイトル構成
+
+            メインタイトル
+
+            [生成されたメインタイトル]
+
+            サブタイトル
+
+            [生成されたサブタイトル]
+
+            ■ 2. Amazon最適化設定
+
+            推奨カテゴリ（※KDP画面で最も近いものを選択してください）
+
+            Kindleストア > [ジャンル] > [サブカテゴリ]
+
+            Kindleストア > [ジャンル] > [サブカテゴリ]
+
+            Kindleストア > [ジャンル] > [サブカテゴリ]
+
+            バックエンドキーワード（タイトル・サブタイトルと重複しない語のみ）
+
+            k1, k2, k3, k4, k5, k6, k7
+
+            ■ 3. SEO・マーケティング分析
+
+            キーワード戦略
+
+            タイトル・サブタイトルでどの検索語をどの位置に配置したか、同義語の中からなぜその表現を選んだか、バックエンドキーワードでどの検索面を補完しているかを簡潔に説明してください。
+
+            心理的トリガー
+
+            この案がどの読者の痛みや欲求に刺さるかを簡潔に説明してください。
+
+            【案2】[コンセプト名]
+
+            （同形式）
+
+            【案3】[コンセプト名]
+
+            （同形式）
+
+            Additional Instructions
+
+            最終行に【推し案】として、3案の中で最も有望な1案を選び、理由を1〜2文で書いてください。
+
+            ただし、改善要望で特定の案を修正した場合は、その案を推し案として選び、修正後の強みを理由に書いてください。改善要望で手を入れた案は、利用者が最も注力している案です。'
+        selected: false
+        title: タイトル、サブタイトル生成
+        type: llm
+        vision:
+          enabled: false
+      height: 88
+      id: '1772854865893'
+      position:
+        x: 988.2772782510044
+        y: 303
+      positionAbsolute:
+        x: 988.2772782510044
+        y: 303
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    viewport:
+      x: 192.99469664111302
+      y: 51.823411469990106
+      zoom: 0.5719382064358149
+  rag_pipeline_variables: []

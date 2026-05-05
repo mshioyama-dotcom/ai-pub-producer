@@ -1,0 +1,620 @@
+app:
+  description: ''
+  icon: 🤖
+  icon_background: '#FFEAD5'
+  icon_type: emoji
+  mode: workflow
+  name: Amazon説明文作成
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/openai:0.2.10@7ca552fb9e48caa4deddfdef5aa71c200d06d03c26c2e8bb428b3250101b9cb3
+    version: null
+kind: app
+version: 0.6.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        attachment_image_file_size_limit: 2
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        file_upload_limit: 50
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: llm
+      id: 1773568684126-source-1773569309147-target
+      source: '1773568684126'
+      sourceHandle: source
+      target: '1773569309147'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: code
+      id: 1773569309147-source-1773572274012-target
+      source: '1773569309147'
+      sourceHandle: source
+      target: '1773572274012'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: code
+        targetType: llm
+      id: 1773572274012-source-1773572099258-target
+      source: '1773572274012'
+      sourceHandle: source
+      target: '1773572099258'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: end
+      id: 1773572099258-source-1773579433651-target
+      source: '1773572099258'
+      sourceHandle: source
+      target: '1773579433651'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: ユーザー入力
+        type: start
+        variables:
+        - default: ''
+          hint: ''
+          label: タイトル（必須）
+          max_length: 128
+          options: []
+          placeholder: ''
+          required: true
+          type: text-input
+          variable: title
+        - default: ''
+          hint: ''
+          label: サブタイトル（必須）
+          max_length: 256
+          options: []
+          placeholder: ''
+          required: true
+          type: text-input
+          variable: subtitle
+        - default: ''
+          hint: ''
+          label: 読者価値設計のアウトプット（必須）
+          max_length: 5000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: reader_value_design
+        - default: ''
+          hint: ''
+          label: エピソードインタビューのアウトプット（必須）
+          max_length: 5000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: author_episode
+        - default: ''
+          hint: ''
+          label: 章構成作成のアウトプット（必須）
+          max_length: 20000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: toc_text
+        - default: ''
+          hint: ''
+          label: 著者プロフィール（任意）
+          max_length: 2000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: author_profile
+      height: 238
+      id: '1773568684126'
+      position:
+        x: 80
+        y: 282
+      positionAbsolute:
+        x: 80
+        y: 282
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            max_tokens: 1500
+            temperature: 0.2
+            top_p: 0.9
+          mode: chat
+          name: gpt-4o
+          provider: langgenius/openai/openai
+        prompt_template:
+        - id: 76b5efe0-4f0a-43eb-a1f6-109c4589c4cf
+          role: system
+          text: 'あなたは、Amazonの商品ページに掲載する本の説明文を作成する前に、入力素材を整理する編集アシスタントです。
+
+            あなたの役割は、説明文そのものを書くことではありません。
+
+            本のタイトル、サブタイトル、読者価値設計、著者エピソード、著者プロフィール、目次などを読み取り、Amazon説明文を書くために必要な材料だけを整理して出力することです。
+
+            出力は、後続ノードで説明文を安定して生成できるように、過不足なく整理された内容にしてください。
+
+            入力
+
+            本のタイトル: {{#1773568684126.title#}}
+
+            サブタイトル: {{#1773568684126.subtitle#}}
+
+            読者価値設計: {{#1773568684126.reader_value_design#}}
+
+            著者エピソード: {{#1773568684126.author_episode#}}
+
+            著者プロフィール（任意）: {{#1773568684126.author_profile#}}
+
+            目次: {{#1773568684126.toc_text#}}
+
+
+            あなたの仕事
+
+            入力された情報を読み取り、次の観点で整理してください。
+
+            この本は誰向けの本か
+
+            読者は今どんな悩みやつまずきを抱えているか
+
+            読者は本当はどうなりたいか
+
+            この本を読むことで、読後にどのような変化が得られるか
+
+            この本では何が扱われているか
+
+            この本ならではの価値は何か
+
+            著者はなぜこの本を書いたのか
+
+            この本の信頼性の根拠は何か
+
+            他の一般的な本と比べた差別化ポイントは何か
+
+
+            整理のルール
+
+            説明文本文は書かないでください。
+
+            要約しすぎず、後続ノードで説明文に使いやすい粒度で整理してください。
+
+            本の内容にないことを勝手に補わないでください。
+
+            抽象語だけで終わらせず、できるだけ具体性を残してください。
+
+            目次は単なる章タイトルの羅列としてではなく、「この本で何が学べるか」がわかる形で要約してください。
+
+            著者エピソードは全文要約ではなく、「なぜこの本を書くのか」「どんな実体験や問題意識があるのか」に絞って整理してください。
+
+            著者プロフィールがある場合は、著者の立場、実務経験、実績、活動内容などを踏まえて、信頼性の根拠として活用してください。
+
+            著者プロフィールが空の場合は、無理に補わず、著者エピソードと他の入力情報だけで整理してください。
+
+            読者価値設計に書かれている想定読者・悩み・読後変化を優先してください。
+
+            タイトル・サブタイトルとズレないようにしてください。
+
+            改善要望は解釈しすぎず、そのまま後続に渡せる形で保持してください。
+
+            出力は必ずJSON形式にしてください。
+
+            JSON以外の説明文、前置き、補足は不要です。
+
+            各項目の出力方針
+
+            target_reader
+
+            この本が誰向けの本かを、1〜2文で整理してください。
+
+            reader_problem
+
+            読者が抱えている悩み、つまずき、困りごとを整理してください。
+
+            複数ある場合でも、中心課題がわかるようにまとめてください。
+
+            reader_desire
+
+            読者が本当はどうなりたいのか、どんな状態を望んでいるのかを整理してください。
+
+            after_state
+
+            この本を読むことで、読者がどのように変化できるかを整理してください。
+
+            book_contents_summary
+
+            目次とタイトル・サブタイトルをもとに、この本で扱う内容を説明文向けに要約してください。
+
+            章タイトルの並べ替えではなく、「何が学べる本か」がわかる形にしてください。
+
+            book_value
+
+            この本を読む価値を整理してください。
+
+            読者にとって何が役立つのかを明確にしてください。
+
+            author_reason
+
+            著者がこの本を書く理由、背景、問題意識、体験を整理してください。
+
+            著者プロフィールに、この理由を補強する情報がある場合は自然に反映してください。
+
+            trust_points
+
+            実体験、実務経験、具体性、現場性、活動実績など、この本に信頼感を持てる根拠を整理してください。
+
+            著者プロフィールに信頼性につながる情報がある場合は優先的に活用してください。
+
+            difference_points
+
+            一般的な類書と比べたときの違いや、この本ならではの特徴を整理してください。
+
+
+            出力形式
+
+            必ず以下のJSON形式で出力してください。
+
+            {
+
+            "target_reader": "",
+
+            "reader_problem": "",
+
+            "reader_desire": "",
+
+            "after_state": "",
+
+            "book_contents_summary": "",
+
+            "book_value": "",
+
+            "author_reason": "",
+
+            "trust_points": "",
+
+            "difference_points": "",
+
+            }'
+        selected: false
+        title: 説明材料整理
+        type: llm
+        vision:
+          enabled: false
+      height: 88
+      id: '1773569309147'
+      position:
+        x: 373
+        y: 303
+      positionAbsolute:
+        x: 373
+        y: 303
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            max_tokens: 2500
+            reasoning_effort: low
+            verbosity: medium
+          mode: chat
+          name: gpt-5.2
+          provider: langgenius/openai/openai
+        prompt_template:
+        - id: 81a2d729-d492-4272-a03e-897c699f0227
+          role: system
+          text: 'あなたはAmazonの商品ページに掲載する本の説明文を書くライターです。
+
+            読者が「自分のための本だ」と感じ、購入を決められる説明文を作成してください。
+
+            ━━━━━━━━━━━━━━━━━━
+
+            【入力】
+
+            ━━━━━━━━━━━━━━━━━━
+
+            本のタイトル: {{#1773568684126.title#}}
+
+            サブタイトル: {{#1773568684126.subtitle#}}
+
+            想定読者: {{#1773572274012.target_reader#}}
+
+            読者の悩み: {{#1773572274012.reader_problem#}}
+
+            読者の願望: {{#1773572274012.reader_desire#}}
+
+            読後の変化: {{#1773572274012.after_state#}}
+
+            本書で扱う内容: {{#1773572274012.book_contents_summary#}}
+
+            本書の提供価値: {{#1773572274012.book_value#}}
+
+            著者がこの本を書く理由: {{#1773572274012.author_reason#}}
+
+            信頼性の根拠: {{#1773572274012.trust_points#}}
+
+            差別化ポイント: {{#1773572274012.difference_points#}}
+
+            簡易目次: {{#1773568684126.toc_text#}}
+
+            著者プロフィール（任意）: {{#1773568684126.author_profile#}}
+
+
+
+            ━━━━━━━━━━━━━━━━━━
+
+            【文章構成】
+
+            ━━━━━━━━━━━━━━━━━━
+
+            以下の順で書くこと。
+
+            読者の悩み・状況（冒頭で「自分のことだ」と思わせる）
+
+            この本で得られること・読後の変化
+
+            本書で扱う内容の具体性
+
+            著者がこの本を書く理由・信頼の根拠
+
+            この本ならではの価値・向いている読者像
+
+            簡易目次（章タイトルベースで簡潔に）
+
+            著者プロフィール（入力がある場合のみ、短く）
+
+            ━━━━━━━━━━━━━━━━━━
+
+            【文体・分量】
+
+            ━━━━━━━━━━━━━━━━━━
+
+            落ち着いたビジネス書調。煽らず、誠実に。
+
+            本文は4〜6段落。スマホで読みやすい長さの段落にする。
+
+            簡易目次と著者プロフィールは本文を圧迫しない分量にする。
+
+            ━━━━━━━━━━━━━━━━━━
+
+            【禁止】
+
+            ━━━━━━━━━━━━━━━━━━
+
+            URL、メールアドレス、電話番号、他サイト誘導
+
+            ハッシュタグ、絵文字、キーワード羅列
+
+            レビュー依頼、推薦文引用
+
+            「ベストセラー」「No.1」等の根拠不明な表現
+
+            「必ず」「確実に」等の断定表現
+
+            価格訴求、期間限定表現
+
+            ネタバレ、本文と一致しない誇大表現
+
+            JSON、コードブロック、ラベル（amazon_description等）
+
+            前置き、補足、メタ説明
+
+            ━━━━━━━━━━━━━━━━━━
+
+            【出力】
+
+            ━━━━━━━━━━━━━━━━━━
+
+            完成したAmazon説明文のみを出力すること。
+
+            簡易目次は【本書の内容】の見出しの下に入れる。
+
+            著者プロフィールは【著者プロフィール】の見出しの下に入れる（入力がある場合のみ）。'
+        selected: true
+        title: Amazon説明文生成
+        type: llm
+        vision:
+          enabled: false
+      height: 88
+      id: '1773572099258'
+      position:
+        x: 1049
+        y: 303
+      positionAbsolute:
+        x: 1049
+        y: 303
+      selected: true
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: "import json\n\ndef main(text: str):\n    try:\n        data = json.loads(text)\
+          \ if isinstance(text, str) else text\n\n        return {\n            \"\
+          target_reader\": str(data.get(\"target_reader\", \"\")).strip(),\n     \
+          \       \"reader_problem\": str(data.get(\"reader_problem\", \"\")).strip(),\n\
+          \            \"reader_desire\": str(data.get(\"reader_desire\", \"\")).strip(),\n\
+          \            \"after_state\": str(data.get(\"after_state\", \"\")).strip(),\n\
+          \            \"book_contents_summary\": str(data.get(\"book_contents_summary\"\
+          , \"\")).strip(),\n            \"book_value\": str(data.get(\"book_value\"\
+          , \"\")).strip(),\n            \"author_reason\": str(data.get(\"author_reason\"\
+          , \"\")).strip(),\n            \"trust_points\": str(data.get(\"trust_points\"\
+          , \"\")).strip(),\n            \"difference_points\": str(data.get(\"difference_points\"\
+          , \"\")).strip(),\n            \"improvement_request\": str(data.get(\"\
+          improvement_request\", \"\")).strip(),\n            \"author_profile\":\
+          \ str(data.get(\"author_profile\", \"\")).strip(),\n            \"parse_error\"\
+          : \"\"\n        }\n\n    except Exception as e:\n        return {\n    \
+          \        \"target_reader\": \"\",\n            \"reader_problem\": \"\"\
+          ,\n            \"reader_desire\": \"\",\n            \"after_state\": \"\
+          \",\n            \"book_contents_summary\": \"\",\n            \"book_value\"\
+          : \"\",\n            \"author_reason\": \"\",\n            \"trust_points\"\
+          : \"\",\n            \"difference_points\": \"\",\n            \"improvement_request\"\
+          : \"\",\n            \"author_profile\": \"\",\n            \"parse_error\"\
+          : f\"JSON parse error: {str(e)}\"\n        }"
+        code_language: python3
+        outputs:
+          after_state:
+            children: null
+            type: string
+          author_profile:
+            children: null
+            type: string
+          author_reason:
+            children: null
+            type: string
+          book_contents_summary:
+            children: null
+            type: string
+          book_value:
+            children: null
+            type: string
+          difference_points:
+            children: null
+            type: string
+          improvement_request:
+            children: null
+            type: string
+          parse_error:
+            children: null
+            type: string
+          reader_desire:
+            children: null
+            type: string
+          reader_problem:
+            children: null
+            type: string
+          target_reader:
+            children: null
+            type: string
+          trust_points:
+            children: null
+            type: string
+        selected: false
+        title: text JSON を分解
+        type: code
+        variables:
+        - value_selector:
+          - '1773569309147'
+          - text
+          value_type: string
+          variable: text
+      height: 52
+      id: '1773572274012'
+      position:
+        x: 675
+        y: 303
+      positionAbsolute:
+        x: 675
+        y: 303
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        outputs:
+        - value_selector:
+          - '1773572099258'
+          - text
+          value_type: string
+          variable: text
+        selected: false
+        title: 出力
+        type: end
+      height: 88
+      id: '1773579433651'
+      position:
+        x: 1350
+        y: 303
+      positionAbsolute:
+        x: 1350
+        y: 303
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    viewport:
+      x: -332.5
+      y: -46
+      zoom: 1
+  rag_pipeline_variables: []

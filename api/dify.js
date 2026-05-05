@@ -2,6 +2,7 @@
 const DIFY_API_BASE = "https://api.dify.ai/v1";
 
 const API_KEYS = {
+  0:  process.env.DIFY_API_KEY_STEP00_A,
   1:  process.env.DIFY_API_KEY_STEP01,
   2:  process.env.DIFY_API_KEY_STEP02,
   3:  process.env.DIFY_API_KEY_STEP03,
@@ -102,6 +103,7 @@ export default async function handler(req, res) {
     const output = data?.data?.outputs?.text
       || data?.data?.outputs?.output
       || data?.data?.outputs?.result
+      || data?.data?.outputs?.author_profile
       || JSON.stringify(data?.data?.outputs || data, null, 2);
 
     // --- DEBUG LOG (for Vercel logs) ---

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { extractTextFromFile, buildSourceText, ACCEPTED_EXTENSIONS } from "./utils/extractText";
 
 // ============================================================
 // デザイントークン（ネイビー × ゴールド × ホワイト）
@@ -213,6 +214,7 @@ const STATUS_COLORS = {
 
 const STORAGE_KEY = "aipub:project";
 const STEPS_KEY_PREFIX = "aipub:step:";
+const AUTHOR_PROFILE_KEY = "aipub:author_profile";
 
 const defaultProject = () => ({
   projectName: "新しい企画",
@@ -262,7 +264,14 @@ async function loadAllSteps() {
   return all;
 }
 async function resetAllData() {
-  try { localStorage.removeItem(STORAGE_KEY); for (let i = 1; i <= 10; i++) { localStorage.removeItem(STEPS_KEY_PREFIX + i); } } catch (e) { console.error(e); }
+  try { localStorage.removeItem(STORAGE_KEY); for (let i = 1; i <= 10; i++) { localStorage.removeItem(STEPS_KEY_PREFIX + i); } localStorage.removeItem(AUTHOR_PROFILE_KEY); } catch (e) { console.error(e); }
+}
+
+async function loadAuthorProfile() {
+  try { return localStorage.getItem(AUTHOR_PROFILE_KEY) || ""; } catch { return ""; }
+}
+async function saveAuthorProfile(text) {
+  try { localStorage.setItem(AUTHOR_PROFILE_KEY, text || ""); } catch (e) { console.error(e); }
 }
 
 function parseStep2Output(text) {
@@ -577,6 +586,8 @@ const SideMenu = ({ currentPage, onNavigate, stepStatuses }) => {
         <div style={{ fontSize: 11, fontWeight: 700, color: C.white, letterSpacing: "0.06em", padding: "7px 18px", background: C.navy }}>ホーム</div>
         {menuItem("ダッシュボード", "home", null)}
         {menuItem("使い方", "guide", null)}
+        {catLabel("著者プロファイル")}
+        {menuItem("STEP0　著者プロファイル", "step_0", null)}
         {CATEGORIES.map((cat) => (
           <div key={cat.label}>
             {catLabel(cat.label)}
@@ -683,6 +694,212 @@ const HomePage = ({ project, stepStatuses, allSteps, onNavigate }) => {
           <li>修正は自分またはAIチャットで行ってください</li>
         </ul>
       </Card>
+    </div>
+  );
+};
+
+const BookSlotInput = ({ slot, idx, onChange, onClear }) => {
+  const inputId = `book-slot-${idx}`;
+  return (
+    <div style={{ marginBottom: 8, padding: "10px 14px", border: `1px solid ${C.border}`, borderRadius: 4, background: C.white }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: C.navy, minWidth: 60 }}>📎 書籍{idx + 1}</span>
+        {(!slot || slot.status !== "extracting") && (
+          <label htmlFor={inputId} style={{ fontSize: 12.5, padding: "6px 14px", background: C.navyLight, color: C.navyMid, border: `1px solid rgba(42,68,104,0.2)`, borderRadius: 3, cursor: "pointer", fontWeight: 600 }}>
+            {slot ? "別のファイルを選択" : "ファイルを選択"}
+          </label>
+        )}
+        <input id={inputId} type="file" accept={ACCEPTED_EXTENSIONS}
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) onChange(idx, file);
+            e.target.value = "";
+          }} />
+        {slot && (
+          <>
+            <span style={{ fontSize: 12.5, color: C.text, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{slot.filename}</span>
+            {slot.status === "extracting" && <span style={{ fontSize: 11, color: C.gold, fontWeight: 600 }}>抽出中...</span>}
+            {slot.status === "done" && <span style={{ fontSize: 11, color: C.green, fontWeight: 600 }}>✓ 抽出完了</span>}
+            {slot.status === "error" && <span style={{ fontSize: 11, color: C.red, fontWeight: 600 }}>⚠ 失敗</span>}
+            <button onClick={() => onClear(idx)} style={{ fontSize: 11, color: C.textLight, background: "none", border: `1px solid ${C.border}`, borderRadius: 3, padding: "3px 8px", cursor: "pointer" }}>削除</button>
+          </>
+        )}
+      </div>
+      {slot && slot.status === "error" && (
+        <div style={{ marginTop: 6, fontSize: 12, color: C.red, lineHeight: 1.6 }}>{slot.error}</div>
+      )}
+    </div>
+  );
+};
+
+const Step0Page = ({ savedProfile, onSaveProfile, onNavigate }) => {
+  const [bookSlots, setBookSlots] = useState([null, null, null]);
+  const [postsText, setPostsText] = useState("");
+  const [profileText, setProfileText] = useState("");
+  const [existingProfile, setExistingProfile] = useState("");
+  const [isRunning, setIsRunning] = useState(false);
+  const [runError, setRunError] = useState("");
+  const [outputText, setOutputText] = useState(savedProfile || "");
+  const [saveMsg, setSaveMsg] = useState(false);
+
+  const handleFileChange = async (slotIdx, file) => {
+    setBookSlots((slots) => {
+      const next = [...slots];
+      next[slotIdx] = { filename: file.name, text: "", status: "extracting", error: "" };
+      return next;
+    });
+    try {
+      const text = await extractTextFromFile(file);
+      setBookSlots((slots) => {
+        const next = [...slots];
+        next[slotIdx] = { filename: file.name, text, status: "done", error: "" };
+        return next;
+      });
+    } catch (e) {
+      setBookSlots((slots) => {
+        const next = [...slots];
+        next[slotIdx] = { filename: file.name, text: "", status: "error", error: e.message || "抽出に失敗しました" };
+        return next;
+      });
+    }
+  };
+
+  const handleClearSlot = (slotIdx) => {
+    setBookSlots((slots) => {
+      const next = [...slots];
+      next[slotIdx] = null;
+      return next;
+    });
+  };
+
+  const handleGenerate = async () => {
+    setRunError("");
+    const books = bookSlots.filter((b) => b && b.status === "done").map((b) => ({ filename: b.filename, text: b.text }));
+    const sourceText = buildSourceText({ books, posts: postsText, profile: profileText });
+    if (!sourceText.trim() && !existingProfile.trim()) {
+      setRunError("素材が何も入力されていません。書籍ファイル・Note/X投稿・プロフィールのいずれかを入力してください。");
+      return;
+    }
+    setIsRunning(true);
+    try {
+      const response = await fetch("/api/dify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stepNum: 0,
+          inputs: { source_text: sourceText, existing_profile: existingProfile },
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setRunError(data.error || "生成中にエラーが発生しました。少し時間をおいて再度お試しください。");
+      } else {
+        setOutputText(data.output || "");
+      }
+    } catch (e) {
+      setRunError(`通信エラーが発生しました：${e.message}`);
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    if (!outputText.trim()) return;
+    await onSaveProfile(outputText);
+    setSaveMsg(true);
+    setTimeout(() => setSaveMsg(false), 2500);
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.gold, marginBottom: 4, letterSpacing: "0.08em" }}>STEP 0</div>
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: C.navy, margin: "0 0 6px", letterSpacing: "-0.01em" }}>著者プロファイル</h1>
+          <p style={{ fontSize: 13.5, color: C.textSub, margin: 0, lineHeight: 1.7 }}>過去の出版物・SNS投稿などからAIが著者の作家性を抽出します。生成したプロファイルはSTEP1〜14の各ステップで自動的に活用されます。</p>
+        </div>
+      </div>
+      <div style={{ height: 1, background: `linear-gradient(to right, ${C.gold}, ${C.goldLight}, transparent)`, width: "100%", opacity: 0.9, marginBottom: 20 }} />
+
+      <Card style={{ marginBottom: 24, background: "#eef2f7", border: `1px solid #c8d4e0` }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.navy, marginBottom: 8 }}>このステップの進め方</div>
+        <div style={{ fontSize: 13.5, color: "#2a2a2a", lineHeight: 2.1 }}>
+          <span style={{ fontWeight: 700, color: C.navy }}>①</span> 書籍ファイル（最大3冊）またはNote/X投稿テキストなどの素材を入力<br />
+          <span style={{ fontWeight: 700, color: C.navy }}>②</span> 「プロファイルを生成する」を押す（30秒〜1分ほどかかります）<br />
+          <span style={{ fontWeight: 700, color: C.navy }}>③</span> 生成結果を確認・必要に応じて編集してから「プロファイルを保存」
+        </div>
+        <div style={{ fontSize: 12.5, color: "#555555", marginTop: 8, lineHeight: 1.7 }}>素材はすべて任意です。書籍ファイル・投稿テキスト・プロフィールのいずれか1つ以上を入力してください。</div>
+      </Card>
+
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <StepBadge num="①" />
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>素材を入力する</h2>
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ fontSize: 13.5, fontWeight: 600, color: C.navy }}>書籍ファイル（最大3冊・任意）</label>
+          <div style={{ fontSize: 13, color: "#444444", marginBottom: 8 }}>過去に出版した書籍があれば添付してください。対応形式：.txt .md .pdf .docx</div>
+          {bookSlots.map((slot, idx) => (
+            <BookSlotInput key={idx} slot={slot} idx={idx} onChange={handleFileChange} onClear={handleClearSlot} />
+          ))}
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ fontSize: 13.5, fontWeight: 600, color: C.navy }}>Note・X投稿記事（任意）</label>
+          <div style={{ fontSize: 13, color: "#444444", marginBottom: 6 }}>NoteやXの投稿テキストを貼り付けてください。複数ある場合は連続でOKです。</div>
+          <textarea value={postsText} onChange={(e) => setPostsText(e.target.value)}
+            placeholder="Note記事 / Xポストの本文をコピーして貼り付け"
+            rows={6}
+            style={{ width: "100%", padding: "10px 12px", fontSize: 14, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.7 }} />
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ fontSize: 13.5, fontWeight: 600, color: C.navy }}>プロフィール・著者ページ（任意）</label>
+          <div style={{ fontSize: 13, color: "#444444", marginBottom: 6 }}>X/Noteのプロフィール文、Amazon著者ページ等の自己紹介テキストがあれば貼り付けてください。</div>
+          <textarea value={profileText} onChange={(e) => setProfileText(e.target.value)}
+            placeholder="プロフィール文・著者ページのテキスト"
+            rows={4}
+            style={{ width: "100%", padding: "10px 12px", fontSize: 14, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.7 }} />
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ fontSize: 13.5, fontWeight: 600, color: C.navy }}>既存の著者プロファイル（任意・更新時のみ）</label>
+          <div style={{ fontSize: 13, color: "#444444", marginBottom: 6 }}>過去に生成した【著者プロファイル】を貼り付けると、新素材で進化型更新します。新規作成時は空欄でOKです。</div>
+          <textarea value={existingProfile} onChange={(e) => setExistingProfile(e.target.value)}
+            placeholder="【著者プロファイル】... を貼り付け"
+            rows={4}
+            style={{ width: "100%", padding: "10px 12px", fontSize: 14, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.7 }} />
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <StepBadge num="②" />
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>AIで生成する</h2>
+        </div>
+        <Card style={{ background: "#eef2f7", border: "1px solid #c8d4e0" }}>
+          <div style={{ fontSize: 13, color: C.textSub, marginBottom: 12, lineHeight: 1.8 }}>素材を入力したら下のボタンを押してください。生成には30秒〜1分ほどかかります。</div>
+          <BtnPrimary onClick={handleGenerate} disabled={isRunning}>{isRunning ? "生成中..." : "▶ プロファイルを生成する"}</BtnPrimary>
+          {runError && <div style={{ marginTop: 12, padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, fontSize: 13, color: C.red, whiteSpace: "pre-wrap", lineHeight: 1.7 }}>{runError}</div>}
+        </Card>
+      </div>
+
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <StepBadge num="③" />
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>生成された著者プロファイル</h2>
+        </div>
+        <textarea value={outputText} onChange={(e) => setOutputText(e.target.value)}
+          rows={20}
+          placeholder="ここにAIが生成した著者プロファイルが表示されます。手動で編集も可能です。"
+          style={{ width: "100%", padding: "12px 14px", fontSize: 13.5, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.85 }} />
+        <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <BtnPrimary onClick={handleSaveProfile} disabled={!outputText.trim()}>プロファイルを保存</BtnPrimary>
+          {saveMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました（STEP1〜14で利用できます）</span>}
+        </div>
+      </div>
     </div>
   );
 };
@@ -1288,6 +1505,7 @@ export default function App() {
   const [page, setPage] = useState("home");
   const [project, setProject] = useState(defaultProject());
   const [allSteps, setAllSteps] = useState({});
+  const [authorProfile, setAuthorProfile] = useState("");
   const [loading, setLoading] = useState(true);
 
   if (typeof window !== "undefined") {
@@ -1302,11 +1520,19 @@ export default function App() {
       const p = await loadProject();
       if (p) setProject(p); else await saveProject(defaultProject());
       const steps = await loadAllSteps();
-      setAllSteps(steps); setLoading(false);
+      setAllSteps(steps);
+      const ap = await loadAuthorProfile();
+      setAuthorProfile(ap);
+      setLoading(false);
       const summary = {};
       for (let i = 1; i <= 10; i++) { const t = steps[i]?.outputText || ""; summary[`STEP${i}`] = { length: t.length, tail: t.slice(-30) }; }
       sendDebugLog("INIT loadAllSteps", summary);
     })();
+  }, []);
+
+  const handleSaveAuthorProfile = useCallback(async (text) => {
+    await saveAuthorProfile(text);
+    setAuthorProfile(text);
   }, []);
 
   const stepStatuses = {};
@@ -1336,7 +1562,9 @@ export default function App() {
     setPage(p);
     if (p.startsWith("step_")) {
       const num = parseInt(p.replace("step_", ""), 10);
-      setProject((prev) => { const updated = { ...prev, currentStep: num }; saveProject(updated); return updated; });
+      if (num >= 1 && num <= 10) {
+        setProject((prev) => { const updated = { ...prev, currentStep: num }; saveProject(updated); return updated; });
+      }
     }
     window.scrollTo?.(0, 0);
   }, []);
@@ -1383,6 +1611,7 @@ export default function App() {
     if (page === "home") return <HomePage project={project} stepStatuses={stepStatuses} allSteps={allSteps} onNavigate={nav} />;
     if (page === "guide") return <GuidePage onNavigate={nav} />;
     if (page === "saved") return <SavedPage project={project} stepStatuses={stepStatuses} allSteps={allSteps} onNavigate={nav} />;
+    if (page === "step_0") return <Step0Page savedProfile={authorProfile} onSaveProfile={handleSaveAuthorProfile} onNavigate={nav} />;
     if (page.startsWith("step_")) {
       const num = parseInt(page.replace("step_", ""), 10);
       const step = STEPS[num - 1];

@@ -1,0 +1,603 @@
+app:
+  description: 新STEP1：Keepaでキーワード候補を取得し、LLMで共起語を抽出して2語候補5個を提示
+  icon: 🔍
+  icon_background: '#FFEAD5'
+  icon_type: emoji
+  mode: workflow
+  name: キーワード候補探索
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/openai:0.2.10@7ca552fb9e48caa4deddfdef5aa71c200d06d03c26c2e8bb428b3250101b9cb3
+    version: null
+kind: app
+version: 0.6.0
+workflow:
+  conversation_variables: []
+  environment_variables:
+  - description: ''
+    id: 45894453-5059-40c2-bac7-c11e14d310a0
+    name: KEEPA_API_KEY
+    selector:
+    - env
+    - KEEPA_API_KEY
+    value: ''
+    value_type: secret
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        attachment_image_file_size_limit: 2
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        file_upload_limit: 50
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: http-request
+      id: start-to-keepa
+      source: start_node
+      sourceHandle: source
+      target: keepa_search
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: http-request
+        targetType: code
+      id: keepa-to-extract
+      source: keepa_search
+      sourceHandle: source
+      target: extract_titles
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: code
+      id: extract-to-format
+      source: extract_titles
+      sourceHandle: source
+      target: format_titles_for_llm
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: llm
+      id: format-to-llm
+      source: format_titles_for_llm
+      sourceHandle: source
+      target: cooccurrence_llm
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: code
+      id: llm-to-parse
+      source: cooccurrence_llm
+      sourceHandle: source
+      target: parse_json
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: code
+      id: parse-to-final
+      source: parse_json
+      sourceHandle: source
+      target: final_output
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: code
+        targetType: end
+      id: final-to-end
+      source: final_output
+      sourceHandle: source
+      target: end_node
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: ユーザー入力
+        type: start
+        variables:
+        - default: ''
+          hint: ''
+          label: 書きたいテーマ語（必須）
+          max_length: 64
+          options: []
+          placeholder: 例：FIRE、プレゼン、Kindle、副業、投資
+          required: true
+          type: text-input
+          variable: theme
+      height: 109
+      id: start_node
+      position:
+        x: 40
+        y: 282
+      positionAbsolute:
+        x: 40
+        y: 282
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data: []
+          type: none
+        headers: ''
+        method: get
+        params: ''
+        retry_config:
+          max_retries: 3
+          retry_enabled: true
+          retry_interval: 1000
+        selected: false
+        ssl_verify: true
+        timeout:
+          max_connect_timeout: 30
+          max_read_timeout: 60
+          max_write_timeout: 30
+        title: Keepa検索
+        type: http-request
+        url: https://api.keepa.com/search?key={{#env.KEEPA_API_KEY#}}&domain=5&type=product&term={{#start_node.theme#}}&category=2250738051&history=0
+        variables: []
+      height: 191
+      id: keepa_search
+      position:
+        x: 330
+        y: 282
+      positionAbsolute:
+        x: 330
+        y: 282
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: "import json\n\ndef main(keepa_response: str, theme: str):\n    \"\"\
+          \"\n    Keepaの /search レスポンスから商品タイトルのみを抽出する。\n    エラーレスポンス（トークン不足・サーバーエラー等）も検知して\n\
+          \    利用者向けのわかりやすいメッセージを返す。\n    \"\"\"\n    # --- 1. JSON 安全パース ---\n  \
+          \  try:\n        if isinstance(keepa_response, str):\n            data =\
+          \ json.loads(keepa_response)\n        else:\n            data = keepa_response\n\
+          \    except Exception as e:\n        return {\n            \"titles\": [],\n\
+          \            \"count\": 0,\n            \"tokens_left\": -1,\n         \
+          \   \"status\": f\"Keepaからの応答が読み取れませんでした。1〜2分お待ちいただいてから再度お試しください。（詳細：JSON\
+          \ parse error: {str(e)}）\",\n            \"theme\": theme or \"\"\n    \
+          \    }\n\n    # ===== ここから追加：Keepaエラーレスポンス検知 =====\n\n    # --- 1-A. トップレベルに\
+          \ \"error\" フィールドがある場合（明示的なエラー応答）---\n    if isinstance(data, dict) and\
+          \ \"error\" in data and data.get(\"error\"):\n        error_info = data.get(\"\
+          error\")\n        # error が dict の場合と文字列の場合の両方に対応\n        if isinstance(error_info,\
+          \ dict):\n            error_type = error_info.get(\"type\", \"\")\n    \
+          \        error_msg = error_info.get(\"message\", \"\") or error_info.get(\"\
+          details\", \"\")\n        else:\n            error_type = \"UnknownError\"\
+          \n            error_msg = str(error_info)\n\n        # トークン不足系のエラー\n   \
+          \     tokens_left_err = data.get(\"tokensLeft\", 0)\n        refill_in_ms\
+          \ = data.get(\"refillIn\", 0)\n        if \"NOT_ENOUGH_TOKEN\" in str(error_type).upper()\
+          \ or \"TOKEN\" in str(error_msg).upper() or tokens_left_err <= 0:\n    \
+          \        wait_sec = int(refill_in_ms / 1000) if refill_in_ms else 60\n \
+          \           wait_min = max(1, (wait_sec + 59) // 60)\n            return\
+          \ {\n                \"titles\": [],\n                \"count\": 0,\n  \
+          \              \"tokens_left\": int(tokens_left_err) if isinstance(tokens_left_err,\
+          \ (int, float)) else 0,\n                \"status\": f\"現在Keepaの利用枠が不足しています。約{wait_min}分お待ちいただいてから再度お試しください。\"\
+          ,\n                \"theme\": theme or \"\"\n            }\n\n        #\
+          \ その他のエラー\n        return {\n            \"titles\": [],\n            \"\
+          count\": 0,\n            \"tokens_left\": -1,\n            \"status\": f\"\
+          Keepaでエラーが発生しました。しばらくお待ちいただいてから再度お試しください。（詳細：{error_type} / {error_msg}）\"\
+          ,\n            \"theme\": theme or \"\"\n        }\n\n    # --- 1-B. tokensLeft\
+          \ が 0 以下ならトークン不足（errorフィールドがない場合の保険）---\n    tokens_left_check = data.get(\"\
+          tokensLeft\")\n    if isinstance(tokens_left_check, (int, float)) and tokens_left_check\
+          \ <= 0:\n        refill_in_ms = data.get(\"refillIn\", 0)\n        wait_sec\
+          \ = int(refill_in_ms / 1000) if refill_in_ms else 60\n        wait_min =\
+          \ max(1, (wait_sec + 59) // 60)\n        return {\n            \"titles\"\
+          : [],\n            \"count\": 0,\n            \"tokens_left\": int(tokens_left_check),\n\
+          \            \"status\": f\"現在Keepaの利用枠が不足しています。約{wait_min}分お待ちいただいてから再度お試しください。\"\
+          ,\n            \"theme\": theme or \"\"\n        }\n\n    # ===== ここまで追加\
+          \ =====\n\n    # --- 2. products 配列の取得 ---\n    # Keepaは通常トップレベルにproductsを返すが、body内にネストしている場合もある\n\
+          \    products = data.get(\"products\")\n    if not products and isinstance(data.get(\"\
+          body\"), dict):\n        products = data[\"body\"].get(\"products\", [])\n\
+          \    if not isinstance(products, list):\n        products = []\n\n    #\
+          \ --- 3. タイトル抽出 ---\n    titles = []\n    seen = set()\n    for p in products:\n\
+          \        if not isinstance(p, dict):\n            continue\n        title\
+          \ = p.get(\"title\", \"\")\n        if not title or not isinstance(title,\
+          \ str):\n            continue\n        title = title.strip()\n        if\
+          \ not title or title in seen:\n            continue\n        seen.add(title)\n\
+          \        titles.append(title)\n\n    # --- 4. tokens_left の取得 ---\n    tokens_left\
+          \ = data.get(\"tokensLeft\", -1)\n    if not isinstance(tokens_left, (int,\
+          \ float)):\n        tokens_left = -1\n\n    # --- 5. ステータス生成 ---\n    count\
+          \ = len(titles)\n    if count == 0:\n        status = f\"検索結果ゼロ：テーマ『{theme}』ではKindle市場に本がほぼ存在しません\"\
+          \n    elif count < 10:\n        status = f\"検索結果少なめ（{count}件）：テーマ『{theme}』はニッチ市場の可能性あり\"\
+          \n    else:\n        status = f\"検索結果{count}件を取得\"\n\n    return {\n   \
+          \     \"titles\": titles,\n        \"count\": count,\n        \"tokens_left\"\
+          : int(tokens_left) if tokens_left != -1 else -1,\n        \"status\": status,\n\
+          \        \"theme\": theme or \"\"\n    }\n"
+        code_language: python3
+        outputs:
+          count:
+            children: null
+            type: number
+          status:
+            children: null
+            type: string
+          theme:
+            children: null
+            type: string
+          titles:
+            children: null
+            type: array[string]
+          tokens_left:
+            children: null
+            type: number
+        selected: false
+        title: タイトル抽出
+        type: code
+        variables:
+        - value_selector:
+          - keepa_search
+          - body
+          value_type: string
+          variable: keepa_response
+        - value_selector:
+          - start_node
+          - theme
+          value_type: string
+          variable: theme
+      height: 52
+      id: extract_titles
+      position:
+        x: 620
+        y: 282
+      positionAbsolute:
+        x: 620
+        y: 282
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: "def main(titles: list, count: int):\n    \"\"\"\n    タイトル配列をLLMに渡しやすい改行区切りテキストに整形。\n\
+          \    番号を付けて順序を明示。\n    \"\"\"\n    if not titles or count == 0:\n      \
+          \  return {\n            \"titles_text\": \"（検索結果なし）\",\n            \"\
+          has_titles\": False\n        }\n\n    lines = []\n    for i, t in enumerate(titles,\
+          \ start=1):\n        # LLMの処理負荷軽減のため、タイトルの先頭80文字に丸める\n        snippet =\
+          \ t[:80]\n        lines.append(f\"{i}. {snippet}\")\n\n    return {\n  \
+          \      \"titles_text\": \"\\n\".join(lines),\n        \"has_titles\": True\n\
+          \    }"
+        code_language: python3
+        outputs:
+          has_titles:
+            children: null
+            type: boolean
+          titles_text:
+            children: null
+            type: string
+        selected: false
+        title: LLM入力整形
+        type: code
+        variables:
+        - value_selector:
+          - extract_titles
+          - titles
+          value_type: array[string]
+          variable: titles
+        - value_selector:
+          - extract_titles
+          - count
+          value_type: number
+          variable: count
+      height: 52
+      id: format_titles_for_llm
+      position:
+        x: 910
+        y: 282
+      positionAbsolute:
+        x: 910
+        y: 282
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            max_tokens: 2000
+            reasoning_effort: low
+            verbosity: low
+          mode: chat
+          name: gpt-5.2
+          provider: langgenius/openai/openai
+        prompt_template:
+        - id: cooccurrence-prompt-01
+          role: system
+          text: "あなたはAmazon Kindleの出版市場に精通した編集者です。\n\n以下はAmazon.co.jpで「{{#start_node.theme#}}」を検索して得られた、Kindleストアの商品タイトル一覧です。\n\
+            この一覧から、「{{#start_node.theme#}}」と組み合わせると読者が反応しやすい2語キーワード候補を抽出してください。\n\n\
+            【入力】\nテーマ語：{{#start_node.theme#}}\nKindle商品タイトル一覧（{{#extract_titles.count#}}件）：\n\
+            {{#format_titles_for_llm.titles_text#}}\n\n【抽出ルール】\n1. 必ず「{{#start_node.theme#}}\
+            \ × 語2」の形式にする\n2. 語2は、タイトル中で「{{#start_node.theme#}}」と共起している具体語を優先する\n\
+            3. 以下のような抽象語・汎用語は避ける\n   NG例：入門、基本、完全、方法、やり方、本、解説、ガイド、まとめ、極意、思考法、活用術、使い方\n\
+            4. 以下のような具体語を優先する\n   OK例：\n   ・固有名詞（NISA、iDeCo、ChatGPT、Excel、NotebookLM等）\n\
+            \   ・読者属性（40代、会社員、主婦、初心者、フリーランス等）\n   ・実践領域（副業、節税、投資、営業、プレゼン等）\n   ・悩み・場面（続かない、不安、会議、面接、転職等）\n\
+            5. タイトル中の出現頻度が多い語を優先するが、頻度だけでなく魅力度も考慮する\n6. 上位5個を厳選して出力する（多すぎると利用者が選べない）\n\
+            7. 5個はできるだけ異なる軸を持たせる（同じ方向性の候補を並べない）\n8. 入力タイトル一覧に実在する語から選ぶこと。タイトルにほぼ出てこない語を提案してはいけない\n\
+            \n【出力形式】\n以下のJSON配列の形式で5個の候補を出力してください。\nJSON配列のみ。前置き・後書き・コードブロック記号は不要。\n\
+            \n[\n  {\n    \"rank\": 1,\n    \"keyword1\": \"{{#start_node.theme#}}\"\
+            ,\n    \"keyword2\": \"副業\",\n    \"frequency\": 18,\n    \"reader\":\
+            \ \"会社員で副業によるFIRE達成を目指す30〜40代\"\n  }\n]\n\nrank：1〜5（総合評価順）\nkeyword1：入力テーマ語そのまま\n\
+            keyword2：抽出した共起語（具体語）\nfrequency：入力タイトル中でkeyword2が出現した回数（推定でよい）\nreader：このキーワードで狙える読者層を1行（40〜60字程度）\n\
+            \n【重要な注意】\n- タイトルにほぼ出てこない語を提案してはいけない\n- 抽象語や汎用語で5個を埋めないこと\n- 同じ軸の候補（例：「会社員」「サラリーマン」）で複数並べないこと\n\
+            - JSON配列以外の文字列を一切出力しないこと\n"
+        selected: false
+        title: 共起語抽出
+        type: llm
+        vision:
+          enabled: false
+      height: 88
+      id: cooccurrence_llm
+      position:
+        x: 1200
+        y: 282
+      positionAbsolute:
+        x: 1200
+        y: 282
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: "import json\nimport re\n\ndef main(llm_text: str):\n    \"\"\"\n  \
+          \  LLMが返したJSON配列文字列をパースして、構造化された候補リストを返す。\n    \"\"\"\n    if not llm_text\
+          \ or not isinstance(llm_text, str):\n        return {\n            \"candidates\"\
+          : [],\n            \"candidate_count\": 0,\n            \"parse_ok\": False,\n\
+          \            \"parse_error\": \"empty response\"\n        }\n\n    # コードブロック記号を除去\n\
+          \    cleaned = llm_text.strip()\n    cleaned = re.sub(r\"^```(?:json)?\\\
+          s*\", \"\", cleaned)\n    cleaned = re.sub(r\"\\s*```\\s*$\", \"\", cleaned)\n\
+          \    cleaned = cleaned.strip()\n\n    # JSON配列の開始・終了を探す\n    start = cleaned.find(\"\
+          [\")\n    end = cleaned.rfind(\"]\")\n    if start >= 0 and end > start:\n\
+          \        cleaned = cleaned[start:end + 1]\n\n    # パース\n    try:\n     \
+          \   data = json.loads(cleaned)\n    except Exception as e:\n        return\
+          \ {\n            \"candidates\": [],\n            \"candidate_count\": 0,\n\
+          \            \"parse_ok\": False,\n            \"parse_error\": f\"JSON\
+          \ parse error: {str(e)}\"\n        }\n\n    if not isinstance(data, list):\n\
+          \        return {\n            \"candidates\": [],\n            \"candidate_count\"\
+          : 0,\n            \"parse_ok\": False,\n            \"parse_error\": \"\
+          response is not a JSON array\"\n        }\n\n    # 各要素のバリデーション\n    candidates\
+          \ = []\n    for i, item in enumerate(data, start=1):\n        if not isinstance(item,\
+          \ dict):\n            continue\n        rank = item.get(\"rank\", i)\n \
+          \       keyword1 = item.get(\"keyword1\", \"\")\n        keyword2 = item.get(\"\
+          keyword2\", \"\")\n        frequency = item.get(\"frequency\", 0)\n    \
+          \    reader = item.get(\"reader\", \"\")\n        if not keyword1 or not\
+          \ keyword2:\n            continue\n        candidates.append({\n       \
+          \     \"rank\": int(rank) if isinstance(rank, (int, float)) else i,\n  \
+          \          \"keyword1\": str(keyword1).strip(),\n            \"keyword2\"\
+          : str(keyword2).strip(),\n            \"frequency\": int(frequency) if isinstance(frequency,\
+          \ (int, float)) else 0,\n            \"reader\": str(reader).strip()\n \
+          \       })\n\n    # rank順にソート\n    candidates.sort(key=lambda x: x[\"rank\"\
+          ])\n\n    return {\n        \"candidates\": candidates,\n        \"candidate_count\"\
+          : len(candidates),\n        \"parse_ok\": True,\n        \"parse_error\"\
+          : \"\"\n    }"
+        code_language: python3
+        outputs:
+          candidate_count:
+            children: null
+            type: number
+          candidates:
+            children: null
+            type: array[object]
+          parse_error:
+            children: null
+            type: string
+          parse_ok:
+            children: null
+            type: boolean
+        selected: false
+        title: JSON整形
+        type: code
+        variables:
+        - value_selector:
+          - cooccurrence_llm
+          - text
+          value_type: string
+          variable: llm_text
+      height: 52
+      id: parse_json
+      position:
+        x: 1490
+        y: 282
+      positionAbsolute:
+        x: 1490
+        y: 282
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: "def main(candidates: list, candidate_count: int, theme: str, total_titles:\
+          \ int, tokens_left: int, parse_ok: bool, parse_error: str):\n    \"\"\"\n\
+          \    利用者向けの最終表示テキストを整形する。\n    portal側で解析しやすいよう、構造化された表示形式にする。\n    \"\"\
+          \"\n    lines = []\n    lines.append(f\"# 2語キーワード候補：{theme}\")\n    lines.append(\"\
+          \")\n    lines.append(f\"Amazon.co.jpのKindleストアから「{theme}」の検索結果を分析し、5つの候補を抽出しました。\"\
+          )\n    lines.append(\"\")\n\n    if not parse_ok:\n        lines.append(\"\
+          ## 処理エラー\")\n        lines.append(f\"LLMの応答を解析できませんでした：{parse_error}\")\n\
+          \        lines.append(\"もう一度実行するか、別のテーマ語で試してください。\")\n        return {\n\
+          \            \"final_text\": \"\\n\".join(lines),\n            \"candidates_summary\"\
+          : []\n        }\n\n    if candidate_count == 0:\n        lines.append(\"\
+          ## 候補なし\")\n        lines.append(\"このテーマでは有力な候補を抽出できませんでした。\")\n       \
+          \ lines.append(\"テーマ語を変えて再度お試しください。\")\n        return {\n            \"\
+          final_text\": \"\\n\".join(lines),\n            \"candidates_summary\":\
+          \ []\n        }\n\n    # 候補一覧\n    lines.append(\"---\")\n    lines.append(\"\
+          \")\n    summary = []\n    for c in candidates:\n        rank = c.get(\"\
+          rank\", 0)\n        kw1 = c.get(\"keyword1\", \"\")\n        kw2 = c.get(\"\
+          keyword2\", \"\")\n        freq = c.get(\"frequency\", 0)\n        reader\
+          \ = c.get(\"reader\", \"\")\n\n        lines.append(f\"## {rank}. {kw1}\
+          \ × {kw2}\")\n        lines.append(f\"出現頻度（推定）：{freq}回\")\n        lines.append(f\"\
+          狙える読者層：{reader}\")\n        lines.append(\"\")\n\n        summary.append({\n\
+          \            \"rank\": rank,\n            \"keyword\": f\"{kw1} × {kw2}\"\
+          ,\n            \"keyword1\": kw1,\n            \"keyword2\": kw2,\n    \
+          \        \"frequency\": freq,\n            \"reader\": reader\n        })\n\
+          \n    # 末尾：案内のみ（取得件数・残トークンは非表示）\n    lines.append(\"---\")\n    lines.append(\"\
+          \")\n    lines.append(\"気になる1つを選んで、STEP2（市場勝率診断）でキーワード1・2に入力してください。\")\n\
+          \n    return {\n        \"final_text\": \"\\n\".join(lines),\n        \"\
+          candidates_summary\": summary\n    }\n"
+        code_language: python3
+        outputs:
+          candidates_summary:
+            children: null
+            type: array[object]
+          final_text:
+            children: null
+            type: string
+        selected: false
+        title: 最終出力整形
+        type: code
+        variables:
+        - value_selector:
+          - parse_json
+          - candidates
+          value_type: array[object]
+          variable: candidates
+        - value_selector:
+          - parse_json
+          - candidate_count
+          value_type: number
+          variable: candidate_count
+        - value_selector:
+          - start_node
+          - theme
+          value_type: string
+          variable: theme
+        - value_selector:
+          - extract_titles
+          - count
+          value_type: number
+          variable: total_titles
+        - value_selector:
+          - extract_titles
+          - tokens_left
+          value_type: number
+          variable: tokens_left
+        - value_selector:
+          - parse_json
+          - parse_ok
+          value_type: boolean
+          variable: parse_ok
+        - value_selector:
+          - parse_json
+          - parse_error
+          value_type: string
+          variable: parse_error
+      height: 52
+      id: final_output
+      position:
+        x: 1780
+        y: 282
+      positionAbsolute:
+        x: 1780
+        y: 282
+      selected: true
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        outputs:
+        - value_selector:
+          - final_output
+          - final_text
+          value_type: string
+          variable: text
+        selected: false
+        title: 出力
+        type: end
+      height: 88
+      id: end_node
+      position:
+        x: 2070
+        y: 282
+      positionAbsolute:
+        x: 2070
+        y: 282
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    viewport:
+      x: -196.20000000000005
+      y: 164.8
+      zoom: 0.7
+  rag_pipeline_variables: []

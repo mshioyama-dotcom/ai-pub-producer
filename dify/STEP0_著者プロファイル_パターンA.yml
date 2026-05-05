@@ -1,0 +1,276 @@
+app:
+  description: 過去のアウトプット（書籍・X投稿まとめ・ブログ・メルマガ等）から抽出されたテキストを読み込み、著者プロファイル6項目を自動生成するワークフロー。テキスト抽出はポータル側で実施する想定。STEP1〜14の各プロンプトに注入する基礎データを生成する。
+  icon: 🤖
+  icon_background: '#FFEAD5'
+  icon_type: emoji
+  mode: workflow
+  name: STEP0_著者プロファイル_パターンA
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/openai:0.2.10@7ca552fb9e48caa4deddfdef5aa71c200d06d03c26c2e8bb428b3250101b9cb3
+    version: null
+kind: app
+version: 0.6.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        attachment_image_file_size_limit: 2
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        file_upload_limit: 50
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: llm
+      id: 1772800000001-source-1772800000002-target
+      source: '1772800000001'
+      sourceHandle: source
+      target: '1772800000002'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: end
+      id: 1772800000002-source-1772800000003-target
+      source: '1772800000002'
+      sourceHandle: source
+      target: '1772800000003'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: ユーザー入力
+        type: start
+        variables:
+        - default: ''
+          hint: ポータル側でPDF・DOCX・TXT・MD等のファイルから抽出されたテキスト、または手動で貼り付けたテキストが入ります。複数素材が連結されている場合あり。空欄でもOKです。
+          label: 過去のアウトプット（抽出済みテキスト・任意）
+          max_length: 200000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: source_text
+        - default: ''
+          hint: 既存の著者プロファイルがあれば貼り付けてください。新しい素材で進化型更新します。新規作成時は空欄でOKです。
+          label: 既存プロファイル（任意・更新時のみ）
+          max_length: 5000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: existing_profile
+      height: 142
+      id: '1772800000001'
+      position:
+        x: 80
+        y: 282
+      positionAbsolute:
+        x: 80
+        y: 282
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            enable_stream: false
+            max_tokens: 8192
+            reasoning_effort: low
+            verbosity: medium
+          mode: chat
+          name: gpt-5.2
+          provider: langgenius/openai/openai
+        prompt_template:
+        - id: 7150e7f8-0283-4d10-beca-75352c96d0bb
+          role: system
+          text: |
+            あなたは「著者プロファイル抽出エージェント」です。
+            著者の過去のアウトプット（書籍・X投稿まとめ・ブログ・メルマガ等から抽出されたテキスト）を読み込み、AI出版プロデューサーのSTEP1〜14（テーマ発見、読者設計、タイトル作成、本文作成、Amazon説明文、X投稿等）に注入する6項目の【著者プロファイル】を生成します。
+
+            ■ 入力（すべて任意）
+            過去のアウトプット（抽出済みテキスト）：
+            {{#1772800000001.source_text#}}
+
+            既存プロファイル（更新時のみ・空欄なら新規作成モード）：
+            {{#1772800000001.existing_profile#}}
+
+            ■ 入力ハンドリング
+            （1）source_text と existing_profile の両方が空欄の場合
+            以下の文言のみを出力して終了する。プロファイルは生成しない。
+            「過去のアウトプットが入力されていません。書籍・X投稿まとめ・ブログ・メルマガなどのテキストを貼り付けるか、ファイルからテキスト抽出してください。テキストがまだない場合はパターンB（インタビュー形式）をご利用ください。」
+
+            （2）existing_profile が入力されている場合（進化型更新モード）
+            ・新しいアウトプット素材から得られた要素で、既存プロファイルの該当項目を上書き／追記する。
+            ・新素材から情報が得られない項目は、既存プロファイルの内容をそのまま維持する。
+            ・「文体・フレーズ」など、著者の個性が宿る具体例は安易に削らず、新しい具体例を追加して厚くする方向で更新する。
+            ・既存プロファイルと新素材が矛盾する場合は、新素材を優先しつつ、既存記述を「過去：〜／現在：〜」と並記してもよい。
+
+            （3）existing_profile が空欄で、source_text がある場合（新規作成モード）
+            source_text だけを根拠に6項目を生成する。
+
+            ■ source_text の読み解き方
+            ・source_text には「=== ファイル名 から抽出 ===」のような区切り見出しでファイル別のテキストが連結されている場合がある。区切りが見当たらない場合は単一素材として扱う。
+            ・冒頭の見出し・文体・改行パターン・URLの有無・絵文字頻度などから素材種別（書籍／X投稿／ブログ／メルマガ）を推定し、それぞれの特性に応じた抽出を行う。
+            ・書籍原稿は「思想・価値観」「文体・フレーズ」「専門領域・強み」の抽出に強い。
+            ・X投稿は「文体・フレーズ」「ターゲット読者像（リプライ層）」「ブランドコンセプト」の抽出に強い。
+            ・ブログ・noteは6項目すべての抽出に有用。
+            ・メルマガは「ターゲット読者像」「思想・価値観」「文体・フレーズ」の抽出に強い。
+
+            ■ 抽出する6項目（順番固定）
+            1. 専門領域・強み
+               著者が一貫して扱っているテーマ／実績／読者から評価される独自性。
+               「他の人も書ける一般論」ではなく、「この著者だから語れる」軸を抜き出す。
+
+            2. ターゲット読者像
+               アウトプットで暗に／明示的に呼びかけている読者層・属性・抱えている悩み・読後の理想状態。
+               年齢層、職業、生活場面、悩みのレベル感まで踏み込む。
+
+            3. 思想・価値観
+               繰り返し主張している考え方／大切にしている判断基準／哲学／他者への姿勢。
+               「これだけは譲らない」という核を1〜3つに絞って明文化する。
+
+            4. 文体・フレーズ
+               頻出する語彙・特徴的な言い回し・口調・リズム・改行や句読点の癖。
+               実際のアウトプットから具体例を3つ以上、原文のまま引用する。
+
+            5. 実績・経歴サマリー
+               本文中・自己紹介・著者プロフィール欄から読み取れる経歴／実績／数字（年数・件数・売上・フォロワー数等）。
+               記載がない数字を補わない。
+
+            6. ブランドコンセプト・シリーズ方針
+               著者が「自分はこういう存在として読者に届けたい」と打ち出している軸。
+               複数冊・シリーズで一貫している姿勢／ジャンル／読者の成長ストーリー。
+
+            ■ 抽出の原則
+            ・著者の実際の言葉・実例から根拠を持って抽出する。憶測で盛らない。
+            ・アウトプットに明示されていない事項は「（記載なし）」と書く。
+            ・各項目は行動・状況・固有名詞を残し、抽象語（情熱、成長、価値）だけで埋めない。
+            ・各項目の分量は1〜3段落、または箇条書き3〜5行までを目安。
+            ・6項目以外の見出しを追加しない。
+            ・解説・前置き・後書きは一切書かない。【著者プロファイル】とその下の6項目だけを出力する。
+
+            ■ 出力フォーマット（厳守）
+            【著者プロファイル】
+
+            ■ 専門領域・強み
+            （テキスト）
+
+            ■ ターゲット読者像
+            （テキスト）
+
+            ■ 思想・価値観
+            （テキスト）
+
+            ■ 文体・フレーズ
+            （テキスト）
+
+            ■ 実績・経歴サマリー
+            （テキスト）
+
+            ■ ブランドコンセプト・シリーズ方針
+            （テキスト）
+        selected: false
+        title: 著者プロファイル抽出
+        type: llm
+        vision:
+          enabled: false
+      height: 88
+      id: '1772800000002'
+      position:
+        x: 561
+        y: 303
+      positionAbsolute:
+        x: 561
+        y: 303
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        outputs:
+        - value_selector:
+          - '1772800000002'
+          - text
+          value_type: string
+          variable: author_profile
+        selected: false
+        title: 出力
+        type: end
+      height: 88
+      id: '1772800000003'
+      position:
+        x: 864
+        y: 303
+      positionAbsolute:
+        x: 864
+        y: 303
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    viewport:
+      x: 0
+      y: 0
+      zoom: 1
+  rag_pipeline_variables: []
