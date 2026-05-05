@@ -125,7 +125,25 @@ workflow:
           required: false
           type: paragraph
           variable: added_episodes
-      height: 135
+        - default: ''
+          hint: 著者プロファイル（STEP0出力・自動転記）
+          label: 著者プロファイル
+          max_length: 10000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: author_profile
+        - default: ''
+          hint: 書籍プロファイル（STEP1〜2出力・自動転記）
+          label: 書籍プロファイル
+          max_length: 10000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: work_profile
+      height: 230
       id: '1773057012167'
       position:
         x: 80
@@ -154,7 +172,24 @@ workflow:
         prompt_template:
         - id: 392a08df-b5de-4bbb-a09a-f3a0139c98ee
           role: system
-          text: 'あなたは実用書・ビジネス書の構成設計者です。
+          text: '■ 著者プロファイル（参考情報・自動転記／空欄の場合は無視）
+
+            {{#1773057012167.author_profile#}}
+
+
+            ■ 書籍プロファイル（参考情報・自動転記／空欄の場合は無視）
+
+            {{#1773057012167.work_profile#}}
+
+
+            ■ プロファイルの扱い
+
+            著者プロファイル・書籍プロファイルが提供されている場合は、著者の角度・読者像・差分を踏まえて項見出し・要約を設計してください。
+
+            プロファイルが空欄の場合は、他の入力のみを根拠にしてください。
+
+
+            あなたは実用書・ビジネス書の構成設計者です。
 
 
             目的は、与えられた1章分のアウトラインをもとに、

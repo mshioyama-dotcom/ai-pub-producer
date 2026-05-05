@@ -130,7 +130,25 @@ workflow:
           required: true
           type: paragraph
           variable: diff_elements
-      height: 186
+        - default: ''
+          hint: 著者プロファイル（STEP0出力・自動転記）
+          label: 著者プロファイル
+          max_length: 10000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: author_profile
+        - default: ''
+          hint: 書籍プロファイル（STEP1〜2出力・自動転記）
+          label: 書籍プロファイル
+          max_length: 10000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: work_profile
+      height: 280
       id: '1772343147375'
       position:
         x: 80
@@ -182,7 +200,24 @@ workflow:
         prompt_template:
         - id: 8278bf9a-d4f5-4b47-99c0-467b6bc2984d
           role: system
-          text: 'Role
+          text: '■ 著者プロファイル（参考情報・自動転記／空欄の場合は無視）
+
+            {{#1772343147375.author_profile#}}
+
+
+            ■ 書籍プロファイル（参考情報・自動転記／空欄の場合は無視）
+
+            {{#1772343147375.work_profile#}}
+
+
+            ■ プロファイルの扱い
+
+            著者プロファイル・書籍プロファイルが提供されている場合は、著者の角度・読者像・差分・ポジショニングを踏まえて出力してください。
+
+            プロファイルが空欄の場合は、他の入力のみを根拠に出力してください。
+
+
+            Role
 
             あなたはAmazon Kindle向けのタイトル・サブタイトル設計に強い出版プロデューサーです。
 

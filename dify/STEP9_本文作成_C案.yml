@@ -123,7 +123,25 @@ workflow:
           required: false
           type: paragraph
           variable: past_writing_data
-      height: 160
+        - default: ''
+          hint: 著者プロファイル（STEP0出力・自動転記）
+          label: 著者プロファイル
+          max_length: 10000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: author_profile
+        - default: ''
+          hint: 書籍プロファイル（STEP1〜2出力・自動転記）
+          label: 書籍プロファイル
+          max_length: 10000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: work_profile
+      height: 250
       id: '1773099539029'
       position:
         x: 79
@@ -151,7 +169,24 @@ workflow:
         prompt_template:
         - id: 9a681e29-d984-497f-85ce-3c58a0999505
           role: system
-          text: 'あなたは商業出版レベルの実用書本文を執筆する日本語ライターです。
+          text: '■ 著者プロファイル（参考情報・自動転記／空欄の場合は無視）
+
+            {{#1773099539029.author_profile#}}
+
+
+            ■ 書籍プロファイル（参考情報・自動転記／空欄の場合は無視）
+
+            {{#1773099539029.work_profile#}}
+
+
+            ■ プロファイルの扱い
+
+            著者プロファイル・書籍プロファイルが提供されている場合は、著者の角度・読者像・差分を踏まえて本文の語り方・読者への呼びかけを調整してください。
+
+            プロファイルが空欄の場合は、他の入力のみを根拠にしてください。
+
+
+            あなたは商業出版レベルの実用書本文を執筆する日本語ライターです。
 
 
             【役割と目的】

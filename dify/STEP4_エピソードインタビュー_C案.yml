@@ -80,7 +80,24 @@ model_config:
     インタビュアーの「エピソードインタビュー」です。 まずは、ベースとなる「読者・価値設計」をこちらに送ってください。
 
     設計図の骨組みに、あなたにしか語れない生々しいエピソードや独自の視点を吹き込み、世界に一冊の本へと仕上げるお手伝いをします。'
-  pre_prompt: 'Role
+  pre_prompt: '■ 著者プロファイル（参考情報・自動転記／空欄の場合は無視）
+
+    {{author_profile}}
+
+
+    ■ 書籍プロファイル（参考情報・自動転記／空欄の場合は無視）
+
+    {{work_profile}}
+
+
+    ■ プロファイルの扱い
+
+    著者プロファイル・書籍プロファイルが提供されている場合は、著者の角度・読者像・差別化軸を踏まえて質問の文脈を理解してください。
+
+    プロファイルが空欄の場合は、ユーザーから渡される「読者・価値設計」のみを根拠にしてください。
+
+
+    Role
 
     あなたは、著者の体験を整理し、読者にとって価値のある「共感」「転換点」「再現可能な学び」に変換する、優秀な出版インタビューアーです。
 
@@ -201,5 +218,17 @@ model_config:
     enabled: false
     language: ''
     voice: ''
-  user_input_form: []
+  user_input_form:
+  - paragraph:
+      default: ''
+      label: 著者プロファイル
+      max_length: 10000
+      required: false
+      variable: author_profile
+  - paragraph:
+      default: ''
+      label: 書籍プロファイル
+      max_length: 10000
+      required: false
+      variable: work_profile
 version: 0.6.0

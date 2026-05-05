@@ -112,7 +112,25 @@ workflow:
           required: true
           type: paragraph
           variable: interview_notes
-      height: 135
+        - default: ''
+          hint: 著者プロファイル（STEP0出力・自動転記）
+          label: 著者プロファイル
+          max_length: 10000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: author_profile
+        - default: ''
+          hint: 書籍プロファイル（STEP1〜2出力・自動転記）
+          label: 書籍プロファイル
+          max_length: 10000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: work_profile
+      height: 230
       id: '1772856018370'
       position:
         x: 576.0754893040655
@@ -140,7 +158,24 @@ workflow:
         prompt_template:
         - id: 8495f65c-5811-4317-afe4-00ca0da78f3b
           role: system
-          text: 'Role
+          text: '■ 著者プロファイル（参考情報・自動転記／空欄の場合は無視）
+
+            {{#1772856018370.author_profile#}}
+
+
+            ■ 書籍プロファイル（参考情報・自動転記／空欄の場合は無視）
+
+            {{#1772856018370.work_profile#}}
+
+
+            ■ プロファイルの扱い
+
+            著者プロファイル・書籍プロファイルが提供されている場合は、著者の角度・読者像・差分・ポジショニングを踏まえて目次を構成してください。
+
+            プロファイルが空欄の場合は、blueprintとinterview_notesのみを根拠にしてください。
+
+
+            Role
 
             あなたは、Kindle実用書の目次設計に強い編集者です。
 
