@@ -1,5 +1,5 @@
 app:
-  description: 書籍プロファイル草案と著者プロファイルを、Amazonの検索結果（最大3軸）と照合し、市場需要を検証して書籍プロファイル確定版を生成するC案 Phase 1 のSTEP2ワークフロー。STEP1への修正提案も同時に出力する。
+  description: C案 Phase 1 のSTEP2。書籍プロファイル草案を、Amazonの検索結果（主題軸）+ Keepa API のメタデータで市場検証し、確定版に refine する。STEP1への修正提案も同時出力。
   icon: 🔍
   icon_background: '#FFEAD5'
   icon_type: emoji
@@ -16,7 +16,31 @@ kind: app
 version: 0.6.0
 workflow:
   conversation_variables: []
-  environment_variables: []
+  environment_variables:
+  - description: ''
+    id: 189eaed6-9c8e-4b25-a82d-b951c2963734
+    name: Google_API_KEY
+    selector:
+    - env
+    - Google_API_KEY
+    value: ''
+    value_type: secret
+  - description: ''
+    id: 45894453-5059-40c2-bac7-c11e14d310a0
+    name: KEEPA_API_KEY
+    selector:
+    - env
+    - KEEPA_API_KEY
+    value: ''
+    value_type: secret
+  - description: ''
+    id: b0e795a0-a1bb-4119-82c3-360a934bf50b
+    name: BRAVE_API_KEY
+    selector:
+    - env
+    - BRAVE_API_KEY
+    value: ''
+    value_type: secret
   features:
     file_upload:
       allowed_file_extensions:
@@ -69,23 +93,117 @@ workflow:
     - data:
         isInIteration: false
         isInLoop: false
-        sourceType: start
-        targetType: llm
-      id: 1910000000001-source-1910000000002-target
-      source: '1910000000001'
+        sourceType: code
+        targetType: http-request
+      id: 1772791217407-source-1772791705709-target
+      source: '1772791217407'
       sourceHandle: source
-      target: '1910000000002'
+      target: '1772791705709'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: http-request
+        targetType: code
+      id: 1772791705709-source-1772794901965-target
+      source: '1772791705709'
+      sourceHandle: source
+      target: '1772794901965'
       targetHandle: target
       type: custom
       zIndex: 0
     - data:
         isInLoop: false
-        sourceType: llm
-        targetType: end
-      id: 1910000000002-source-1910000000003-target
-      source: '1910000000002'
+        sourceType: code
+        targetType: code
+      id: 1772794901965-source-1772792512100-target
+      source: '1772794901965'
       sourceHandle: source
-      target: '1910000000003'
+      target: '1772792512100'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: code
+      id: 1772792512100-source-1772795287759-target
+      source: '1772792512100'
+      sourceHandle: source
+      target: '1772795287759'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: code
+      id: 1772795287759-source-1772795747047-target
+      source: '1772795287759'
+      sourceHandle: source
+      target: '1772795747047'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: llm
+      id: 1772795747047-source-1772796195470-target
+      source: '1772795747047'
+      sourceHandle: source
+      target: '1772796195470'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: code
+      id: 1772796195470-source-1772796904781-target
+      source: '1772796195470'
+      sourceHandle: source
+      target: '1772796904781'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: code
+      id: 1772796904781-source-1772797131063-target
+      source: '1772796904781'
+      sourceHandle: source
+      target: '1772797131063'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: code
+        targetType: end
+      id: 1772797131063-source-1771834860223-target
+      source: '1772797131063'
+      sourceHandle: source
+      target: '1771834860223'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: start
+        targetType: code
+      id: 1771119975121-source-1772791217407-target
+      source: '1771119975121'
+      sourceHandle: source
+      target: '1772791217407'
       targetHandle: target
       type: custom
       zIndex: 0
@@ -96,41 +214,23 @@ workflow:
         type: start
         variables:
         - default: ''
-          hint: STEP0で生成された著者プロファイル全文（ポータルから自動転記されます）
-          label: 著者プロファイル
-          max_length: 10000
-          options: []
-          placeholder: ''
-          required: true
-          type: paragraph
-          variable: author_profile
-        - default: ''
-          hint: STEP1で生成された書籍プロファイル草案全文（ポータルから自動転記されます）
-          label: 書籍プロファイル草案
-          max_length: 10000
-          options: []
-          placeholder: ''
-          required: true
-          type: paragraph
-          variable: work_profile_draft
-        - default: ''
-          hint: STEP1でユーザーが入力した「動機・きっかけ」原文（ポータルから自動抽出・転記）。本の目的（リードマグネット／ノウハウ書／権威構築 等）を判定する重要情報。
-          label: 動機（STEP1原文）
-          max_length: 2000
-          options: []
-          placeholder: ''
-          required: false
-          type: paragraph
-          variable: motivation
-        - default: ''
-          hint: 主題軸の検索キーワード（STEP1出力からの自動転記、ユーザによる編集可）。例：「ChatGPT 資料作成」
-          label: 主題軸キーワード（必須）
-          max_length: 200
+          hint: 主題軸キーワードの1語目（ポータルが分割転記）
+          label: 主題軸キーワード1（必須）
+          max_length: 256
           options: []
           placeholder: ''
           required: true
           type: text-input
-          variable: keyword_theme
+          variable: keyword1
+        - default: ''
+          hint: 主題軸キーワードの2語目（ポータルが分割転記）
+          label: 主題軸キーワード2（必須）
+          max_length: 256
+          options: []
+          placeholder: ''
+          required: true
+          type: text-input
+          variable: keyword2
         - default: ''
           hint: 主題軸キーワードでAmazon検索した結果のHTML（必須）
           label: 主題軸 Amazon HTML（必須）
@@ -139,18 +239,45 @@ workflow:
           placeholder: ''
           required: true
           type: paragraph
-          variable: html_theme
+          variable: HTML
         - default: ''
-          hint: 読者軸の検索キーワード（任意）。例：「会社員 報告書 効率化」
+          hint: 著者プロファイル（STEP0出力・自動転記）
+          label: 著者プロファイル
+          max_length: 10000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: author_profile
+        - default: ''
+          hint: 書籍プロファイル草案（STEP1出力・自動転記）
+          label: 書籍プロファイル草案
+          max_length: 10000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: work_profile_draft
+        - default: ''
+          hint: 動機原文（STEP1の「動機」セクションから自動抽出）。本の目的（リードマグネット／権威構築／ノウハウ書 等）の判定に使う最重要情報。
+          label: 動機原文
+          max_length: 2000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: motivation
+        - default: ''
+          hint: 読者軸キーワード（任意）
           label: 読者軸キーワード（任意）
-          max_length: 200
+          max_length: 256
           options: []
           placeholder: ''
           required: false
           type: text-input
           variable: keyword_reader
         - default: ''
-          hint: 読者軸キーワードでAmazon検索した結果のHTML（任意・空欄可）
+          hint: 読者軸でAmazon検索した結果のHTML（任意・空欄可）
           label: 読者軸 Amazon HTML（任意）
           max_length: 1000000
           options: []
@@ -159,16 +286,16 @@ workflow:
           type: paragraph
           variable: html_reader
         - default: ''
-          hint: 差分軸の検索キーワード（任意）。例：「ロングセラー Kindle」
+          hint: 差分軸キーワード（任意）
           label: 差分軸キーワード（任意）
-          max_length: 200
+          max_length: 256
           options: []
           placeholder: ''
           required: false
           type: text-input
           variable: keyword_diff
         - default: ''
-          hint: 差分軸キーワードでAmazon検索した結果のHTML（任意・空欄可）
+          hint: 差分軸でAmazon検索した結果のHTML（任意・空欄可）
           label: 差分軸 Amazon HTML（任意）
           max_length: 1000000
           options: []
@@ -176,14 +303,578 @@ workflow:
           required: false
           type: paragraph
           variable: html_diff
-      height: 350
-      id: '1910000000001'
+      height: 160
+      id: '1771119975121'
       position:
-        x: 80
-        y: 282
+        x: 483.2361090106334
+        y: 765.2592454663188
       positionAbsolute:
-        x: 80
-        y: 282
+        x: 483.2361090106334
+        y: 765.2592454663188
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        outputs:
+        - value_selector:
+          - '1772797131063'
+          - final_report
+          value_type: string
+          variable: result
+        selected: false
+        title: 出力
+        type: end
+      height: 88
+      id: '1771834860223'
+      position:
+        x: 4677.784792971545
+        y: 786.2592454663188
+      positionAbsolute:
+        x: 4677.784792971545
+        y: 786.2592454663188
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: "import re\n\ndef main(**kwargs):\n    html_content = str(kwargs.get(\"\
+          html\", kwargs.get(\"amazon_url\", \"\")))\n\n    if not html_content.strip():\n\
+          \        return {\n            \"asin_query\": \"\",\n            \"count\"\
+          : 0\n        }\n\n    # エスケープを少し戻す\n    text = html_content.replace('\\\\\
+          \"', '\"').replace(\"\\\\/\", \"/\")\n\n    # --- ASIN取得側フィルタ：スポンサー広告枠を除去してからASINを探す\
+          \ ---\n    # スポンサー広告枠（AdHolder等）を除去\n    cleaned = re.sub(r'<div[^>]*class=\"\
+          [^\"]*(?:AdHolder|ad-feedback|s-ad-feedback)[^\"]*\"[\\s\\S]*?</div>', '',\
+          \ text, flags=re.IGNORECASE)\n\n    # まず検索結果ブロックの data-asin を最優先で取る\n  \
+          \  primary_pattern = r'data-component-type=\"s-search-result\"[^>]*data-asin=\"\
+          ([A-Za-z0-9]{10})\"|data-asin=\"([A-Za-z0-9]{10})\"[^>]*data-component-type=\"\
+          s-search-result\"'\n    matches = re.findall(primary_pattern, cleaned, flags=re.IGNORECASE)\n\
+          \n    found_asins = []\n    for m in matches:\n        asin = m[0] if m[0]\
+          \ else m[1]\n        if asin:\n            found_asins.append(asin)\n\n\
+          \    # 検索結果ブロックから取れなかった場合のみフォールバック\n    if not found_asins:\n        fallback_patterns\
+          \ = [\n            r'data-asin=\"([A-Za-z0-9]{10})\"',\n            r\"\
+          data-asin='([A-Za-z0-9]{10})'\",\n            r'/dp/([A-Za-z0-9]{10})',\n\
+          \            r'/gp/product/([A-Za-z0-9]{10})'\n        ]\n        for pattern\
+          \ in fallback_patterns:\n            found_asins.extend(re.findall(pattern,\
+          \ cleaned, flags=re.IGNORECASE))\n\n    # 重複除去（B0フィルタなし：紙書籍もKindle本も対象）\n\
+          \    unique_asins = []\n    for asin in found_asins:\n        asin = asin.strip().upper()\n\
+          \        if len(asin) == 10 and asin not in unique_asins:\n            unique_asins.append(asin)\n\
+          \n    limited_asins = unique_asins[:20]\n\n    return {\n        \"asin_query\"\
+          : \",\".join(limited_asins),\n        \"count\": len(limited_asins)\n  \
+          \  }\n"
+        code_language: python3
+        outputs:
+          asin_query:
+            children: null
+            type: string
+          count:
+            children: null
+            type: number
+        selected: false
+        title: ASIN取得
+        type: code
+        variables:
+        - value_selector:
+          - '1771119975121'
+          - HTML
+          value_type: string
+          variable: amazon_url
+      height: 52
+      id: '1772791217407'
+      position:
+        x: 1294.8878283031158
+        y: 786.2592454663188
+      positionAbsolute:
+        x: 1294.8878283031158
+        y: 786.2592454663188
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data: []
+          type: none
+        headers: ''
+        method: get
+        params: ''
+        retry_config:
+          max_retries: 3
+          retry_enabled: true
+          retry_interval: 100
+        selected: false
+        ssl_verify: true
+        timeout:
+          max_connect_timeout: 0
+          max_read_timeout: 0
+          max_write_timeout: 0
+        title: Keepa API（HTTPリクエスト）
+        type: http-request
+        url: https://api.keepa.com/product?key={{#env.KEEPA_API_KEY#}}&domain=5&asin={{#1772791217407.asin_query#}}&stats=0&history=0&rating=1
+        variables: []
+      height: 191
+      id: '1772791705709'
+      position:
+        x: 1665.14550143038
+        y: 786.2592454663188
+      positionAbsolute:
+        x: 1665.14550143038
+        y: 786.2592454663188
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: "import re\nimport statistics\nimport math\n\ndef main(top10_list: str):\n\
+          \    out = {\n        \"ranking_rank\": \"?\",\n        \"ranking_score\"\
+          : 0,\n        \"ranking_emoji\": \"❓\",\n        \"ranking_summary\": \"\
+          データなし\",\n        \"average_rank\": 0,\n        \"rank_median\": 0\n   \
+          \ }\n\n    if not isinstance(top10_list, str) or not top10_list.strip():\n\
+          \        return out\n\n    ranks = []\n\n    for line in top10_list.splitlines():\n\
+          \        line_clean = line.replace(\",\", \"\").strip()\n\n        m_rank\
+          \ = re.search(r'^全体順位\\s*[:：]\\s*(\\d+)$', line_clean)\n        if m_rank:\n\
+          \            ranks.append(int(m_rank.group(1)))\n            continue\n\n\
+          \    if not ranks:\n        return out\n\n    ranks.sort()\n    n = len(ranks)\n\
+          \n    median_rank = statistics.median(ranks)\n    top3_avg = sum(ranks[:3])\
+          \ / min(n, 3)\n    top5_avg = sum(ranks[:5]) / min(n, 5)\n    total_avg\
+          \ = sum(ranks) / n\n\n    def calc_rank_score(rank):\n        upper, lower\
+          \ = 1000, 100000\n        if rank <= upper:\n            return 100.0\n\
+          \        if rank >= lower:\n            return 0.0\n        return (\n \
+          \           (math.log10(lower) - math.log10(rank)) /\n            (math.log10(lower)\
+          \ - math.log10(upper))\n        ) * 100.0\n\n    # 上位帯を少し重めに評価\n    rank_score_raw\
+          \ = (\n        calc_rank_score(top3_avg) * 0.32 +\n        calc_rank_score(top5_avg)\
+          \ * 0.28 +\n        calc_rank_score(median_rank) * 0.25 +\n        calc_rank_score(total_avg)\
+          \ * 0.15\n    )\n\n    # 上位の強さに下駄を履かせる\n    if n >= 3:\n        if top3_avg\
+          \ <= 3000:\n            rank_score_raw = max(rank_score_raw, 74.0)\n   \
+          \     elif top3_avg <= 7000:\n            rank_score_raw = max(rank_score_raw,\
+          \ 66.0)\n        elif top3_avg <= 10000:\n            rank_score_raw = max(rank_score_raw,\
+          \ 60.0)\n\n    if n >= 5:\n        if top5_avg <= 10000:\n            rank_score_raw\
+          \ = max(rank_score_raw, 62.0)\n        elif top5_avg <= 20000:\n       \
+          \     rank_score_raw = max(rank_score_raw, 52.0)\n        elif top5_avg\
+          \ <= 30000:\n            rank_score_raw = max(rank_score_raw, 44.0)\n\n\
+          \    # 抽出件数補正\n    if n <= 3:\n        rank_score_raw *= 0.84\n    elif\
+          \ n <= 5:\n        rank_score_raw *= 0.91\n    elif n <= 7:\n        rank_score_raw\
+          \ *= 0.97\n\n    ranking_score = round(min(max(rank_score_raw, 0), 100),\
+          \ 1)\n    note = f\"（抽出{n}件の暫定値）\" if n < 8 else \"\"\n\n    if ranking_score\
+          \ >= 78:\n        r, e, s = \"S\", \"\U0001F48E\", f\"ランキング評価は非常に強い{note}\"\
+          \n    elif ranking_score >= 58:\n        r, e, s = \"A\", \"\U0001F525\"\
+          , f\"ランキング評価は強い{note}\"\n    elif ranking_score >= 36:\n        r, e, s\
+          \ = \"B\", \"✅\", f\"ランキング評価は中間{note}\"\n    else:\n        r, e, s = \"\
+          C\", \"\U0001F4A4\", f\"ランキング評価は弱め{note}\"\n\n    return {\n        \"ranking_rank\"\
+          : r,\n        \"ranking_score\": ranking_score,\n        \"ranking_emoji\"\
+          : e,\n        \"ranking_summary\": s,\n        \"average_rank\": round(total_avg,\
+          \ 1),\n        \"rank_median\": round(median_rank, 1)\n    }"
+        code_language: python3
+        outputs:
+          average_rank:
+            children: null
+            type: number
+          rank_median:
+            children: null
+            type: number
+          ranking_emoji:
+            children: null
+            type: string
+          ranking_rank:
+            children: null
+            type: string
+          ranking_score:
+            children: null
+            type: number
+          ranking_summary:
+            children: null
+            type: string
+        retry_config:
+          max_retries: 3
+          retry_enabled: false
+          retry_interval: 1000
+        selected: false
+        title: ランキング評価
+        type: code
+        variables:
+        - value_selector:
+          - '1772794901965'
+          - top10_list
+          value_type: string
+          variable: top10_list
+      height: 52
+      id: '1772792512100'
+      position:
+        x: 2407.8950479092873
+        y: 786.2592454663188
+      positionAbsolute:
+        x: 2407.8950479092873
+        y: 786.2592454663188
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: "import json\nfrom typing import Any, Dict, List, Optional\n\n\ndef\
+          \ safe_json_loads(value: Any) -> Any:\n    if isinstance(value, str):\n\
+          \        value = value.strip()\n        if not value:\n            return\
+          \ {}\n        try:\n            return json.loads(value)\n        except\
+          \ Exception:\n            return {}\n    return value\n\n\ndef safe_int(value:\
+          \ Any) -> Optional[int]:\n    try:\n        if value is None or isinstance(value,\
+          \ bool):\n            return None\n        return int(float(value))\n  \
+          \  except Exception:\n        return None\n\n\ndef pick_latest_rank_from_history(history:\
+          \ Any) -> Optional[int]:\n    history = safe_json_loads(history)\n    if\
+          \ not isinstance(history, list) or not history:\n        return None\n\n\
+          \    for v in reversed(history):\n        iv = safe_int(v)\n        if iv\
+          \ is not None and iv > 0:\n            return iv\n    return None\n\n\n\
+          def pick_latest_count_from_history(history: Any) -> Optional[int]:\n   \
+          \ history = safe_json_loads(history)\n    if not isinstance(history, list)\
+          \ or not history:\n        return None\n\n    for v in reversed(history):\n\
+          \        iv = safe_int(v)\n        if iv is not None and iv >= 0:\n    \
+          \        return iv\n    return None\n\n\ndef is_book_product(product: Dict[str,\
+          \ Any]) -> bool:\n    \"\"\"\n    書籍（紙・Kindle）かどうかを判定する。\n    書籍以外の商品（家電、PC等）を除外するために使用。\n\
+          \    \"\"\"\n    if not isinstance(product, dict):\n        return False\n\
+          \n    # 1. productGroup で判定（最も確実）\n    product_group = str(product.get(\"\
+          productGroup\", \"\")).strip().lower()\n    book_groups = {\"book\", \"\
+          ebook\", \"digital_ebook_purchase\", \"ebooks\", \"abis_book\"}\n    if\
+          \ product_group and product_group in book_groups:\n        return True\n\
+          \n    # 2. categoryTree で判定（productGroupがない場合のフォールバック）\n    category_tree\
+          \ = product.get(\"categoryTree\")\n    if isinstance(category_tree, list):\n\
+          \        for cat in category_tree:\n            if isinstance(cat, dict):\n\
+          \                cat_name = str(cat.get(\"name\", \"\")).strip()\n     \
+          \           if cat_name in (\"本\", \"Kindle本\", \"Kindleストア\", \"洋書\", \"\
+          雑誌\"):\n                    return True\n\n    # 3. rootCategory で判定（さらにフォールバック）\n\
+          \    root_cat = safe_int(product.get(\"rootCategory\"))\n    # amazon.co.jp\
+          \ の書籍系rootCategory ID\n    book_root_cats = {\n        465392,      # 本\n\
+          \        2250738051,  # Kindleストア\n        86137051,    # 洋書\n    }\n  \
+          \  if root_cat is not None and root_cat in book_root_cats:\n        return\
+          \ True\n\n    # 4. binding（形態）で判定（最終フォールバック）\n    binding = str(product.get(\"\
+          binding\", \"\")).strip()\n    book_bindings = {\"単行本\", \"文庫\", \"新書\"\
+          , \"ハードカバー\", \"Kindle版\", \"Kindle Edition\",\n                     \"\
+          ペーパーバック\", \"Paperback\", \"Hardcover\", \"単行本（ソフトカバー）\",\n            \
+          \         \"大型本\", \"オンデマンド\"}\n    if binding and binding in book_bindings:\n\
+          \        return True\n\n    # productGroupもcategoryTreeもrootCategoryもbindingも判定できない場合\n\
+          \    # → 安全のため書籍として扱う（情報不足で除外するより、含める方がリスクが低い）\n    if not product_group\
+          \ and not category_tree and root_cat is None and not binding:\n        return\
+          \ True\n\n    return False\n\n\ndef extract_sales_rank(product: Dict[str,\
+          \ Any]) -> Optional[int]:\n    \"\"\"\n    書籍の全体順位を取得する。\n\n    優先順:\n \
+          \   1. stats.current[3]\n    2. csv[3]\n    3. salesRanks / salesRankReference\
+          \ を補助的に参照\n    \"\"\"\n    if not isinstance(product, dict):\n        return\
+          \ None\n\n    # 1. stats.current[3]\n    stats = safe_json_loads(product.get(\"\
+          stats\", {}))\n    if isinstance(stats, dict):\n        current = stats.get(\"\
+          current\")\n        if isinstance(current, list) and len(current) > 3:\n\
+          \            val = safe_int(current[3])\n            if val is not None\
+          \ and val > 0:\n                return val\n\n    # 2. csv[3]\n    csv_data\
+          \ = safe_json_loads(product.get(\"csv\", []))\n    if isinstance(csv_data,\
+          \ list) and len(csv_data) > 3:\n        val = pick_latest_rank_from_history(csv_data[3])\n\
+          \        if val is not None:\n            return val\n\n    # 3. 補助的に salesRanks\
+          \ / salesRankReference\n    sales_ranks = safe_json_loads(product.get(\"\
+          salesRanks\", {}))\n    sales_rank_reference = product.get(\"salesRankReference\"\
+          )\n\n    if isinstance(sales_ranks, dict) and sales_rank_reference is not\
+          \ None:\n        ref_key = str(sales_rank_reference).strip()\n        if\
+          \ ref_key in sales_ranks:\n            val = pick_latest_rank_from_history(sales_ranks.get(ref_key))\n\
+          \            if val is not None:\n                return val\n\n    return\
+          \ None\n\n\ndef extract_review_count(product: Dict[str, Any]) -> Optional[int]:\n\
+          \    \"\"\"\n    レビュー件数取得。\n\n    優先順:\n    1. stats.current[17]\n    2.\
+          \ csv[17]\n    3. direct / nested keys\n    4. variationCSV\n    \"\"\"\n\
+          \    if not isinstance(product, dict):\n        return None\n\n    # 1.\
+          \ stats.current[17]\n    stats = safe_json_loads(product.get(\"stats\",\
+          \ {}))\n    if isinstance(stats, dict):\n        current = stats.get(\"\
+          current\")\n        if isinstance(current, list) and len(current) > 17:\n\
+          \            val = safe_int(current[17])\n            if val is not None\
+          \ and val >= 0:\n                return val\n\n    # 2. csv[17]\n    csv_data\
+          \ = safe_json_loads(product.get(\"csv\", []))\n    if isinstance(csv_data,\
+          \ list) and len(csv_data) > 17:\n        review_count = pick_latest_count_from_history(csv_data[17])\n\
+          \        if review_count is not None:\n            return review_count\n\
+          \n    # 3. direct keys\n    direct_keys = [\n        \"reviewCount\", \"\
+          reviewsCount\", \"review_count\", \"reviews_count\",\n        \"ratingCount\"\
+          , \"ratingsCount\"\n    ]\n    for key in direct_keys:\n        val = safe_int(product.get(key))\n\
+          \        if val is not None and val >= 0:\n            return val\n\n  \
+          \  # 4. nested keys\n    nested_sources = [\"reviews\", \"review\", \"stats\"\
+          , \"offers\"]\n    nested_keys = [\n        \"reviewCount\", \"reviewsCount\"\
+          , \"ratingCount\", \"ratingsCount\",\n        \"count\", \"totalReviewCount\"\
+          , \"totalReviews\"\n    ]\n    for source in nested_sources:\n        obj\
+          \ = product.get(source)\n        if isinstance(obj, dict):\n           \
+          \ for key in nested_keys:\n                val = safe_int(obj.get(key))\n\
+          \                if val is not None and val >= 0:\n                    return\
+          \ val\n\n    # 5. variationCSV\n    variation_csv = safe_json_loads(product.get(\"\
+          variationCSV\"))\n    if isinstance(variation_csv, list) and len(variation_csv)\
+          \ > 1:\n        maybe_reviews = variation_csv[1]\n        if isinstance(maybe_reviews,\
+          \ list):\n            review_count = pick_latest_count_from_history(maybe_reviews)\n\
+          \            if review_count is not None:\n                return review_count\n\
+          \n    return None\n\n\ndef format_int_or_unknown(value: Optional[int]) ->\
+          \ str:\n    return \"不明\" if value is None else f\"{value:,}\"\n\n\ndef\
+          \ main(keepa_response: str) -> Dict[str, Any]:\n    try:\n        data =\
+          \ safe_json_loads(keepa_response)\n\n        body = data.get(\"body\", data)\
+          \ if isinstance(data, dict) else data\n        body = safe_json_loads(body)\n\
+          \n        if isinstance(body, dict) and \"error\" in body:\n           \
+          \ error_obj = body.get(\"error\", {})\n            msg = error_obj.get(\"\
+          message\", \"Unknown Keepa error\")\n            return {\n            \
+          \    \"top10_list\": f\"Keepaエラー: {msg}\"\n            }\n\n        products\
+          \ = body.get(\"products\", []) if isinstance(body, dict) else []\n     \
+          \   if not isinstance(products, list):\n            products = []\n\n  \
+          \      valid_products: List[Dict[str, Any]] = []\n\n        for product\
+          \ in products:\n            if not isinstance(product, dict):\n        \
+          \        continue\n\n            # 書籍以外の商品を除外\n            if not is_book_product(product):\n\
+          \                continue\n\n            title = product.get(\"title\")\
+          \ or \"タイトル不明\"\n            asin = product.get(\"asin\") or \"\"\n    \
+          \        sales_rank = extract_sales_rank(product)\n            review_count\
+          \ = extract_review_count(product)\n\n            if sales_rank is None:\n\
+          \                continue\n\n            valid_products.append({\n     \
+          \           \"asin\": asin,\n                \"title\": title,\n       \
+          \         \"sales_rank\": sales_rank,\n                \"review_count\"\
+          : review_count,\n            })\n\n        valid_products = sorted(valid_products,\
+          \ key=lambda x: x[\"sales_rank\"])[:10]\n\n        if not valid_products:\n\
+          \            return {\n                \"top10_list\": \"書籍候補が取得できませんでした\"\
+          \n            }\n\n        lines = []\n        for item in valid_products:\n\
+          \            lines.append(\n                f\"■ASIN: {item['asin']}\\n\"\
+          \n                f\"タイトル: {item['title']}\\n\"\n                f\"全体順位:\
+          \ {format_int_or_unknown(item['sales_rank'])}\\n\"\n                f\"\
+          レビュー数: {format_int_or_unknown(item['review_count'])}\"\n            )\n\n\
+          \        return {\n            \"top10_list\": \"\\n\\n\".join(lines)\n\
+          \        }\n\n    except Exception as e:\n        return {\n           \
+          \ \"top10_list\": f\"Keepa解析エラー: {str(e)}\"\n        }\n"
+        code_language: python3
+        outputs:
+          top10_list:
+            children: null
+            type: string
+        selected: false
+        title: Keepa解析
+        type: code
+        variables:
+        - value_selector:
+          - '1772791705709'
+          - body
+          value_type: string
+          variable: keepa_response
+      height: 52
+      id: '1772794901965'
+      position:
+        x: 2056.855586111927
+        y: 786.2592454663188
+      positionAbsolute:
+        x: 2056.855586111927
+        y: 786.2592454663188
+      selected: true
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: "import re\nimport statistics\n\ndef main(top10_list=\"\", **kwargs):\n\
+          \    raw_data = str(top10_list)\n\n    ranks = []\n    reviews = []\n  \
+          \  review_unknown_count = 0\n\n    for line in raw_data.splitlines():\n\
+          \        line_clean = line.replace(\",\", \"\").strip()\n\n        m_rank\
+          \ = re.search(r'^全体順位\\s*[:：]\\s*(\\d+)$', line_clean)\n        if m_rank:\n\
+          \            ranks.append(int(m_rank.group(1)))\n            continue\n\n\
+          \        m_review = re.search(r'^レビュー数\\s*[:：]\\s*(\\d+)$', line_clean)\n\
+          \        if m_review:\n            reviews.append(int(m_review.group(1)))\n\
+          \            continue\n\n        m_review_unknown = re.search(r'^レビュー数\\\
+          s*[:：]\\s*(不明)$', line_clean)\n        if m_review_unknown:\n          \
+          \  review_unknown_count += 1\n            continue\n\n    top10_count =\
+          \ len(ranks)\n    review_available_count = len(reviews)\n\n    if top10_count\
+          \ == 0:\n        return {\n            \"review_score\": 0,\n          \
+          \  \"review_label\": \"No Data\",\n            \"review_strong_ratio\":\
+          \ 0,\n            \"top10_count\": 0,\n            \"review_median\": 0,\n\
+          \            \"rank_median\": 0,\n            \"c_le_10\": 0,\n        \
+          \    \"c_le_30\": 0,\n            \"c_le_100\": 0,\n            \"c_gt_100\"\
+          : 0\n        }\n\n    ranks.sort()\n    rank_median = statistics.median(ranks)\
+          \ if ranks else 0\n\n    reviews = [r for r in reviews if isinstance(r,\
+          \ int) and r >= 0]\n\n    # 取得件数が少なすぎる場合は保留\n    if review_available_count\
+          \ < 4:\n        return {\n            \"review_score\": 0,\n           \
+          \ \"review_label\": \"判定保留\",\n            \"review_strong_ratio\": 0,\n\
+          \            \"top10_count\": top10_count,\n            \"review_median\"\
+          : 0,\n            \"rank_median\": round(rank_median, 1),\n            \"\
+          c_le_10\": 0,\n            \"c_le_30\": 0,\n            \"c_le_100\": 0,\n\
+          \            \"c_gt_100\": 0\n        }\n\n    review_median = statistics.median(reviews)\n\
+          \n    c_le_10 = len([r for r in reviews if r <= 10])\n    c_11_30 = len([r\
+          \ for r in reviews if 10 < r <= 30])\n    c_31_100 = len([r for r in reviews\
+          \ if 30 < r <= 100])\n    c_gt_100 = len([r for r in reviews if r > 100])\n\
+          \n    c_le_30 = c_le_10 + c_11_30\n    c_le_100 = c_le_30 + c_31_100\n\n\
+          \    def review_band_score(median_review):\n        if median_review > 100:\n\
+          \            return 72\n        elif median_review > 30:\n            return\
+          \ 52\n        elif median_review > 10:\n            return 32\n        else:\n\
+          \            return 12\n\n    distribution_score = (\n        c_gt_100 *\
+          \ 18 +\n        c_31_100 * 10 +\n        c_11_30 * 4\n    )\n\n    median_score\
+          \ = review_band_score(review_median)\n\n    # レビュー評価はレビュー情報だけで決める\n    score_raw\
+          \ = distribution_score + median_score\n\n    # 件数補正\n    if review_available_count\
+          \ <= 3:\n        score_raw *= 0.78\n    elif review_available_count <= 5:\n\
+          \        score_raw *= 0.88\n    elif review_available_count <= 7:\n    \
+          \    score_raw *= 0.95\n\n    review_score = round(min(100, score_raw),\
+          \ 1)\n\n    if review_score >= 70:\n        review_label = \"多い\"\n    elif\
+          \ review_score >= 40:\n        review_label = \"中間\"\n    else:\n      \
+          \  review_label = \"少ない\"\n\n    review_strong_ratio = round(\n        (len([r\
+          \ for r in reviews if r > 30]) / review_available_count) * 100, 1\n    )\
+          \ if review_available_count > 0 else 0.0\n\n    return {\n        \"review_score\"\
+          : review_score,\n        \"review_label\": review_label,\n        \"review_strong_ratio\"\
+          : review_strong_ratio,\n        \"top10_count\": top10_count,\n        \"\
+          review_median\": round(review_median, 1),\n        \"rank_median\": round(rank_median,\
+          \ 1),\n        \"c_le_10\": c_le_10,\n        \"c_le_30\": c_le_30,\n  \
+          \      \"c_le_100\": c_le_100,\n        \"c_gt_100\": c_gt_100\n    }"
+        code_language: python3
+        outputs:
+          c_gt_100:
+            children: null
+            type: number
+          c_le_10:
+            children: null
+            type: number
+          c_le_100:
+            children: null
+            type: number
+          c_le_30:
+            children: null
+            type: number
+          rank_median:
+            children: null
+            type: number
+          review_label:
+            children: null
+            type: string
+          review_median:
+            children: null
+            type: number
+          review_score:
+            children: null
+            type: number
+          review_strong_ratio:
+            children: null
+            type: number
+          top10_count:
+            children: null
+            type: number
+        selected: false
+        title: レビュー評価
+        type: code
+        variables:
+        - value_selector:
+          - '1772794901965'
+          - top10_list
+          value_type: string
+          variable: top10_list
+      height: 52
+      id: '1772795287759'
+      position:
+        x: 2785.953597965382
+        y: 786.2592454663188
+      positionAbsolute:
+        x: 2785.953597965382
+        y: 786.2592454663188
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: "def main(arg1, arg2, arg3, arg4, arg5):\n    \"\"\"\n    総合評価ノード v3.0\n\
+          \    ランキング評価とレビュー評価を統合し、総合コメントを出す\n\n    arg1: review_score\n    arg2: review_strong_ratio\n\
+          \    arg3: top10_count\n    arg4: ranking_score\n    arg5: review_label\n\
+          \    \"\"\"\n\n    def to_float(v, default=0.0):\n        try:\n       \
+          \     if v is None:\n                return default\n            s = str(v).strip()\n\
+          \            return float(s) if s != \"\" else default\n        except:\n\
+          \            return default\n\n    def to_int(v, default=0):\n        try:\n\
+          \            if v is None:\n                return default\n           \
+          \ s = str(v).strip()\n            return int(float(s)) if s != \"\" else\
+          \ default\n        except:\n            return default\n\n    review_score\
+          \ = to_float(arg1, 0.0)\n    review_strong_ratio = to_float(arg2, 0.0)\n\
+          \    top10_count = to_int(arg3, 0)\n    ranking_score = to_float(arg4, 0.0)\n\
+          \n    review_label_raw = \"\" if arg5 is None else str(arg5)\n    review_label\
+          \ = review_label_raw.strip()\n\n    # 判定保留条件\n    if (\n        review_label\
+          \ == \"\"\n        or review_label.lower() == \"no data\"\n        or review_label\
+          \ == \"判定保留\"\n        or top10_count <= 3\n    ):\n        if top10_count\
+          \ <= 3:\n            overall_result = \"判定保留（抽出不足）\"\n            overall_comment\
+          \ = \"抽出件数が少ないため、総合評価を確定できません。再検索またはキーワード見直しを推奨します。\"\n        elif review_label\
+          \ == \"判定保留\":\n            overall_result = \"判定保留（レビュー取得不足）\"\n      \
+          \      overall_comment = \"レビュー件数の取得が十分でないため、総合評価を確定できません。レビュー取得状況を確認したうえで再判定してください。\"\
+          \n        else:\n            overall_result = \"判定保留\"\n            overall_comment\
+          \ = \"評価に必要な情報が不足しているため、総合評価を確定できません。\"\n\n        summary_text = f\"【総合評価】{overall_result}\\\
+          n結論：{overall_comment}\"\n\n        return {\n            \"overall_result\"\
+          : overall_result,\n            \"overall_comment\": overall_comment,\n \
+          \           \"summary_text\": summary_text\n        }\n\n    # ランキング評価を3段階化\n\
+          \    if ranking_score >= 58:\n        ranking_side = \"ランキング強\"\n    elif\
+          \ ranking_score >= 36:\n        ranking_side = \"ランキング中間\"\n    else:\n\
+          \        ranking_side = \"ランキング弱\"\n\n    # レビュー評価は現状の3段階ラベルをそのまま尊重\n  \
+          \  if review_label == \"多い\":\n        review_side = \"レビュー多\"\n       \
+          \ review_tone = \"（上位本のレビュー壁：厚い）\"\n    elif review_label == \"中間\":\n \
+          \       review_side = \"レビュー中間\"\n        review_tone = \"（上位本のレビュー壁：中程度）\"\
+          \n    elif review_label == \"少ない\":\n        review_side = \"レビュー少\"\n \
+          \       review_tone = \"（上位本のレビュー壁：薄め）\"\n    else:\n        review_side\
+          \ = \"レビュー不明\"\n        review_tone = \"（上位本のレビュー壁：判定補助情報なし）\"\n\n    overall_result\
+          \ = f\"{ranking_side} × {review_side}\"\n\n    # コメント分岐\n    if overall_result\
+          \ == \"ランキング強 × レビュー多\":\n        overall_comment = \"上位本のランキングは強く、レビューの壁も厚めです。売れ筋はある一方で、正面突破は厳しめです。切り口の差別化を推奨します。\"\
+          \n\n    elif overall_result == \"ランキング強 × レビュー中間\":\n        overall_comment\
+          \ = \"上位本のランキングは強く、市場需要は見込めます。レビュー壁は極端に厚いわけではないため、切り口設計次第で参入余地があります。\"\n\
+          \n    elif overall_result == \"ランキング強 × レビュー少\":\n        overall_comment\
+          \ = \"上位本のランキングは強く、レビューの壁は比較的薄めです。売れ筋がありつつ、入り込む余地もある有望な候補です。\"\n\n    elif\
+          \ overall_result == \"ランキング中間 × レビュー多\":\n        overall_comment = \"一定の需要は見込める一方で、レビュー実績のある本が目立ちます。市場はあるものの、後発は訴求軸や対象読者を明確にした方が入りやすいです。\"\
+          \n\n    elif overall_result == \"ランキング中間 × レビュー中間\":\n        overall_comment\
+          \ = \"一定の需要があり、競合の壁も極端には偏っていません。広く取りに行くより、読者像や用途を絞った設計の方が勝ち筋を作りやすいです。\"\n\
+          \n    elif overall_result == \"ランキング中間 × レビュー少\":\n        overall_comment\
+          \ = \"需要は一定程度見込め、レビュー壁も比較的薄めです。ニッチ化や用途特化によって後発でも十分に検討できる候補です。\"\n\n    elif\
+          \ overall_result == \"ランキング弱 × レビュー多\":\n        overall_comment = \"レビュー実績のある本は多い一方で、ランキングの勢いは弱めです。市場の鮮度や切り口の再設計を推奨します。\"\
+          \n\n    elif overall_result == \"ランキング弱 × レビュー中間\":\n        overall_comment\
+          \ = \"市場規模は大きくない一方で、一定の競合は存在します。広いテーマのままでは埋もれやすいため、用途や対象読者の絞り込みが重要です。\"\n\
+          \n    else:\n        overall_comment = \"ランキングもレビュー壁も強くありません。ニッチ寄りのテーマとして、読者像や用途を絞ると検討しやすいです。\"\
+          \n\n    sample_note = \"\"\n    if top10_count <= 5:\n        sample_note\
+          \ = \"（抽出件数が少ないため暫定判定）\"\n\n    ratio_note = \"\"\n    if review_strong_ratio\
+          \ > 0:\n        ratio_note = f\"\\n参考：レビュー30件超の上位本比率 {review_strong_ratio}%\"\
+          \n\n    summary_text = (\n        f\"【総合評価】{overall_result}{sample_note}\\\
+          n\"\n        f\"{review_tone}\\n\"\n        f\"結論：{overall_comment}{ratio_note}\"\
+          \n    )\n\n    return {\n        \"overall_result\": overall_result,\n \
+          \       \"overall_comment\": overall_comment,\n        \"summary_text\"\
+          : summary_text\n    }"
+        code_language: python3
+        outputs:
+          overall_comment:
+            children: null
+            type: string
+          overall_result:
+            children: null
+            type: string
+          summary_text:
+            children: null
+            type: string
+        selected: false
+        title: 総合評価
+        type: code
+        variables:
+        - value_selector:
+          - '1772795287759'
+          - review_score
+          value_type: number
+          variable: arg1
+        - value_selector:
+          - '1772795287759'
+          - review_strong_ratio
+          value_type: number
+          variable: arg2
+        - value_selector:
+          - '1772795287759'
+          - top10_count
+          value_type: number
+          variable: arg3
+        - value_selector:
+          - '1772792512100'
+          - ranking_score
+          value_type: number
+          variable: arg4
+        - value_selector:
+          - '1772795287759'
+          - review_label
+          value_type: string
+          variable: arg5
+      height: 52
+      id: '1772795747047'
+      position:
+        x: 3101.6051325908347
+        y: 786.2592454663188
+      positionAbsolute:
+        x: 3101.6051325908347
+        y: 786.2592454663188
       selected: false
       sourcePosition: right
       targetPosition: left
@@ -195,83 +886,103 @@ workflow:
           variable_selector: []
         model:
           completion_params:
-            enable_stream: false
-            max_tokens: 8192
+            max_tokens: 2400
             reasoning_effort: low
             verbosity: medium
           mode: chat
           name: gpt-5.2
           provider: langgenius/openai/openai
         prompt_template:
-        - id: a1b2c3d4-1910-4001-9000-000000000001
+        - id: b34a598c-ad59-4838-8d35-0f33605e0db0
           role: system
-          text: |
-            あなたは「市場検証エージェント」です。
-            著者プロファイル（普遍）と書籍プロファイル草案（STEP1で生成）を、Amazonの検索結果（1〜3軸）と照合し、書籍の市場需要を検証します。
-            検証結果に基づいて、書籍プロファイルを refine した「確定版」と、STEP1への「修正提案」を出力します。
+          text: 'Role
 
-            ■ 入力
+            あなたは「市場検証エージェント」です。書籍プロファイル草案（STEP1出力）と著者プロファイルを、Amazon主題軸検索結果（Keepa enriched）+ 任意の読者軸/差分軸 HTML と照合し、市場需要を検証して書籍プロファイル確定版に refine します。STEP1への修正提案も同時出力します。
 
-            著者プロファイル（自動転記）：
-            {{#1910000000001.author_profile#}}
 
-            書籍プロファイル草案（STEP1出力・自動転記）：
-            {{#1910000000001.work_profile_draft#}}
+            Inputs
 
-            ユーザーが入力した「動機・きっかけ」原文（STEP1から自動抽出・最重要情報）：
-            {{#1910000000001.motivation#}}
+            ■ 著者プロファイル（自動転記・C案の核）
+            {{#1771119975121.author_profile#}}
 
-            ※ この動機は「本の目的」を表す最重要情報です。下記のいずれの目的が含まれているかを必ず判定してください：
-            - リードマグネット書（自分のサービス・サブスク・講座への誘導目的）
-            - 権威構築書（著者ブランディング・専門性訴求）
-            - ノウハウ書（読者単独で完結する方法論提供）
-            - コミュニティ書（既存ファン向け追加価値）
-            判定した目的は、市場検証・改善提案・確定版すべてに反映すること。とくに**サービス誘導目的なら「読者がサービスに登録したくなる成功体験を最短で作る」観点**で確定版を refine する。
+            ■ 書籍プロファイル草案（STEP1出力・自動転記）
+            {{#1771119975121.work_profile_draft#}}
 
-            ■ Amazon検索結果（最大3軸）
+            ■ 動機原文（STEP1の動機セクションから自動抽出・本の目的判定の最重要情報）
+            {{#1771119975121.motivation#}}
 
-            【主題軸】（必須）
-            キーワード：{{#1910000000001.keyword_theme#}}
+            ■ 主題軸キーワード
+            {{#1771119975121.keyword1#}} × {{#1771119975121.keyword2#}}
+
+            ■ 主題軸の市場分析（Keepaから取得した競合データ）
+            ランキング評価：{{#1772792512100.ranking_summary#}}
+            レビュー評価：{{#1772795287759.review_label#}}
+            総合評価：{{#1772795747047.overall_result#}} / {{#1772795747047.overall_comment#}}
+            競合タイトル一覧（top10・Keepa enriched）：
+            {{#1772794901965.top10_list#}}
+
+            ■ 読者軸（任意）
+            キーワード：{{#1771119975121.keyword_reader#}}
+            HTML（cleaned or raw）：
+            {{#1771119975121.html_reader#}}
+
+            ■ 差分軸（任意）
+            キーワード：{{#1771119975121.keyword_diff#}}
             HTML：
-            {{#1910000000001.html_theme#}}
+            {{#1771119975121.html_diff#}}
 
-            【読者軸】（任意）
-            キーワード：{{#1910000000001.keyword_reader#}}
-            HTML：
-            {{#1910000000001.html_reader#}}
 
-            【差分軸】（任意）
-            キーワード：{{#1910000000001.keyword_diff#}}
-            HTML：
-            {{#1910000000001.html_diff#}}
+            Mission
 
-            ■ 分析の進め方
+            1. 動機原文から「本の目的」を判定する：
+               - リードマグネット書（自分のサービス・サブスクへの誘導目的）
+               - 権威構築書（著者ブランディング・専門性訴求）
+               - ノウハウ書（読者単独で完結する方法論提供）
+               - コミュニティ書（既存ファン向け追加価値）
+               判定した目的は、需要診断・勝率・改善提案・確定版すべてに反映する。
+               特にリードマグネット書なら「読者がサービスに登録したくなる成功体験を最短で作る」観点で確定版を refine する。
+               動機が空欄の場合は「ノウハウ書」をデフォルト仮定するが、その旨を「動機」セクションで明記する。
 
-            1. 各軸のHTMLからAmazonの検索結果（書籍タイトル・著者・売れ筋ランキング・レビュー数・価格帯）を抽出する
-            2. 読者軸・差分軸のHTMLが空欄の場合は「データなし」とみなし、その軸の分析は省略する
-            3. 書籍プロファイル草案の各要素（想定読者・主題×読者・ポジショニング仮説・著者の角度）について、市場データから需要があるかを判定する
-            4. 総合的に勝率（A〜D）を判定し、改善提案をまとめる
+            2. 市場像を3軸で分析する：
+               主題軸はKeepaのメタデータ（ランキング・レビュー・総合評価・競合一覧）を活用し、客観的な市場構造を読み取る。
+               読者軸・差分軸はHTMLが提供されていれば軽い分析、空欄ならスキップ（「データなし」と明記）。
 
-            ■ 重要な原則
+            3. 書籍プロファイル草案の各要素について需要診断する：
+               想定読者・主題×読者・ポジショニング・著者の角度の4項目を判定し、1行根拠を付ける。
 
-            - 客観分析（市場像・需要診断・勝率）は中立に書く。著者プロファイル/書籍プロファイルに引きずられない
-            - 改善提案セクションでは、著者プロファイルと書籍プロファイルを踏まえて「この著者にとって意味のある改善」を提案する
-            - STEP1修正提案は「現状」と「提案」の対比形式で書く。フロント側のUIが差分を抽出して表示するため、フォーマットを厳守する
-            - 書籍プロファイル確定版は、草案を市場知見で refine した完成形。STEP3以降の各STEPで参照される最終版
+            4. 総合勝率を A/B/C/D で判定し、勝てるルートと避けるべきルートを示す。
 
-            ■ 出力フォーマット（厳守・マークダウン）
+            5. STEP1への修正提案を出す：
+               仮テーマ・動機・想定読者の3項目について「現状」「提案」「根拠」のフォーマットで対比形式で書く。
+               変更不要なら「（変更なし）」と書く。動機の改変は基本しないが、目的が薄まっていれば強める提案をする。
+
+            6. 書籍プロファイル確定版を出力する：
+               草案を市場知見・本の目的を反映して refine。STEP3以降のすべてのSTEPで参照される最終版。
+
+
+            Output Rules
+
+            マークダウン構造で出力（## 見出し・- リスト・**太字** 使用可）。
+
+            出力は以下の5セクションを順番通りに：
+
 
             ## 市場像
 
-            主題軸の市場構造（競合密度・売れ筋傾向・空白地帯）を3〜5行で説明。
-            読者軸・差分軸が提供されていれば、それぞれ同様に分析。
+            主題軸（Keepaデータ含む）+ 任意の読者軸/差分軸の市場構造を3〜6行で説明。
+
+            空白地帯と差別化余地を明示。
+
+            読者軸・差分軸が空欄なら「読者軸：データなし」のように明記してスキップ。
+
 
             ## 書籍プロファイル需要診断
 
-            - 想定読者：✓需要あり / △ニッチ / ✕不在　＋ 1行の根拠
-            - 主題×読者：✓需要あり / △競合多数 / ✕実例なし　＋ 1行の根拠
-            - ポジショニング：✓空白あり / △既存と被り / ✕レッドオーシャン　＋ 1行の根拠
-            - 著者の角度：✓類例あり / △未開拓 / ✕実証困難　＋ 1行の根拠
+            - 想定読者：✓需要あり / △ニッチ / ✕不在　＋ 1行根拠
+            - 主題×読者：✓需要あり / △競合多数 / ✕実例なし　＋ 1行根拠
+            - ポジショニング：✓空白あり / △既存と被り / ✕レッドオーシャン　＋ 1行根拠
+            - 著者の角度：✓類例あり / △未開拓 / ✕実証困難　＋ 1行根拠
+
 
             ## 総合勝率診断
 
@@ -279,15 +990,16 @@ workflow:
 
             根拠を3〜5行で。「勝てるルート」「避けるべきルート」を含める。
 
+
             ## STEP1修正提案
 
             ### 仮テーマ
             - 現状: （草案のテキストをそのまま）
-            - 提案: （改善案。変更不要なら「（変更なし）」と書く）
+            - 提案: （改善案。変更不要なら「（変更なし）」）
             - 根拠: （1行）
 
             ### 動機
-            - 現状: （ユーザー入力をそのまま）
+            - 現状: （動機原文をそのまま。空欄なら「データなし」）
             - 提案: （変更不要なら「（変更なし）」）
             - 根拠: （1行）
 
@@ -296,9 +1008,10 @@ workflow:
             - 提案: （改善案または「（変更なし）」）
             - 根拠: （1行）
 
+
             ## 書籍プロファイル確定版
 
-            草案を市場知見で refine した完成版。STEP1の出力フォーマットを踏襲：
+            草案を市場知見と本の目的で refine した完成版。STEP3以降の各STEPがこれを参照する。
 
             【書籍プロファイル確定版】
 
@@ -308,62 +1021,161 @@ workflow:
             ■ 想定読者
             （refine 後）
 
+            ■ 動機（原文を保持）
+            （動機原文をそのまま転記。空欄なら「ノウハウ書としてデフォルト仮定」と書く）
+
             ■ 著者の角度
             （refine 後）
 
             ■ ポジショニング
-            （refine 後・市場の空白地帯を反映）
+            （refine 後・市場の空白地帯と本の目的を反映）
 
             ■ 読了後の状態
             （refine 後）
 
             ■ 検索キーワード3軸（再選定可）
-            - 主題軸：
-            - 読者軸：
-            - 差分軸：
+            - 主題軸：（半角スペース区切りで2語）
+            - 読者軸：（半角スペース区切りで2〜3語）
+            - 差分軸：（半角スペース区切りで2〜3語）
+
+
+            重要な制約
+
+            - 客観分析（市場像・需要診断・勝率）は中立に書く。著者プロファイル/書籍プロファイルに引きずられない
+            - 改善提案・確定版セクションでは、著者プロファイル・書籍プロファイル・動機を踏まえる
+            - 競合一覧から読み取れない内容は「余地がある」「推測される」と書く
+            - 「検索キーワードが不明」などの記述は絶対にしない（与えられている前提で書く）
+            - 数値（ランキング・レビュー件数）は本文に出さない（評価の A/B/C/D は除く）'
         selected: false
-        title: 市場検証＋書籍プロファイル確定
+        title: 市場勝率診断レポート生成プロンプト
         type: llm
         vision:
           enabled: false
       height: 88
-      id: '1910000000002'
+      id: '1772796195470'
       position:
-        x: 561
-        y: 303
+        x: 3483.564121111345
+        y: 786.2592454663188
       positionAbsolute:
-        x: 561
-        y: 303
+        x: 3483.564121111345
+        y: 786.2592454663188
       selected: false
       sourcePosition: right
       targetPosition: left
       type: custom
       width: 242
     - data:
+        code: "import re\n\ndef main(top10_list=\"\", **kwargs):\n    blocks = [b\
+          \ for b in str(top10_list).split(\"■ASIN:\") if b.strip()]\n    formatted_results\
+          \ = []\n\n    for block in blocks:\n        asin_m = re.search(r\"([A-Z0-9]{10})\"\
+          , block)\n        asin = asin_m.group(1) if asin_m else \"不明\"\n\n     \
+          \   title_m = re.search(r\"タイトル[:：]\\s*(.*)\", block)\n        title = title_m.group(1).split(\"\
+          \\n\")[0].strip() if title_m else \"タイトル不明\"\n\n        rank_m = re.search(r\"\
+          全体順位[:：]\\s*(\\d+)\", block.replace(\",\", \"\"))\n        rank_str = f\"\
+          {int(rank_m.group(1)):,}位\" if rank_m else \"不明\"\n\n        review_m =\
+          \ re.search(r\"レビュー数[:：]\\s*(\\d+)\", block.replace(\",\", \"\"))\n    \
+          \    review_str = f\"{int(review_m.group(1)):,}件\" if review_m else \"不明\"\
+          \n\n        formatted_results.append(\n            f\"- タイトル: {title}\\\
+          n\"\n            f\"  - ランキング: {rank_str}\\n\"\n            f\"  - レビュー数:\
+          \ {review_str}\\n\"\n            f\"  - URL: https://www.amazon.co.jp/dp/{asin}\"\
+          \n        )\n\n    return {\"formatted_list\": \"\\n\".join(formatted_results)}"
+        code_language: python3
         outputs:
+          formatted_list:
+            children: null
+            type: string
+        selected: false
+        title: 競合本リスト整形ノード
+        type: code
+        variables:
         - value_selector:
-          - '1910000000002'
+          - '1772794901965'
+          - top10_list
+          value_type: string
+          variable: top10_list
+      height: 52
+      id: '1772796904781'
+      position:
+        x: 3855.7720134708165
+        y: 786.2592454663188
+      positionAbsolute:
+        x: 3855.7720134708165
+        y: 786.2592454663188
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: "def main(analysis_text=\"\", formatted_list=\"\", **kwargs):\n    report\
+          \ = str(analysis_text).strip()\n    book_list = str(formatted_list).strip()\
+          \ if formatted_list else \"\"\n    if book_list:\n        report += \"\\\
+          n\\n---\\n\\n## 📚 検証で参照した競合本（Keepa取得）\\n\\n\" + book_list\n    return\
+          \ {\"final_report\": report}"
+        code_language: python3
+        outputs:
+          final_report:
+            children: null
+            type: string
+        selected: false
+        title: レポート整形
+        type: code
+        variables:
+        - value_selector:
+          - '1772796195470'
           - text
           value_type: string
-          variable: text
-        selected: false
-        title: 出力
-        type: end
-      height: 88
-      id: '1910000000003'
+          variable: analysis_text
+        - value_selector:
+          - '1772796904781'
+          - formatted_list
+          value_type: string
+          variable: formatted_list
+        - value_selector:
+          - '1771119975121'
+          - keyword1
+          value_type: string
+          variable: keyword1
+        - value_selector:
+          - '1771119975121'
+          - keyword2
+          value_type: string
+          variable: keyword2
+        - value_selector:
+          - '1772795747047'
+          - overall_result
+          value_type: string
+          variable: overall_result
+        - value_selector:
+          - '1772795747047'
+          - overall_comment
+          value_type: string
+          variable: overall_comment
+        - value_selector:
+          - '1772792512100'
+          - ranking_summary
+          value_type: string
+          variable: ranking_summary
+        - value_selector:
+          - '1772795287759'
+          - review_label
+          value_type: string
+          variable: review_label
+      height: 52
+      id: '1772797131063'
       position:
-        x: 864
-        y: 303
+        x: 4265.034071242232
+        y: 786.2592454663188
       positionAbsolute:
-        x: 864
-        y: 303
+        x: 4265.034071242232
+        y: 786.2592454663188
       selected: false
       sourcePosition: right
       targetPosition: left
       type: custom
       width: 242
     viewport:
-      x: 0
-      y: 0
-      zoom: 1
+      x: -1350.8504566285158
+      y: -274.01284237039226
+      zoom: 0.7371346307943278
   rag_pipeline_variables: []

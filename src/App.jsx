@@ -1170,17 +1170,22 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
       const cleanedReader = htmlReader ? (cleanHtmlMinimal(htmlReader) || htmlReader).slice(0, 999000) : "";
       const cleanedDiff = htmlDiff ? (cleanHtmlMinimal(htmlDiff) || htmlDiff).slice(0, 999000) : "";
       const motivation = extractMotivation(savedWorkProfileDraft);
+      // 主題軸キーワードを半角スペースで2分割（旧STEP2 Keepaパイプラインの keyword1/keyword2 互換）
+      const themeWords = keywordTheme.trim().split(/\s+/);
+      const keyword1 = themeWords[0] || "";
+      const keyword2 = themeWords.slice(1).join(" ") || keyword1;
       const response = await fetch("/api/dify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           stepNum: 2,
           inputs: {
+            keyword1,
+            keyword2,
+            HTML: cleanedTheme,
             author_profile: savedAuthorProfile || "",
             work_profile_draft: savedWorkProfileDraft || "",
             motivation: motivation,
-            keyword_theme: keywordTheme.trim(),
-            html_theme: cleanedTheme,
             keyword_reader: keywordReader.trim(),
             html_reader: cleanedReader,
             keyword_diff: keywordDiff.trim(),
