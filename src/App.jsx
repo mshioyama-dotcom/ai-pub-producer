@@ -1182,6 +1182,12 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
   const renderAxisSection = (axisLabel, icon, isRequired, keyword, setKeyword, html, setHtml, expanded, setExpanded) => {
     const isCollapsible = !isRequired;
     const showContent = isRequired || expanded;
+    const canOpenAmazon = !!keyword.trim();
+    const handleOpenAmazon = () => {
+      if (!canOpenAmazon) return;
+      const query = encodeURIComponent(keyword.trim());
+      window.open(`https://www.amazon.co.jp/s?i=digital-text&k=${query}`, "_blank", "noopener,noreferrer");
+    };
     return (
       <div style={{ marginBottom: 16, border: `1px solid ${C.border}`, borderRadius: 4, background: C.white }}>
         <div onClick={isCollapsible ? () => setExpanded(!expanded) : undefined}
@@ -1197,9 +1203,18 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
             <input value={keyword} onChange={(e) => setKeyword(e.target.value)}
               placeholder={isRequired ? "例：ChatGPT 資料作成" : "STEP1出力から自動転記"}
               style={{ width: "100%", padding: "8px 10px", fontSize: 13, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", marginTop: 4, marginBottom: 10, background: C.white }} />
+            <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
+              <button onClick={handleOpenAmazon} disabled={!canOpenAmazon}
+                style={{ padding: "7px 14px", background: canOpenAmazon ? C.navy : "rgba(0,0,0,0.1)", color: canOpenAmazon ? C.white : C.textLight, border: "none", borderRadius: 4, fontSize: 12.5, fontWeight: 600, cursor: canOpenAmazon ? "pointer" : "default", flexShrink: 0 }}>
+                🔍 AmazonでKindle検索を開く
+              </button>
+              <div style={{ fontSize: 11.5, color: C.textSub, flex: 1, minWidth: 180, lineHeight: 1.6 }}>
+                {canOpenAmazon ? <>開いたページで<strong>右クリック→「ページのソースを表示」→Ctrl+A→Ctrl+C</strong></> : <>上のキーワードを入力すると検索が開けます</>}
+              </div>
+            </div>
             <label style={{ fontSize: 12.5, fontWeight: 600, color: C.navy }}>Amazon検索結果(HTML){isRequired ? "（必須）" : "（任意）"}</label>
             <textarea value={html} onChange={(e) => setHtml(e.target.value)}
-              placeholder="Amazon検索結果ページの右クリック→「ページのソースを表示」→Ctrl+A→Ctrl+C で全選択コピーして貼り付け"
+              placeholder="Amazon検索結果ページのHTMLソースを貼り付け"
               rows={5}
               style={{ width: "100%", padding: "8px 10px", fontSize: 12, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "monospace", background: C.white, marginTop: 4 }} />
           </div>
