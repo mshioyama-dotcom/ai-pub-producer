@@ -294,6 +294,28 @@ async function saveWorkProfileConfirmed(text) {
   try { localStorage.setItem(WORK_PROFILE_CONFIRMED_KEY, text || ""); } catch (e) { console.error(e); }
 }
 
+function splitStep2Output(text) {
+  if (!text) return { market: "", suggestions: "", confirmed: "", competitors: "", raw: text || "" };
+  const extract = (heading) => {
+    const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`(?:^|\\n)##\\s*${escaped}\\s*\\n([\\s\\S]*?)(?=\\n##\\s|$)`);
+    const m = text.match(re);
+    return m ? m[1].trim() : "";
+  };
+  const marketParts = [];
+  ["市場像", "書籍プロファイル需要診断", "総合勝率診断"].forEach((h) => {
+    const content = extract(h);
+    if (content) marketParts.push(`### ${h}\n\n${content}`);
+  });
+  return {
+    market: marketParts.join("\n\n"),
+    suggestions: extract("STEP1修正提案"),
+    confirmed: extract("書籍プロファイル確定版"),
+    competitors: extract("📚 検証で参照した競合本（Keepa取得）") || extract("検証で参照した競合本"),
+    raw: text,
+  };
+}
+
 function extractMotivation(workProfileDraft) {
   if (!workProfileDraft) return "";
   // ■ 動機 セクションを抽出（次の ■ または末尾まで）
@@ -1128,11 +1150,22 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
 
   const [isRunning, setIsRunning] = useState(false);
   const [runError, setRunError] = useState("");
-  const [outputText, setOutputText] = useState(savedWorkProfileConfirmed || "");
+  const [outputText, setOutputText] = useState("");
+  const [confirmedDraft, setConfirmedDraft] = useState(savedWorkProfileConfirmed || "");
   const [saveMsg, setSaveMsg] = useState(false);
   const [authorPreviewOpen, setAuthorPreviewOpen] = useState(false);
   const [draftPreviewOpen, setDraftPreviewOpen] = useState(false);
   const [procedureOpen, setProcedureOpen] = useState(false);
+  const [competitorsOpen, setCompetitorsOpen] = useState(false);
+  const [rawOutputOpen, setRawOutputOpen] = useState(false);
+
+  const sections = useMemo(() => splitStep2Output(outputText), [outputText]);
+  useEffect(() => {
+    if (outputText) {
+      const newConfirmed = splitStep2Output(outputText).confirmed;
+      if (newConfirmed) setConfirmedDraft(newConfirmed);
+    }
+  }, [outputText]);
 
   const hasAuthorProfile = !!(savedAuthorProfile || "").trim();
   const hasDraft = !!(savedWorkProfileDraft || "").trim();
@@ -1207,8 +1240,8 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
   };
 
   const handleSave = async () => {
-    if (!outputText.trim()) return;
-    await onSaveWorkProfileConfirmed(outputText);
+    if (!confirmedDraft.trim()) return;
+    await onSaveWorkProfileConfirmed(confirmedDraft);
     setSaveMsg(true);
     setTimeout(() => setSaveMsg(false), 2500);
   };
@@ -1376,20 +1409,80 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
         </Card>
       </div>
 
-      <div style={{ marginBottom: 28 }}>
+      <div style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
           <StepBadge num="③" />
-          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>市場検証結果＋書籍プロファイル確定版</h2>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>市場検証結果（参考）</h2>
         </div>
-        <textarea value={outputText} onChange={(e) => setOutputText(e.target.value)}
-          rows={28}
-          placeholder="ここに市場検証結果と書籍プロファイル確定版が表示されます。手動で編集も可能です。"
+        {sections.market ? (
+          <Card style={{ background: "#f8f9fc", border: `1px solid ${C.border}` }}>
+            <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordWrap: "break-word", fontFamily: "inherit", fontSize: 13, lineHeight: 1.85, color: C.text }}>{sections.market}</pre>
+          </Card>
+        ) : (
+          <div style={{ padding: "24px 16px", textAlign: "center", color: C.textLight, fontSize: 13, background: "#f8f8f8", borderRadius: 4, border: `1px dashed ${C.border}` }}>市場像・需要診断・勝率診断はSTEP2実行後にここに表示されます</div>
+        )}
+      </div>
+
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <StepBadge num="④" />
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>STEP1への修正提案（参考）</h2>
+        </div>
+        {sections.suggestions ? (
+          <Card style={{ background: "#fff8e6", border: `1px solid #e0c8a0` }}>
+            <div style={{ fontSize: 12, color: C.textSub, marginBottom: 8, lineHeight: 1.6 }}>STEP1の入力を修正したくなったときの提案。納得できれば <strong>STEP1に戻って入力フォームに反映 → 再生成</strong> してください。</div>
+            <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordWrap: "break-word", fontFamily: "inherit", fontSize: 13, lineHeight: 1.85, color: C.text }}>{sections.suggestions}</pre>
+          </Card>
+        ) : (
+          <div style={{ padding: "20px 16px", textAlign: "center", color: C.textLight, fontSize: 13, background: "#f8f8f8", borderRadius: 4, border: `1px dashed ${C.border}` }}>STEP1への修正提案はSTEP2実行後にここに表示されます</div>
+        )}
+      </div>
+
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <StepBadge num="⑤" />
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>書籍プロファイル確定版（保存対象・編集可能）</h2>
+        </div>
+        <div style={{ fontSize: 12, color: C.textSub, marginBottom: 8, lineHeight: 1.7 }}>
+          STEP3以降の各STEPに自動転記される最終データです。保存したものがSTEP3〜10で使われます。
+        </div>
+        <textarea value={confirmedDraft} onChange={(e) => setConfirmedDraft(e.target.value)}
+          rows={20}
+          placeholder="STEP2実行後にここに書籍プロファイル確定版が表示されます。手動で編集も可能です。"
           style={{ width: "100%", padding: "12px 14px", fontSize: 13.5, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.85 }} />
         <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <BtnPrimary onClick={handleSave} disabled={!outputText.trim()}>書籍プロファイル確定版を保存</BtnPrimary>
+          <BtnPrimary onClick={handleSave} disabled={!confirmedDraft.trim()}>書籍プロファイル確定版を保存</BtnPrimary>
           {saveMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました（STEP3以降で使えます）</span>}
         </div>
       </div>
+
+      {sections.competitors && (
+        <div style={{ marginBottom: 24 }}>
+          <div onClick={() => setCompetitorsOpen(!competitorsOpen)} style={{ fontSize: 12.5, color: C.navyMid, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 0", fontWeight: 600 }}>
+            <span style={{ transform: competitorsOpen ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.15s", display: "inline-block" }}>▶</span>
+            📚 検証で参照した競合本（Keepa取得・参考）
+          </div>
+          {competitorsOpen && (
+            <Card style={{ background: "#f8f8f8", border: `1px solid ${C.border}`, marginTop: 8 }}>
+              <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordWrap: "break-word", fontFamily: "inherit", fontSize: 12, lineHeight: 1.7, color: C.text }}>{sections.competitors}</pre>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {outputText && (
+        <div style={{ marginBottom: 24 }}>
+          <div onClick={() => setRawOutputOpen(!rawOutputOpen)} style={{ fontSize: 12.5, color: C.textLight, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 0", fontWeight: 600 }}>
+            <span style={{ transform: rawOutputOpen ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.15s", display: "inline-block" }}>▶</span>
+            🔧 全文出力（デバッグ用）
+          </div>
+          {rawOutputOpen && (
+            <textarea value={outputText} onChange={(e) => setOutputText(e.target.value)}
+              rows={20}
+              style={{ width: "100%", padding: "10px 12px", fontSize: 12, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "monospace", background: "#fafafa", lineHeight: 1.7, color: C.textSub, marginTop: 8 }} />
+          )}
+        </div>
+      )}
     </div>
   );
 };
