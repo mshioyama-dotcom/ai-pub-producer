@@ -1428,6 +1428,7 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
   const [procedureOpen, setProcedureOpen] = useState(false);
   const [competitorsOpen, setCompetitorsOpen] = useState(false);
   const [rawOutputOpen, setRawOutputOpen] = useState(false);
+  const [marketResultOpen, setMarketResultOpen] = useState(false);
 
   const sections = useMemo(() => splitStep2Output(outputText), [outputText]);
   useEffect(() => {
@@ -1740,24 +1741,28 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
         </Card>
       </div>
 
-      <div style={{ marginBottom: 24 }}>
+      <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
           <StepBadge num="③" />
-          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>市場検証結果（参考）</h2>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>出力：書籍プロファイル確定版（保存対象・編集可能）</h2>
         </div>
-        {sections.market ? (
-          <Card style={{ background: "#f8f9fc", border: `1px solid ${C.border}` }}>
-            <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordWrap: "break-word", fontFamily: "inherit", fontSize: 13, lineHeight: 1.85, color: C.text }}>{sections.market}</pre>
-          </Card>
-        ) : (
-          <div style={{ padding: "24px 16px", textAlign: "center", color: C.textLight, fontSize: 13, background: "#f8f8f8", borderRadius: 4, border: `1px dashed ${C.border}` }}>市場像・需要診断・勝率診断はSTEP2実行後にここに表示されます</div>
-        )}
+        <div style={{ fontSize: 12, color: C.textSub, marginBottom: 8, lineHeight: 1.7 }}>
+          STEP3以降の各STEPに自動転記される最終データです。保存したものがSTEP3〜10で使われます。
+        </div>
+        <textarea value={confirmedDraft} onChange={(e) => setConfirmedDraft(e.target.value)}
+          rows={20}
+          placeholder="STEP2実行後にここに書籍プロファイル確定版が表示されます。手動で編集も可能です。"
+          style={{ width: "100%", padding: "12px 14px", fontSize: 13.5, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.85 }} />
+        <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <BtnPrimary onClick={handleSave} disabled={!confirmedDraft.trim()}>書籍プロファイル確定版を保存</BtnPrimary>
+          {saveMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました（STEP3以降で使えます）</span>}
+        </div>
       </div>
 
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
           <StepBadge num="④" />
-          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>STEP1への修正提案</h2>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>STEP1への修正提案（参考）</h2>
           {sections.suggestions && (
             <div style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button onClick={() => {
@@ -1834,22 +1839,27 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
         )}
       </div>
 
-      <div style={{ marginBottom: 28 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
           <StepBadge num="⑤" />
-          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>書籍プロファイル確定版（保存対象・編集可能）</h2>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>市場検証結果（参考）</h2>
+          {sections.market && (
+            <button onClick={() => setMarketResultOpen(!marketResultOpen)} style={{ marginLeft: "auto", background: "none", border: `1px solid ${C.border}`, padding: "3px 10px", borderRadius: 4, fontSize: 11.5, color: C.navy, cursor: "pointer" }}>
+              {marketResultOpen ? "閉じる" : "開く"}
+            </button>
+          )}
         </div>
-        <div style={{ fontSize: 12, color: C.textSub, marginBottom: 8, lineHeight: 1.7 }}>
-          STEP3以降の各STEPに自動転記される最終データです。保存したものがSTEP3〜10で使われます。
-        </div>
-        <textarea value={confirmedDraft} onChange={(e) => setConfirmedDraft(e.target.value)}
-          rows={20}
-          placeholder="STEP2実行後にここに書籍プロファイル確定版が表示されます。手動で編集も可能です。"
-          style={{ width: "100%", padding: "12px 14px", fontSize: 13.5, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.85 }} />
-        <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <BtnPrimary onClick={handleSave} disabled={!confirmedDraft.trim()}>書籍プロファイル確定版を保存</BtnPrimary>
-          {saveMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました（STEP3以降で使えます）</span>}
-        </div>
+        {sections.market ? (
+          marketResultOpen ? (
+            <Card style={{ background: "#f8f9fc", border: `1px solid ${C.border}` }}>
+              <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordWrap: "break-word", fontFamily: "inherit", fontSize: 13, lineHeight: 1.85, color: C.text }}>{sections.market}</pre>
+            </Card>
+          ) : (
+            <div style={{ fontSize: 12.5, color: C.textSub, padding: "10px 14px", background: "#f8f8f8", borderRadius: 4, border: `1px dashed ${C.border}` }}>市場像・需要診断・勝率診断の詳細。「開く」ボタンで表示します。</div>
+          )
+        ) : (
+          <div style={{ padding: "20px 16px", textAlign: "center", color: C.textLight, fontSize: 13, background: "#f8f8f8", borderRadius: 4, border: `1px dashed ${C.border}` }}>市場像・需要診断・勝率診断はSTEP2実行後にここに表示されます</div>
+        )}
       </div>
 
       {sections.competitors && (
