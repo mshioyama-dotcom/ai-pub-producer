@@ -100,19 +100,38 @@ export default async function handler(req, res) {
     }
 
     const data = await response.json();
-    const output = data?.data?.outputs?.text
-      || data?.data?.outputs?.output
-      || data?.data?.outputs?.result
-      || data?.data?.outputs?.author_profile
-      || JSON.stringify(data?.data?.outputs || data, null, 2);
+    const outputs = data?.data?.outputs || {};
+    const output = outputs.text
+      || outputs.output
+      || outputs.result
+      || outputs.author_profile
+      || outputs.final_report
+      || JSON.stringify(outputs, null, 2);
 
     // --- DEBUG LOG (for Vercel logs) ---
-    const rawText = data?.data?.outputs?.text;
+    const rawText = outputs.text;
     const rawTextLen = (rawText || "").length;
     const outputLen = (output || "").length;
     const rawTextTail = rawText ? String(rawText).slice(-30) : "(empty)";
-    console.log(`[DIFY_DEBUG] STEP${stepNum} rawText.length=${rawTextLen} output.length=${outputLen} tail="${rawTextTail}"`);
+    const outputKeys = Object.keys(outputs).join(",");
+    const workflowStatus = data?.data?.status || "unknown";
+    const workflowError = data?.data?.error || "";
+    console.log(`[DIFY_DEBUG] STEP${stepNum} status=${workflowStatus} keys=[${outputKeys}] outputLen=${outputLen} rawTextLen=${rawTextLen} tail="${rawTextTail}" error="${workflowError}"`);
     // --- END DEBUG ---
+
+    // 出力が異常に短い（≤10文字）場合は診断情報をクライアントに返す
+    if (outputLen <= 10) {
+      return res.status(200).json({
+        output,
+        diagnostic: {
+          workflowStatus,
+          workflowError,
+          outputKeys,
+          outputsRaw: outputs,
+          message: `Dify が空または短い出力を返しました（${outputLen}文字）。Dify ワークフローのノードでエラーが起きているか、出力ノードに正しい変数が接続されていない可能性があります。`,
+        },
+      });
+    }
 
     return res.status(200).json({ output });
 

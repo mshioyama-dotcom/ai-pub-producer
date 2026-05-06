@@ -1540,7 +1540,12 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
         const out = data.output || "";
         if (!out || out.length < 50) {
           // 出力が空または異常に短い場合は警告（成功レスポンスを装って空が返るケース）
-          setRunError(`Dify から有効な出力が返ってきませんでした（出力長 ${out.length} 文字）。\n\n原因の可能性：\n・Keepa API キーが Dify 側に設定されていない／無効\n・主題軸キーワードでの Amazon 検索結果が0件で Keepa 呼び出しが空\n・Dify ワークフロー内部でエラー（Dify のログを確認）\n\nDify cloud の「STEP2_市場検証_書籍プロファイル確定」アプリのログを確認してください。`);
+          let diag = "";
+          if (data.diagnostic) {
+            const d = data.diagnostic;
+            diag = `\n\n【Dify 応答の診断情報】\n・ワークフロー status: ${d.workflowStatus}\n・出力キー: [${d.outputKeys || "(空)"}]\n${d.workflowError ? "・Dify エラー: " + d.workflowError + "\n" : ""}・raw outputs: ${JSON.stringify(d.outputsRaw, null, 2).slice(0, 500)}`;
+          }
+          setRunError(`Dify から有効な出力が返ってきませんでした（出力長 ${out.length} 文字）。\n\n原因の可能性：\n・Keepa API キーが Dify 側に設定されていない／無効\n・主題軸キーワードでの Amazon 検索結果が0件で Keepa 呼び出しが空\n・Dify ワークフロー内部でエラー（Dify cloud のログを確認）\n・YML 改修後に Dify への再 import を忘れている${diag}`);
         } else {
           setOutputText(out);
           try { localStorage.setItem(WORK_PROFILE_STEP2_FULL_KEY, out); } catch (e) {}
