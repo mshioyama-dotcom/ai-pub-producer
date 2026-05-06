@@ -1079,13 +1079,9 @@ const Step0Page = ({ savedProfile, onSaveProfile, onNavigate }) => {
   );
 };
 
-const Step1Page = ({ savedAuthorProfile, savedWorkProfile, onSaveWorkProfile, onNavigate }) => {
-  // STEP2からの修正提案を mount 時に1回だけ消費（useRef でキャッシュし StrictMode の二重呼び出しでも安全）
-  const pendingRef = useRef(null);
-  if (pendingRef.current === null) {
-    pendingRef.current = consumeStep1Pending() || {};
-  }
-  const pending = pendingRef.current;
+const Step1Page = ({ savedAuthorProfile, savedWorkProfile, onSaveWorkProfile, onNavigate, pendingApply }) => {
+  // pendingApply は親 App が navigate 時に 1 回だけ consume したものを props で受け渡す
+  const pending = pendingApply || {};
 
   const [theme, setTheme] = useState(pending.theme || "");
   const [motivation, setMotivation] = useState(pending.motivation || "");
@@ -2332,6 +2328,8 @@ export default function App() {
   const [workProfile, setWorkProfile] = useState("");
   const [workProfileConfirmed, setWorkProfileConfirmed] = useState("");
   const [loading, setLoading] = useState(true);
+  // STEP2→STEP1 への pending（user click 時に navigate 内で1回だけ consume するので StrictMode 二重 mount でも安全）
+  const [step1PendingApply, setStep1PendingApply] = useState(null);
 
   if (typeof window !== "undefined") {
     window.__DEBUG_LOGS = window.__DEBUG_LOGS || [];
@@ -2398,6 +2396,13 @@ export default function App() {
       });
       return {};
     });
+    // STEP1 へ遷移する瞬間に pending を一度だけ消費して props 化（user click は1回なので StrictMode 二重 mount でも安全）
+    if (p === "step_1") {
+      const pending = consumeStep1Pending();
+      setStep1PendingApply(pending && Object.keys(pending).length > 0 ? pending : null);
+    } else {
+      setStep1PendingApply(null);
+    }
     setPage(p);
     if (p.startsWith("step_")) {
       const num = parseInt(p.replace("step_", ""), 10);
@@ -2451,7 +2456,7 @@ export default function App() {
     if (page === "guide") return <GuidePage onNavigate={nav} />;
     if (page === "saved") return <SavedPage project={project} stepStatuses={stepStatuses} allSteps={allSteps} onNavigate={nav} />;
     if (page === "step_0") return <Step0Page savedProfile={authorProfile} onSaveProfile={handleSaveAuthorProfile} onNavigate={nav} />;
-    if (page === "step_1") return <Step1Page savedAuthorProfile={authorProfile} savedWorkProfile={workProfile} onSaveWorkProfile={handleSaveWorkProfile} onNavigate={nav} />;
+    if (page === "step_1") return <Step1Page savedAuthorProfile={authorProfile} savedWorkProfile={workProfile} onSaveWorkProfile={handleSaveWorkProfile} onNavigate={nav} pendingApply={step1PendingApply} />;
     if (page === "step_2") return <Step2Page savedAuthorProfile={authorProfile} savedWorkProfileDraft={workProfile} savedWorkProfileConfirmed={workProfileConfirmed} onSaveWorkProfileConfirmed={handleSaveWorkProfileConfirmed} onNavigate={nav} />;
     if (page.startsWith("step_")) {
       const num = parseInt(page.replace("step_", ""), 10);
