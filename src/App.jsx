@@ -1351,7 +1351,7 @@ const ApplyToStep1Button = ({ title, proposal, onApply }) => {
 const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfileConfirmed, onSaveWorkProfileConfirmed, onNavigate, onApplyToStep1Pending }) => {
   const initialKeywords = useMemo(() => extractKeywords3Axes(savedWorkProfileDraft), [savedWorkProfileDraft]);
 
-  // localStorage から永続化された入力データを読む（既存値 > 草案からの自動抽出 の優先順位）
+  // localStorage から永続化された入力データを読む
   // ※ HTML はサイズが大きい（数十KB×3軸）ので localStorage 保存対象に含めない
   const savedInputs = (() => {
     try {
@@ -1360,29 +1360,56 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
     } catch { return {}; }
   })();
 
-  const [keywordTheme, setKeywordTheme] = useState(savedInputs.keywordTheme || initialKeywords.theme);
+  // STEP1 のキーワードが前回 Step2 を開いた時から更新されたかを検出
+  // 更新されていれば最新の STEP1 値を初期値に採用（保存値より STEP1 を優先）
+  // 同じならユーザー編集を維持するため savedInputs を優先
+  const step1Changed = (
+    (initialKeywords.theme && savedInputs.lastStep1Theme !== initialKeywords.theme) ||
+    (initialKeywords.reader && savedInputs.lastStep1Reader !== initialKeywords.reader) ||
+    (initialKeywords.diff && savedInputs.lastStep1Diff !== initialKeywords.diff)
+  );
+  const pickInitial = (latestStep1, savedValue) => {
+    if (step1Changed) return latestStep1 || savedValue || "";
+    return savedValue || latestStep1 || "";
+  };
+
+  const [keywordTheme, setKeywordTheme] = useState(pickInitial(initialKeywords.theme, savedInputs.keywordTheme));
   const [htmlTheme, setHtmlTheme] = useState("");
   const [readerExpanded, setReaderExpanded] = useState(!!savedInputs.readerExpanded);
-  const [keywordReader, setKeywordReader] = useState(savedInputs.keywordReader || initialKeywords.reader);
+  const [keywordReader, setKeywordReader] = useState(pickInitial(initialKeywords.reader, savedInputs.keywordReader));
   const [htmlReader, setHtmlReader] = useState("");
   const [diffExpanded, setDiffExpanded] = useState(!!savedInputs.diffExpanded);
-  const [keywordDiff, setKeywordDiff] = useState(savedInputs.keywordDiff || initialKeywords.diff);
+  const [keywordDiff, setKeywordDiff] = useState(pickInitial(initialKeywords.diff, savedInputs.keywordDiff));
   const [htmlDiff, setHtmlDiff] = useState("");
 
+  // STEP1 から最新値を強制取り込み（ユーザーが手動でリセットしたいときの操作）
+  const handleResyncFromStep1 = () => {
+    if (initialKeywords.theme) setKeywordTheme(initialKeywords.theme);
+    if (initialKeywords.reader) setKeywordReader(initialKeywords.reader);
+    if (initialKeywords.diff) setKeywordDiff(initialKeywords.diff);
+  };
+
   // キーワード3軸と展開状態を localStorage に自動保存（HTML は除外・容量上限のため）
+  // 同時に「現在の STEP1 キーワード」も記録し、次回 mount 時に変化検出に使う
   useEffect(() => {
     try {
       localStorage.setItem(STEP2_INPUTS_KEY, JSON.stringify({
         keywordTheme, keywordReader, keywordDiff, readerExpanded, diffExpanded,
+        lastStep1Theme: initialKeywords.theme,
+        lastStep1Reader: initialKeywords.reader,
+        lastStep1Diff: initialKeywords.diff,
       }));
     } catch (e) { console.error(e); }
-  }, [keywordTheme, keywordReader, keywordDiff, readerExpanded, diffExpanded]);
+  }, [keywordTheme, keywordReader, keywordDiff, readerExpanded, diffExpanded, initialKeywords.theme, initialKeywords.reader, initialKeywords.diff]);
 
   const [inputSaveMsg, setInputSaveMsg] = useState(false);
   const handleSaveInputs = () => {
     try {
       localStorage.setItem(STEP2_INPUTS_KEY, JSON.stringify({
         keywordTheme, keywordReader, keywordDiff, readerExpanded, diffExpanded,
+        lastStep1Theme: initialKeywords.theme,
+        lastStep1Reader: initialKeywords.reader,
+        lastStep1Diff: initialKeywords.diff,
       }));
       setInputSaveMsg(true);
       setTimeout(() => setInputSaveMsg(false), 2500);
@@ -1657,8 +1684,9 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
 
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 12 }}>
           <BtnPrimary onClick={handleSaveInputs}>入力データを保存</BtnPrimary>
+          <BtnSecondary onClick={handleResyncFromStep1} style={{ fontSize: 12 }}>↻ STEP1から再取得</BtnSecondary>
           {inputSaveMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました（キーワード3軸）</span>}
-          <span style={{ fontSize: 11.5, color: C.textLight }}>※ キーワード3軸は入力中も自動保存／HTMLは保存対象外</span>
+          <span style={{ fontSize: 11.5, color: C.textLight }}>※ STEP1 を再生成した時は「↻ STEP1から再取得」で最新キーワードを取り込めます</span>
         </div>
       </div>
 
