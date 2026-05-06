@@ -455,29 +455,50 @@ function parseWorkProfileForStep3(workProfile) {
 }
 
 function parseStep2Output(text) {
-  const titleMatch = text.match(/^#[^#].*[:：]\s*(.+?)\s*[×x×]\s*(.+?)\s*$/m);
-  const keyword1 = titleMatch ? titleMatch[1].trim() : "";
-  const keyword2 = titleMatch ? titleMatch[2].trim() : "";
-  const intentMatch = text.match(/###\s*🎯\s*検索者の意図[（(]仮説[）)]\s*\n([\s\S]*?)(?=\n---|\n##|$)/);
-  const marketMatch = text.match(/【狙い目の切り口】\s*\n([\s\S]*?)(?=\n---|\n##|\n【|$)/);
-  let markets = [];
-  if (marketMatch) {
-    const section = marketMatch[1];
-    const byBlankLine = section.split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
-    if (byBlankLine.length >= 2) { markets = byBlankLine; }
-    else {
-      const lines = section.split("\n"); const blocks = []; let current = [];
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        if (line.trim() === "") { if (current.length > 0) { blocks.push(current.join("\n").trim()); current = []; } continue; }
-        const isNewParagraph = current.length > 0 && !/^[\s　・\-•]/.test(line) && /^[^\s　]/.test(line);
-        if (isNewParagraph) { blocks.push(current.join("\n").trim()); current = [line]; } else { current.push(line); }
-      }
-      if (current.length > 0) blocks.push(current.join("\n").trim());
-      markets = blocks.filter(Boolean);
-    }
+  if (!text) return { keyword1: "", keyword2: "", intent: "", markets: [] };
+
+  // keyword1/keyword2：新C案では確定版の「■ 検索キーワード3軸 - 主題軸：A B」から、旧版ではタイトル行 `# 〇〇 × △△` から取得
+  let keyword1 = "";
+  let keyword2 = "";
+  const themeAxisMatch = text.match(/[-・]\s*主題軸\s*[:：]\s*([^\n]+)/);
+  if (themeAxisMatch) {
+    const parts = themeAxisMatch[1].replace(/\*+/g, "").trim().split(/[\s　]+/).filter(Boolean);
+    keyword1 = parts[0] || "";
+    keyword2 = parts[1] || "";
+  } else {
+    const titleMatch = text.match(/^#[^#].*[:：]\s*(.+?)\s*[×x×]\s*(.+?)\s*$/m);
+    if (titleMatch) { keyword1 = titleMatch[1].trim(); keyword2 = titleMatch[2].trim(); }
   }
-  return { keyword1, keyword2, intent: intentMatch ? intentMatch[1].trim() : "", markets };
+
+  // 検索意図：新C案 `## 検索者の意図（仮説）` を最優先、旧C案 `### 🎯 検索者の意図（仮説）` をフォールバック
+  // 終端は次の `## 〇〇`（同レベル以上）または `---` または `### 🎯` 系。新フォーマットのみ次の `##` で確実に切る
+  const intentMatchNew = text.match(/(?:^|\n)##\s*検索者の意図[（(]仮説[）)]\s*\n([\s\S]*?)(?=\n##\s|\n---|$)/);
+  const intentMatchOld = text.match(/###\s*🎯\s*検索者の意図[（(]仮説[）)]\s*\n([\s\S]*?)(?=\n---|\n##|$)/);
+  const intent = (intentMatchNew?.[1] || intentMatchOld?.[1] || "").trim();
+
+  // 狙い目の切り口：新C案 `## 狙い目の切り口` を最優先、旧C案 `【狙い目の切り口】` をフォールバック
+  const marketMatchNew = text.match(/(?:^|\n)##\s*狙い目の切り口\s*\n([\s\S]*?)(?=\n##\s|\n---|$)/);
+  const marketMatchOld = text.match(/【狙い目の切り口】\s*\n([\s\S]*?)(?=\n---|\n##|\n【|$)/);
+  const marketSection = (marketMatchNew?.[1] || marketMatchOld?.[1] || "").trim();
+  let markets = [];
+  if (marketSection) {
+    // `- **切り口名**：説明` の箇条書きを切り口ごとに1ブロックとして抽出
+    const lines = marketSection.split("\n");
+    const blocks = [];
+    let current = [];
+    const flush = () => { if (current.length) blocks.push(current.join("\n").trim()); current = []; };
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) { continue; }
+      if (/^[-・*•]\s/.test(trimmed) || /^\d+[.\s]/.test(trimmed)) { flush(); current.push(trimmed); }
+      else { current.push(trimmed); }
+    }
+    flush();
+    markets = blocks.filter(Boolean);
+    if (markets.length === 0) markets.push(marketSection);
+  }
+
+  return { keyword1, keyword2, intent, markets };
 }
 
 function extractSections(text) {
@@ -1941,21 +1962,26 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           const isOverLimit = field.maxChars && currentLen > field.maxChars;
           const isStep3ParsedField = (step.num === 3 || step.num === 5) && (field.name === "keyword1" || field.name === "keyword2" || field.name === "intent_lock" || field.name === "market_report");
           const handleAutoFillParsed = isStep3ParsedField ? () => {
-            // 新C案優先：書籍プロファイル確定版 → 草案 から抽出
+            // 優先：STEP2 全文（新C案出力に「## 検索者の意図（仮説）」「## 狙い目の切り口」を明示的に含む）
+            const step2Output = allSteps?.[2]?.outputText || "";
+            let parsed = step2Output ? parseStep2Output(step2Output) : null;
+            // 補完：書籍プロファイル確定版／草案（STEP2出力が無いか、抽出できなかった項目を補う）
             const wp = (typeof window !== "undefined")
               ? (localStorage.getItem(WORK_PROFILE_CONFIRMED_KEY) || localStorage.getItem(WORK_PROFILE_KEY) || "")
               : "";
-            let parsed = wp ? parseWorkProfileForStep3(wp) : null;
-            // フォールバック：旧STEP2出力フォーマット
-            if (!parsed || (!parsed.keyword1 && !parsed.intent && (!parsed.markets || parsed.markets.length === 0))) {
-              const srcOutput = allSteps?.[2]?.outputText;
-              if (srcOutput) parsed = parseStep2Output(srcOutput);
+            const fromWp = wp ? parseWorkProfileForStep3(wp) : null;
+            if (!parsed) parsed = fromWp;
+            else if (fromWp) {
+              if (!parsed.keyword1) parsed.keyword1 = fromWp.keyword1;
+              if (!parsed.keyword2) parsed.keyword2 = fromWp.keyword2;
+              if (!parsed.intent) parsed.intent = fromWp.intent;
+              if (!parsed.markets || parsed.markets.length === 0) parsed.markets = fromWp.markets;
             }
-            if (!parsed) { alert("書籍プロファイル（またはSTEP2出力）が見つかりません。\n\nSTEP2を実行して書籍プロファイル確定版を保存してから、もう一度お試しください。"); return; }
-            if (field.name === "keyword1") { if (parsed.keyword1) handleInputChange("keyword1", parsed.keyword1); else alert("書籍プロファイルから「主題軸キーワード1」が見つかりませんでした。手動で入力してください。"); }
-            if (field.name === "keyword2") { if (parsed.keyword2) handleInputChange("keyword2", parsed.keyword2); else alert("書籍プロファイルから「主題軸キーワード2」が見つかりませんでした。手動で入力してください。"); }
-            if (field.name === "intent_lock") { if (parsed.intent) handleInputChange("intent_lock", parsed.intent); else alert("書籍プロファイルから「想定読者／検索意図」が見つかりませんでした。手動でコピーして貼り付けてください。"); }
-            if (field.name === "market_report") { if (parsed.markets && parsed.markets.length > 0) { setMarketOptions(parsed.markets); setSelectedMarket(null); handleInputChange("market_report", ""); } else { alert("書籍プロファイルから「ポジショニング仮説／狙い目切り口」が見つかりませんでした。手動でコピーして貼り付けてください。"); } }
+            if (!parsed) { alert("STEP2の出力（または書籍プロファイル）が見つかりません。\n\nSTEP2を実行して保存してから、もう一度お試しください。"); return; }
+            if (field.name === "keyword1") { if (parsed.keyword1) handleInputChange("keyword1", parsed.keyword1); else alert("STEP2出力／書籍プロファイルから「主題軸キーワード1」が見つかりませんでした。手動で入力してください。"); }
+            if (field.name === "keyword2") { if (parsed.keyword2) handleInputChange("keyword2", parsed.keyword2); else alert("STEP2出力／書籍プロファイルから「主題軸キーワード2」が見つかりませんでした。手動で入力してください。"); }
+            if (field.name === "intent_lock") { if (parsed.intent) handleInputChange("intent_lock", parsed.intent); else alert("STEP2出力に「## 検索者の意図（仮説）」セクションが見つかりませんでした。手動でコピーして貼り付けてください。"); }
+            if (field.name === "market_report") { if (parsed.markets && parsed.markets.length > 0) { setMarketOptions(parsed.markets); setSelectedMarket(null); handleInputChange("market_report", ""); } else { alert("STEP2出力に「## 狙い目の切り口」セクションが見つかりませんでした。手動でコピーして貼り付けてください。"); } }
           } : undefined;
 
           if (field.name === "market_report") {
@@ -2303,7 +2329,7 @@ const GuidePage = ({ onNavigate }) => {
           <li>① 入力データ欄に情報を入力する。「自動転記」「参照」「自動振り分け」ボタンを活用してください</li>
           <li style={{ marginTop: 4 }}><span style={{ fontWeight: 700 }}>自動転記（ネイビー）</span>：押すと前のSTEPの出力が自動で入力欄に入る</li>
           <li style={{ marginTop: 4 }}><span style={{ fontWeight: 700 }}>参照（薄ネイビー）</span>：押すと画面右側に前のSTEPの出力が表示される</li>
-          <li style={{ marginTop: 4 }}><span style={{ fontWeight: 700 }}>自動振り分け（ゴールド）</span>：STEP3専用。書籍プロファイル確定版（または草案）から該当箇所を自動で抽出</li>
+          <li style={{ marginTop: 4 }}><span style={{ fontWeight: 700 }}>自動振り分け（ゴールド）</span>：STEP3専用。STEP2出力（検索者の意図／狙い目の切り口）と書籍プロファイル確定版から該当箇所を自動で抽出</li>
           <li style={{ marginTop: 8 }}>② 「実行する」ボタンを押すとAIが自動で処理し、結果が出力欄に表示される</li>
           <li>③ 内容を確認・修正して「出力データを保存」を押す</li>
         </ul>
