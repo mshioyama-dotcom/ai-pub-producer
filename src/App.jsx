@@ -389,7 +389,7 @@ function splitStep2Output(text) {
     return m ? m[1].trim() : "";
   };
   const marketParts = [];
-  ["市場像", "書籍プロファイル需要診断", "総合勝率診断"].forEach((h) => {
+  ["市場像", "書籍プロファイル需要診断", "総合勝率診断", "検索者の意図（仮説）", "狙い目の切り口"].forEach((h) => {
     const content = extract(h);
     if (content) marketParts.push(`### ${h}\n\n${content}`);
   });
@@ -1775,10 +1775,10 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
               <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordWrap: "break-word", fontFamily: "inherit", fontSize: 13, lineHeight: 1.85, color: C.text }}>{sections.market}</pre>
             </Card>
           ) : (
-            <div style={{ fontSize: 12.5, color: C.textSub, padding: "10px 14px", background: "#f8f8f8", borderRadius: 4, border: `1px dashed ${C.border}` }}>市場像・需要診断・勝率診断の詳細。「開く」ボタンで表示します。</div>
+            <div style={{ fontSize: 12.5, color: C.textSub, padding: "10px 14px", background: "#f8f8f8", borderRadius: 4, border: `1px dashed ${C.border}` }}>市場像・需要診断・勝率診断・検索者の意図・狙い目の切り口の詳細。「開く」ボタンで表示します。</div>
           )
         ) : (
-          <div style={{ padding: "20px 16px", textAlign: "center", color: C.textLight, fontSize: 13, background: "#f8f8f8", borderRadius: 4, border: `1px dashed ${C.border}` }}>市場像・需要診断・勝率診断はSTEP2実行後にここに表示されます</div>
+          <div style={{ padding: "20px 16px", textAlign: "center", color: C.textLight, fontSize: 13, background: "#f8f8f8", borderRadius: 4, border: `1px dashed ${C.border}` }}>市場像・需要診断・勝率診断・検索者の意図・狙い目の切り口はSTEP2実行後にここに表示されます</div>
         )}
       </div>
 
