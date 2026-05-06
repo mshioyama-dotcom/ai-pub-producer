@@ -1482,6 +1482,10 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
       return;
     }
     setIsRunning(true);
+    // クライアント側タイムアウト（4分）：Vercel Function 側 maxDuration=300 と組み合わせて、
+    // どちらかが先に切れたら必ずユーザーにエラー表示が届く
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4 * 60 * 1000);
     try {
       const cleanedTheme = (cleanHtmlMinimal(htmlTheme) || htmlTheme).slice(0, 999000);
       const cleanedReader = htmlReader ? (cleanHtmlMinimal(htmlReader) || htmlReader).slice(0, 999000) : "";
@@ -1494,6 +1498,7 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
       const response = await fetch("/api/dify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           stepNum: 2,
           inputs: {
@@ -1519,8 +1524,13 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
         try { localStorage.setItem(WORK_PROFILE_STEP2_FULL_KEY, out); } catch (e) {}
       }
     } catch (e) {
-      setRunError(`通信エラーが発生しました：${e.message}`);
+      if (e.name === "AbortError") {
+        setRunError("4分以上応答がなかったため処理を中断しました。\n\n原因の可能性：\n・Dify ワークフローに想定以上の時間がかかっている\n・Vercel Function のタイムアウト（プランの maxDuration 上限）に達した\n・Keepa API の応答遅延\n\nもう一度「実行する」を押すか、HTML のサイズを小さく（読者軸／差分軸を一旦なしに）して再試行してください。");
+      } else {
+        setRunError(`通信エラーが発生しました：${e.message}`);
+      }
     } finally {
+      clearTimeout(timeoutId);
       setIsRunning(false);
     }
   };
