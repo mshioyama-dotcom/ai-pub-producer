@@ -223,6 +223,8 @@ const WORK_PROFILE_KEY = "aipub:work_profile_draft";
 const WORK_PROFILE_CONFIRMED_KEY = "aipub:work_profile_confirmed";
 const WORK_PROFILE_STEP2_FULL_KEY = "aipub:work_profile_step2_full";
 const STEP1_PENDING_KEY = "aipub:step1_pending_inputs";
+const STEP1_INPUTS_KEY = "aipub:step1_inputs";
+const STEP2_INPUTS_KEY = "aipub:step2_inputs";
 
 const defaultProject = () => ({
   projectName: "新しい企画",
@@ -272,7 +274,17 @@ async function loadAllSteps() {
   return all;
 }
 async function resetAllData() {
-  try { localStorage.removeItem(STORAGE_KEY); for (let i = 1; i <= 10; i++) { localStorage.removeItem(STEPS_KEY_PREFIX + i); } localStorage.removeItem(AUTHOR_PROFILE_KEY); } catch (e) { console.error(e); }
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    for (let i = 1; i <= 10; i++) { localStorage.removeItem(STEPS_KEY_PREFIX + i); }
+    localStorage.removeItem(AUTHOR_PROFILE_KEY);
+    localStorage.removeItem(WORK_PROFILE_KEY);
+    localStorage.removeItem(WORK_PROFILE_CONFIRMED_KEY);
+    localStorage.removeItem(WORK_PROFILE_STEP2_FULL_KEY);
+    localStorage.removeItem(STEP1_PENDING_KEY);
+    localStorage.removeItem(STEP1_INPUTS_KEY);
+    localStorage.removeItem(STEP2_INPUTS_KEY);
+  } catch (e) { console.error(e); }
 }
 
 async function loadAuthorProfile() {
@@ -1083,9 +1095,24 @@ const Step1Page = ({ savedAuthorProfile, savedWorkProfile, onSaveWorkProfile, on
   // pendingApply は親 App が navigate 時に 1 回だけ consume したものを props で受け渡す
   const pending = pendingApply || {};
 
-  const [theme, setTheme] = useState(pending.theme || "");
-  const [motivation, setMotivation] = useState(pending.motivation || "");
-  const [readerHypothesis, setReaderHypothesis] = useState(pending.readerHypothesis || "");
+  // localStorage から永続化された入力データを読む（pendingApply > localStorage > "" の優先順位）
+  const savedInputs = (() => {
+    try {
+      const raw = (typeof window !== "undefined") ? localStorage.getItem(STEP1_INPUTS_KEY) : null;
+      return raw ? (JSON.parse(raw) || {}) : {};
+    } catch { return {}; }
+  })();
+
+  const [theme, setTheme] = useState(pending.theme || savedInputs.theme || "");
+  const [motivation, setMotivation] = useState(pending.motivation || savedInputs.motivation || "");
+  const [readerHypothesis, setReaderHypothesis] = useState(pending.readerHypothesis || savedInputs.readerHypothesis || "");
+
+  // 入力欄の変更を localStorage に自動保存（debounce 不要・小さなテキストなので直書きでOK）
+  useEffect(() => {
+    try {
+      localStorage.setItem(STEP1_INPUTS_KEY, JSON.stringify({ theme, motivation, readerHypothesis }));
+    } catch (e) { console.error(e); }
+  }, [theme, motivation, readerHypothesis]);
   const [isRunning, setIsRunning] = useState(false);
   const [runError, setRunError] = useState("");
   const [outputText, setOutputText] = useState(savedWorkProfile || "");
@@ -1309,14 +1336,32 @@ const ApplyToStep1Button = ({ title, proposal, onApply }) => {
 const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfileConfirmed, onSaveWorkProfileConfirmed, onNavigate, onApplyToStep1Pending }) => {
   const initialKeywords = useMemo(() => extractKeywords3Axes(savedWorkProfileDraft), [savedWorkProfileDraft]);
 
-  const [keywordTheme, setKeywordTheme] = useState(initialKeywords.theme);
+  // localStorage から永続化された入力データを読む（既存値 > 草案からの自動抽出 の優先順位）
+  // ※ HTML はサイズが大きい（数十KB×3軸）ので localStorage 保存対象に含めない
+  const savedInputs = (() => {
+    try {
+      const raw = (typeof window !== "undefined") ? localStorage.getItem(STEP2_INPUTS_KEY) : null;
+      return raw ? (JSON.parse(raw) || {}) : {};
+    } catch { return {}; }
+  })();
+
+  const [keywordTheme, setKeywordTheme] = useState(savedInputs.keywordTheme || initialKeywords.theme);
   const [htmlTheme, setHtmlTheme] = useState("");
-  const [readerExpanded, setReaderExpanded] = useState(false);
-  const [keywordReader, setKeywordReader] = useState(initialKeywords.reader);
+  const [readerExpanded, setReaderExpanded] = useState(!!savedInputs.readerExpanded);
+  const [keywordReader, setKeywordReader] = useState(savedInputs.keywordReader || initialKeywords.reader);
   const [htmlReader, setHtmlReader] = useState("");
-  const [diffExpanded, setDiffExpanded] = useState(false);
-  const [keywordDiff, setKeywordDiff] = useState(initialKeywords.diff);
+  const [diffExpanded, setDiffExpanded] = useState(!!savedInputs.diffExpanded);
+  const [keywordDiff, setKeywordDiff] = useState(savedInputs.keywordDiff || initialKeywords.diff);
   const [htmlDiff, setHtmlDiff] = useState("");
+
+  // キーワード3軸と展開状態を localStorage に自動保存（HTML は除外・容量上限のため）
+  useEffect(() => {
+    try {
+      localStorage.setItem(STEP2_INPUTS_KEY, JSON.stringify({
+        keywordTheme, keywordReader, keywordDiff, readerExpanded, diffExpanded,
+      }));
+    } catch (e) { console.error(e); }
+  }, [keywordTheme, keywordReader, keywordDiff, readerExpanded, diffExpanded]);
 
   const [isRunning, setIsRunning] = useState(false);
   const [runError, setRunError] = useState("");
