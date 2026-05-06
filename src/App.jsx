@@ -1289,12 +1289,13 @@ const CopyButton = ({ text, label }) => {
   );
 };
 
-const ApplyToStep1Button = ({ title, proposal }) => {
+const ApplyToStep1Button = ({ title, proposal, onApply }) => {
   const [applied, setApplied] = useState(false);
   const field = STEP1_FIELD_MAP[(title || "").trim()];
   if (!field) return null;
   const handleApply = () => {
-    applyToStep1Pending(title, proposal);
+    applyToStep1Pending(title, proposal); // 後方互換: localStorage
+    onApply?.({ [field]: proposal }); // 直接 App.state も更新
     setApplied(true);
     setTimeout(() => setApplied(false), 2500);
   };
@@ -1305,7 +1306,7 @@ const ApplyToStep1Button = ({ title, proposal }) => {
   );
 };
 
-const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfileConfirmed, onSaveWorkProfileConfirmed, onNavigate }) => {
+const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfileConfirmed, onSaveWorkProfileConfirmed, onNavigate, onApplyToStep1Pending }) => {
   const initialKeywords = useMemo(() => extractKeywords3Axes(savedWorkProfileDraft), [savedWorkProfileDraft]);
 
   const [keywordTheme, setKeywordTheme] = useState(initialKeywords.theme);
@@ -1617,9 +1618,22 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
           {sections.suggestions && (
             <div style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button onClick={() => {
+                const apply = {};
+                let appliedCount = 0;
                 parseStep1Suggestions(sections.suggestions).forEach((item) => {
-                  if (!isUnchanged(item.proposal)) applyToStep1Pending(item.title, item.proposal);
+                  if (isUnchanged(item.proposal)) return;
+                  const field = STEP1_FIELD_MAP[(item.title || "").trim()];
+                  if (!field) return;
+                  apply[field] = item.proposal;
+                  appliedCount++;
+                  // 後方互換: localStorage にも書いておく（手動リロード等の経路でも反映されるため）
+                  applyToStep1Pending(item.title, item.proposal);
                 });
+                if (appliedCount === 0) {
+                  alert("反映できる提案が見つかりませんでした。\n提案がすべて「変更なし」、または項目名（仮テーマ／動機／想定読者）が STEP2 出力で正しく出ていない可能性があります。");
+                  return;
+                }
+                onApplyToStep1Pending?.(apply);
                 onNavigate("step_1");
               }} style={{ padding: "8px 14px", background: C.gold, color: C.white, border: "none", borderRadius: 4, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                 ✨ 全提案を反映してSTEP1へ
@@ -1651,13 +1665,13 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
                   </div>
                   {!unchanged && (
                     <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-                      <ApplyToStep1Button title={item.title} proposal={item.proposal} />
+                      <ApplyToStep1Button title={item.title} proposal={item.proposal} onApply={onApplyToStep1Pending} />
                       <CopyButton text={item.proposal} label="クリップボードにコピー" />
                     </div>
                   )}
                   {unchanged && item.current && (
                     <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-                      <ApplyToStep1Button title={item.title} proposal={item.current} />
+                      <ApplyToStep1Button title={item.title} proposal={item.current} onApply={onApplyToStep1Pending} />
                       <CopyButton text={item.current} label="クリップボードにコピー" />
                     </div>
                   )}
@@ -2413,6 +2427,15 @@ export default function App() {
     window.scrollTo?.(0, 0);
   }, []);
 
+  const handleApplyToStep1Pending = useCallback((apply) => {
+    if (!apply) return;
+    setStep1PendingApply((prev) => {
+      const merged = { ...(prev || {}) };
+      Object.entries(apply).forEach(([k, v]) => { if (v) merged[k] = v; });
+      return Object.keys(merged).length > 0 ? merged : null;
+    });
+  }, []);
+
   const handleSaveInput = useCallback(async (num, inputData) => {
     const existing = allSteps[num] || defaultStepData(num);
     const updated = { ...existing, inputData, status: existing.status === "completed" ? "completed" : "in_progress", updatedAt: new Date().toISOString() };
@@ -2457,7 +2480,7 @@ export default function App() {
     if (page === "saved") return <SavedPage project={project} stepStatuses={stepStatuses} allSteps={allSteps} onNavigate={nav} />;
     if (page === "step_0") return <Step0Page savedProfile={authorProfile} onSaveProfile={handleSaveAuthorProfile} onNavigate={nav} />;
     if (page === "step_1") return <Step1Page savedAuthorProfile={authorProfile} savedWorkProfile={workProfile} onSaveWorkProfile={handleSaveWorkProfile} onNavigate={nav} pendingApply={step1PendingApply} />;
-    if (page === "step_2") return <Step2Page savedAuthorProfile={authorProfile} savedWorkProfileDraft={workProfile} savedWorkProfileConfirmed={workProfileConfirmed} onSaveWorkProfileConfirmed={handleSaveWorkProfileConfirmed} onNavigate={nav} />;
+    if (page === "step_2") return <Step2Page savedAuthorProfile={authorProfile} savedWorkProfileDraft={workProfile} savedWorkProfileConfirmed={workProfileConfirmed} onSaveWorkProfileConfirmed={handleSaveWorkProfileConfirmed} onNavigate={nav} onApplyToStep1Pending={handleApplyToStep1Pending} />;
     if (page.startsWith("step_")) {
       const num = parseInt(page.replace("step_", ""), 10);
       const step = STEPS[num - 1];
