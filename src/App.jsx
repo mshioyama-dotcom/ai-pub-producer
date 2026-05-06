@@ -1106,6 +1106,7 @@ const Step1Page = ({ savedAuthorProfile, savedWorkProfile, onSaveWorkProfile, on
   const [theme, setTheme] = useState(pending.theme || savedInputs.theme || "");
   const [motivation, setMotivation] = useState(pending.motivation || savedInputs.motivation || "");
   const [readerHypothesis, setReaderHypothesis] = useState(pending.readerHypothesis || savedInputs.readerHypothesis || "");
+  const [inputSaveMsg, setInputSaveMsg] = useState(false);
 
   // 入力欄の変更を localStorage に自動保存（debounce 不要・小さなテキストなので直書きでOK）
   useEffect(() => {
@@ -1113,6 +1114,14 @@ const Step1Page = ({ savedAuthorProfile, savedWorkProfile, onSaveWorkProfile, on
       localStorage.setItem(STEP1_INPUTS_KEY, JSON.stringify({ theme, motivation, readerHypothesis }));
     } catch (e) { console.error(e); }
   }, [theme, motivation, readerHypothesis]);
+
+  const handleSaveInputs = () => {
+    try {
+      localStorage.setItem(STEP1_INPUTS_KEY, JSON.stringify({ theme, motivation, readerHypothesis }));
+      setInputSaveMsg(true);
+      setTimeout(() => setInputSaveMsg(false), 2500);
+    } catch (e) { console.error(e); }
+  };
   const [isRunning, setIsRunning] = useState(false);
   const [runError, setRunError] = useState("");
   const [outputText, setOutputText] = useState(savedWorkProfile || "");
@@ -1262,6 +1271,12 @@ const Step1Page = ({ savedAuthorProfile, savedWorkProfile, onSaveWorkProfile, on
             rows={3}
             style={{ width: "100%", padding: "10px 12px", fontSize: 14, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.7 }} />
         </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 12 }}>
+          <BtnPrimary onClick={handleSaveInputs}>入力データを保存</BtnPrimary>
+          {inputSaveMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました</span>}
+          <span style={{ fontSize: 11.5, color: C.textLight }}>※ 入力中も自動保存されます</span>
+        </div>
       </div>
 
       <div style={{ marginBottom: 28 }}>
@@ -1362,6 +1377,17 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
       }));
     } catch (e) { console.error(e); }
   }, [keywordTheme, keywordReader, keywordDiff, readerExpanded, diffExpanded]);
+
+  const [inputSaveMsg, setInputSaveMsg] = useState(false);
+  const handleSaveInputs = () => {
+    try {
+      localStorage.setItem(STEP2_INPUTS_KEY, JSON.stringify({
+        keywordTheme, keywordReader, keywordDiff, readerExpanded, diffExpanded,
+      }));
+      setInputSaveMsg(true);
+      setTimeout(() => setInputSaveMsg(false), 2500);
+    } catch (e) { console.error(e); }
+  };
 
   const [isRunning, setIsRunning] = useState(false);
   const [runError, setRunError] = useState("");
@@ -1628,6 +1654,12 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
         {renderAxisSection("主題軸", "🎯", true, keywordTheme, setKeywordTheme, htmlTheme, setHtmlTheme, true, () => {})}
         {renderAxisSection("読者軸", "👥", false, keywordReader, setKeywordReader, htmlReader, setHtmlReader, readerExpanded, setReaderExpanded)}
         {renderAxisSection("差分軸", "🪞", false, keywordDiff, setKeywordDiff, htmlDiff, setHtmlDiff, diffExpanded, setDiffExpanded)}
+
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 12 }}>
+          <BtnPrimary onClick={handleSaveInputs}>入力データを保存</BtnPrimary>
+          {inputSaveMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました（キーワード3軸）</span>}
+          <span style={{ fontSize: 11.5, color: C.textLight }}>※ キーワード3軸は入力中も自動保存／HTMLは保存対象外</span>
+        </div>
       </div>
 
       <div style={{ marginBottom: 28 }}>
