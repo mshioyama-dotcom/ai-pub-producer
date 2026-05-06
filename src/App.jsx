@@ -389,7 +389,7 @@ function splitStep2Output(text) {
     return m ? m[1].trim() : "";
   };
   const marketParts = [];
-  ["市場像", "書籍プロファイル需要診断", "総合勝率診断", "検索者の意図（仮説）", "狙い目の切り口"].forEach((h) => {
+  ["市場像", "書籍プロファイル需要診断", "総合勝率診断"].forEach((h) => {
     const content = extract(h);
     if (content) marketParts.push(`### ${h}\n\n${content}`);
   });
@@ -443,12 +443,12 @@ function parseWorkProfileForStep3(workProfile) {
     const m = workProfile.match(re);
     return m ? m[1].trim() : "";
   };
-  // intent_lock は書籍プロファイル確定版には「検索者の意図」セクションが無いので空のまま。
-  // STEP2 全文（## 検索者の意図セクション）から取得するのを優先（呼び出し側のフォールバック順序参照）。
-  // 想定読者を intent_lock に流す旧フォールバックは誤情報を生むため廃止。
-  const intent = "";
-  // ポジショニング仮説→market_report 候補（書籍プロファイル確定版にしかないケースの補助）
-  const posSection = sectionOf("ポジショニング仮説") || sectionOf("ポジショニング") || sectionOf("差別化軸") || sectionOf("狙い目切り口") || sectionOf("狙い目の切り口");
+  // 確定版の「■ 検索者の意図（仮説）」セクションから抽出
+  // 旧版（市場検証セクション側に「## 検索者の意図」があった頃）は parseStep2Output 側でカバー
+  const intentSection = sectionOf("検索者の意図（仮説）") || sectionOf("検索者の意図");
+  const intent = intentSection ? intentSection.split(/\n+/).map((l) => l.trim()).filter(Boolean).join(" ") : "";
+  // 確定版の「■ 狙い目の切り口」セクションから抽出
+  const posSection = sectionOf("狙い目の切り口") || sectionOf("狙い目切り口") || sectionOf("ポジショニング仮説") || sectionOf("ポジショニング") || sectionOf("差別化軸");
   const markets = [];
   if (posSection) {
     const lines = posSection.split("\n").map((l) => l.trim()).filter(Boolean);
@@ -1775,10 +1775,10 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
               <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordWrap: "break-word", fontFamily: "inherit", fontSize: 13, lineHeight: 1.85, color: C.text }}>{sections.market}</pre>
             </Card>
           ) : (
-            <div style={{ fontSize: 12.5, color: C.textSub, padding: "10px 14px", background: "#f8f8f8", borderRadius: 4, border: `1px dashed ${C.border}` }}>市場像・需要診断・勝率診断・検索者の意図・狙い目の切り口の詳細。「開く」ボタンで表示します。</div>
+            <div style={{ fontSize: 12.5, color: C.textSub, padding: "10px 14px", background: "#f8f8f8", borderRadius: 4, border: `1px dashed ${C.border}` }}>市場像・需要診断・勝率診断の詳細。「開く」ボタンで表示します（検索者の意図・狙い目の切り口は ③ 書籍プロファイル確定版の中に含まれます）。</div>
           )
         ) : (
-          <div style={{ padding: "20px 16px", textAlign: "center", color: C.textLight, fontSize: 13, background: "#f8f8f8", borderRadius: 4, border: `1px dashed ${C.border}` }}>市場像・需要診断・勝率診断・検索者の意図・狙い目の切り口はSTEP2実行後にここに表示されます</div>
+          <div style={{ padding: "20px 16px", textAlign: "center", color: C.textLight, fontSize: 13, background: "#f8f8f8", borderRadius: 4, border: `1px dashed ${C.border}` }}>市場像・需要診断・勝率診断はSTEP2実行後にここに表示されます（検索者の意図・狙い目の切り口は ③ 書籍プロファイル確定版の中に含まれます）</div>
         )}
       </div>
 
