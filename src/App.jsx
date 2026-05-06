@@ -73,7 +73,7 @@ const STEPS = [
     inputs: [
       { name: "keyword1", label: "検索キーワード1", desc: "STEP2で確定した1語目", source: "STEP2", required: true, type: "text", autoFill: false, maxChars: 128 },
       { name: "keyword2", label: "検索キーワード2", desc: "STEP2で確定した2語目", source: "STEP2", required: true, type: "text", autoFill: false, maxChars: 256 },
-      { name: "intent_lock", label: "検索意図仮説", desc: "STEP2の出力から「🎯 検索者の意図（仮説）」の文章を見つけて、そのまま貼り付けてください。", source: "STEP2", required: true, type: "textarea", autoFill: false, maxChars: 256 },
+      { name: "intent_lock", label: "検索意図仮説", desc: "STEP2の出力から「## 検索者の意図（仮説）」セクションの文章を貼り付けてください。「自動振り分け」ボタンで自動入力できます（STEP2の最新YMLが必要）。出力に該当セクションが無い場合は手動で記入してください（読者がこのキーワードで何を知りたいかを1文で）。", source: "STEP2", required: true, type: "textarea", autoFill: false, maxChars: 256 },
       { name: "market_report", label: "狙い目切り口（任意）", desc: "STEP2で見つけた「狙い目の切り口」の中から、書きたい切り口を1つ選んでください。", source: "STEP2", required: false, type: "textarea", autoFill: false, maxChars: 256 }
     ],
     outputTitle: "設計結果",
@@ -443,11 +443,12 @@ function parseWorkProfileForStep3(workProfile) {
     const m = workProfile.match(re);
     return m ? m[1].trim() : "";
   };
-  // 想定読者→intent_lock のシード
-  const readerSection = sectionOf("想定読者");
-  const intent = readerSection.split(/\n+/).map((l) => l.trim()).filter((l) => l && !/^[-・*•]\s*$/.test(l))[0] || "";
-  // ポジショニング仮説→market_report 候補
-  const posSection = sectionOf("ポジショニング仮説") || sectionOf("差別化軸") || sectionOf("狙い目切り口") || sectionOf("狙い目の切り口");
+  // intent_lock は書籍プロファイル確定版には「検索者の意図」セクションが無いので空のまま。
+  // STEP2 全文（## 検索者の意図セクション）から取得するのを優先（呼び出し側のフォールバック順序参照）。
+  // 想定読者を intent_lock に流す旧フォールバックは誤情報を生むため廃止。
+  const intent = "";
+  // ポジショニング仮説→market_report 候補（書籍プロファイル確定版にしかないケースの補助）
+  const posSection = sectionOf("ポジショニング仮説") || sectionOf("ポジショニング") || sectionOf("差別化軸") || sectionOf("狙い目切り口") || sectionOf("狙い目の切り口");
   const markets = [];
   if (posSection) {
     const lines = posSection.split("\n").map((l) => l.trim()).filter(Boolean);
@@ -2022,8 +2023,8 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
             if (!parsed) { alert("STEP2の出力（または書籍プロファイル）が見つかりません。\n\nSTEP2を実行して保存してから、もう一度お試しください。"); return; }
             if (field.name === "keyword1") { if (parsed.keyword1) handleInputChange("keyword1", parsed.keyword1); else alert("STEP2出力／書籍プロファイルから「主題軸キーワード1」が見つかりませんでした。手動で入力してください。"); }
             if (field.name === "keyword2") { if (parsed.keyword2) handleInputChange("keyword2", parsed.keyword2); else alert("STEP2出力／書籍プロファイルから「主題軸キーワード2」が見つかりませんでした。手動で入力してください。"); }
-            if (field.name === "intent_lock") { if (parsed.intent) handleInputChange("intent_lock", parsed.intent); else alert("STEP2出力に「## 検索者の意図（仮説）」セクションが見つかりませんでした。手動でコピーして貼り付けてください。"); }
-            if (field.name === "market_report") { if (parsed.markets && parsed.markets.length > 0) { setMarketOptions(parsed.markets); setSelectedMarket(null); handleInputChange("market_report", ""); } else { alert("STEP2出力に「## 狙い目の切り口」セクションが見つかりませんでした。手動でコピーして貼り付けてください。"); } }
+            if (field.name === "intent_lock") { if (parsed.intent) handleInputChange("intent_lock", parsed.intent); else alert("STEP2 出力に「## 検索者の意図（仮説）」セクションが見つかりませんでした。\n\n対処：\n・Dify cloud の STEP2 アプリで最新の YML が公開済みか確認し、STEP2 を再実行してください\n・または、手動で入力してください（読者がこのキーワードで何を知りたいかを1文で）"); }
+            if (field.name === "market_report") { if (parsed.markets && parsed.markets.length > 0) { setMarketOptions(parsed.markets); setSelectedMarket(null); handleInputChange("market_report", ""); } else { alert("STEP2 出力に「## 狙い目の切り口」セクションが見つかりませんでした。\n\n対処：\n・Dify cloud の STEP2 アプリで最新の YML が公開済みか確認し、STEP2 を再実行してください\n・または、手動で入力してください（任意項目）"); } }
           } : undefined;
 
           if (field.name === "market_report") {
