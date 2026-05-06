@@ -1427,7 +1427,6 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
   const [draftPreviewOpen, setDraftPreviewOpen] = useState(false);
   const [procedureOpen, setProcedureOpen] = useState(false);
   const [competitorsOpen, setCompetitorsOpen] = useState(false);
-  const [rawOutputOpen, setRawOutputOpen] = useState(false);
   const [marketResultOpen, setMarketResultOpen] = useState(false);
 
   const sections = useMemo(() => splitStep2Output(outputText), [outputText]);
@@ -1796,19 +1795,6 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
         </div>
       )}
 
-      {outputText && (
-        <div style={{ marginBottom: 24 }}>
-          <div onClick={() => setRawOutputOpen(!rawOutputOpen)} style={{ fontSize: 12.5, color: C.textLight, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 0", fontWeight: 600 }}>
-            <span style={{ transform: rawOutputOpen ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.15s", display: "inline-block" }}>▶</span>
-            🔧 全文出力（デバッグ用）
-          </div>
-          {rawOutputOpen && (
-            <textarea value={outputText} onChange={(e) => setOutputText(e.target.value)}
-              rows={20}
-              style={{ width: "100%", padding: "10px 12px", fontSize: 12, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "monospace", background: "#fafafa", lineHeight: 1.7, color: C.textSub, marginTop: 8 }} />
-          )}
-        </div>
-      )}
     </div>
   );
 };
