@@ -1456,11 +1456,16 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
 
   const getHtmlStatus = (html) => {
     if (!html) return { label: "未入力", color: C.textLight, bg: "rgba(0,0,0,0.04)" };
-    const isCleanedFormat = /^\s*<div\s+data-asin/i.test(html);
-    const looksLikeHtml = /data-asin|<div|<html|<!DOCTYPE/i.test(html);
-    if (isCleanedFormat) return { label: "✓ HTML検知（整形済み）", color: C.green, bg: C.greenLight };
-    if (looksLikeHtml) return { label: "✓ HTML検知", color: C.green, bg: C.greenLight };
-    return { label: "⚠ HTMLではない可能性", color: C.gold, bg: C.goldPale };
+    // cleanHtmlMinimal を実際に実行してASIN抽出件数を算出（クリーニング後のサイズ感を可視化）
+    const cleaned = cleanHtmlMinimal(html);
+    const asinMatches = cleaned.match(/data-asin="[A-Za-z0-9]{10}"/g) || [];
+    const asinCount = new Set(asinMatches.map((s) => s)).size;
+    const rawKb = Math.round(html.length / 1024);
+    const cleanedKb = Math.round(cleaned.length / 1024);
+    if (asinCount === 0) {
+      return { label: `⚠ ASIN抽出0件（生${rawKb}KB→処理0KB）／検索結果ページか確認`, color: C.gold, bg: C.goldPale };
+    }
+    return { label: `✓ ASIN ${asinCount}件抽出（生${rawKb}KB→処理${cleanedKb}KB）`, color: C.green, bg: C.greenLight };
   };
 
   const handleGenerate = async () => {
@@ -1481,15 +1486,28 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
       setRunError("主題軸のAmazon HTMLを貼り付けてください（必須・最低1軸）。");
       return;
     }
+    // HTMLクリーニング → 空ならエラー表示して停止（生HTMLをそのまま送る旧フォールバックは削除）
+    const cleanedTheme = cleanHtmlMinimal(htmlTheme);
+    if (!cleanedTheme || cleanedTheme.length === 0) {
+      setRunError("主題軸のAmazon HTMLから検索結果（ASIN）を抽出できませんでした。\n\n貼り付けたテキストが Amazon Kindleストアの検索結果ページのソースHTML（右クリック→「ページのソースを表示」→Ctrl+A→Ctrl+C）になっているか確認してください。\n\n別のページ（商品詳細・カテゴリTOP等）のHTMLでは ASIN が抽出できません。");
+      return;
+    }
+    const cleanedReader = htmlReader ? cleanHtmlMinimal(htmlReader) : "";
+    const cleanedDiff = htmlDiff ? cleanHtmlMinimal(htmlDiff) : "";
+    if (htmlReader && htmlReader.trim() && (!cleanedReader || cleanedReader.length === 0)) {
+      setRunError("読者軸のAmazon HTMLから検索結果（ASIN）を抽出できませんでした。読者軸のHTMLが正しいか確認するか、空欄にして再実行してください。");
+      return;
+    }
+    if (htmlDiff && htmlDiff.trim() && (!cleanedDiff || cleanedDiff.length === 0)) {
+      setRunError("差分軸のAmazon HTMLから検索結果（ASIN）を抽出できませんでした。差分軸のHTMLが正しいか確認するか、空欄にして再実行してください。");
+      return;
+    }
     setIsRunning(true);
     // クライアント側タイムアウト（4分）：Vercel Function 側 maxDuration=300 と組み合わせて、
     // どちらかが先に切れたら必ずユーザーにエラー表示が届く
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 4 * 60 * 1000);
     try {
-      const cleanedTheme = (cleanHtmlMinimal(htmlTheme) || htmlTheme).slice(0, 999000);
-      const cleanedReader = htmlReader ? (cleanHtmlMinimal(htmlReader) || htmlReader).slice(0, 999000) : "";
-      const cleanedDiff = htmlDiff ? (cleanHtmlMinimal(htmlDiff) || htmlDiff).slice(0, 999000) : "";
       const motivation = extractMotivation(savedWorkProfileDraft);
       // 主題軸キーワードを半角スペースで2分割（旧STEP2 Keepaパイプラインの keyword1/keyword2 互換）
       const themeWords = keywordTheme.trim().split(/\s+/);
@@ -1520,8 +1538,13 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
         setRunError(data.error || "生成中にエラーが発生しました。少し時間をおいて再度お試しください。");
       } else {
         const out = data.output || "";
-        setOutputText(out);
-        try { localStorage.setItem(WORK_PROFILE_STEP2_FULL_KEY, out); } catch (e) {}
+        if (!out || out.length < 50) {
+          // 出力が空または異常に短い場合は警告（成功レスポンスを装って空が返るケース）
+          setRunError(`Dify から有効な出力が返ってきませんでした（出力長 ${out.length} 文字）。\n\n原因の可能性：\n・Keepa API キーが Dify 側に設定されていない／無効\n・主題軸キーワードでの Amazon 検索結果が0件で Keepa 呼び出しが空\n・Dify ワークフロー内部でエラー（Dify のログを確認）\n\nDify cloud の「STEP2_市場検証_書籍プロファイル確定」アプリのログを確認してください。`);
+        } else {
+          setOutputText(out);
+          try { localStorage.setItem(WORK_PROFILE_STEP2_FULL_KEY, out); } catch (e) {}
+        }
       }
     } catch (e) {
       if (e.name === "AbortError") {
