@@ -1621,16 +1621,18 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
                 const apply = {};
                 let appliedCount = 0;
                 parseStep1Suggestions(sections.suggestions).forEach((item) => {
-                  if (isUnchanged(item.proposal)) return;
                   const field = STEP1_FIELD_MAP[(item.title || "").trim()];
                   if (!field) return;
-                  apply[field] = item.proposal;
+                  // 「変更なし」なら現状値を、提案ありならその提案を反映（個別ボタンと同じ仕様）
+                  const value = isUnchanged(item.proposal) ? item.current : item.proposal;
+                  if (!value || !value.trim()) return;
+                  apply[field] = value;
                   appliedCount++;
                   // 後方互換: localStorage にも書いておく（手動リロード等の経路でも反映されるため）
-                  applyToStep1Pending(item.title, item.proposal);
+                  applyToStep1Pending(item.title, value);
                 });
                 if (appliedCount === 0) {
-                  alert("反映できる提案が見つかりませんでした。\n提案がすべて「変更なし」、または項目名（仮テーマ／動機／想定読者）が STEP2 出力で正しく出ていない可能性があります。");
+                  alert("反映できる提案が見つかりませんでした。\n項目名（仮テーマ／動機／想定読者）が STEP2 出力で正しく出ていない可能性があります。");
                   return;
                 }
                 onApplyToStep1Pending?.(apply);
