@@ -139,7 +139,25 @@ workflow:
           required: false
           type: paragraph
           variable: work_profile
-      height: 280
+        - default: ''
+          hint: 改善要望機構用。前回の出力をそのまま渡す（Phase 2機能）
+          label: 前回出力（改善要望がある場合のみ）
+          max_length: 16000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: previous_output
+        - default: ''
+          hint: 改善要望機構用。相談機能で固めた方針を1段落で渡す（Phase 2機能）
+          label: 改善要望
+          max_length: 4000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: improvement_request
+      height: 360
       id: '1772343147375'
       position:
         x: 80
@@ -426,6 +444,10 @@ workflow:
             内容・ストーリーライン（書籍プロファイルから読み取る：仮テーマ・想定読者・読了後の状態・狙い目の切り口）
 
             独自エピソード・差別化要素 ({{#1772343147375.diff_elements#}})
+
+            前回出力（改善要望がある場合のみ参照） ({{#1772343147375.previous_output#}})
+
+            改善要望（相談機能でユーザーがAIと議論した結果の方針） ({{#1772343147375.improvement_request#}})
 
 
             Output Format

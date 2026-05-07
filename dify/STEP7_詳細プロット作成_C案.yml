@@ -143,7 +143,25 @@ workflow:
           required: false
           type: paragraph
           variable: work_profile
-      height: 230
+        - default: ''
+          hint: 改善要望機構用。前回の出力をそのまま渡す（Phase 2機能）
+          label: 前回出力（改善要望がある場合のみ）
+          max_length: 16000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: previous_output
+        - default: ''
+          hint: 改善要望機構用。相談機能で固めた方針を1段落で渡す（Phase 2機能）
+          label: 改善要望
+          max_length: 4000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: improvement_request
+      height: 310
       id: '1773057012167'
       position:
         x: 80

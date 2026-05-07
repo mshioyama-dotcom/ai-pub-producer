@@ -121,7 +121,25 @@ workflow:
           required: false
           type: paragraph
           variable: work_profile
-      height: 230
+        - default: ''
+          hint: 改善要望機構用。前回の出力をそのまま渡す（Phase 2機能）
+          label: 前回出力（改善要望がある場合のみ）
+          max_length: 16000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: previous_output
+        - default: ''
+          hint: 改善要望機構用。相談機能で固めた方針を1段落で渡す（Phase 2機能）
+          label: 改善要望
+          max_length: 4000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: improvement_request
+      height: 310
       id: '1772856018370'
       position:
         x: 576.0754893040655
@@ -271,6 +289,20 @@ workflow:
             で囲ったベネフィット文の出力
 
             目次末尾へのレビュー依頼・特典案内・関連書籍案内
+
+            【改善要望機構】
+
+            previous_output（前回出力）と improvement_request（改善要望）の両方が入力されている場合は、これは「ユーザーが前回出力を確認し、相談機能でAIと議論した結果、特定の修正を希望している」シナリオです。以下の手順で出力してください。
+
+            手順1：improvement_request の内容を読み、どの部分を、どのように修正するのかを把握する。
+
+            手順2：修正対象でない部分は、previous_output からそのまま引き継ぐ。一字も変更しない。
+
+            手順3：修正対象の部分だけを、improvement_request の方針に従って修正する。
+
+            手順4：他の入力（仮テーマ、エピソード、書籍プロファイル等）は新規生成と同じく参照する。
+
+            両方が空欄の場合は通常通り新規生成してください。improvement_requestのみで previous_output が空の場合も、新規生成として improvement_request の方針を反映してください。
 
             Output Format
 

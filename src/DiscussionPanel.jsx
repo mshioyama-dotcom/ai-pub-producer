@@ -58,6 +58,7 @@ export default function DiscussionPanel({
   projectId = "",
   onApplyToImprovementRequest, // 任意（Phase 2用）
   onTransferToOutput,          // 任意：直近のAI回答を出力データへ転記する関数
+  onRegenerateWithRequest,     // Phase 2: 議論ログを要約してSTEP本体を再生成する関数 (improvementRequest: string) => Promise
 }) {
   const storageKey = discussionStorageKey(projectId, stepNum);
 
@@ -83,6 +84,9 @@ export default function DiscussionPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [applyMsg, setApplyMsg] = useState("");
+  // Phase 2: 「✨ この方針で再生成」ボタン用の状態
+  const [regenerating, setRegenerating] = useState(false);
+  const [regeneratePhase, setRegeneratePhase] = useState(""); // "summarizing" | "regenerating" | ""
   const chatAreaRef = useRef(null);
 
   // STEP変更時に状態を読み直す
@@ -209,6 +213,85 @@ export default function DiscussionPanel({
       });
     }
     setTimeout(() => setApplyMsg(""), 2500);
+  };
+
+  // Phase 2: 「✨ この方針で再生成」ボタン
+  // 議論ログをAIに要約させ、それを improvement_request として STEP本体の再生成APIに渡す
+  const handleRegenerate = async () => {
+    if (!onRegenerateWithRequest) return;
+    if (!hasAssistantMessage) {
+      setError("先にAIと議論してから再生成してください。");
+      return;
+    }
+    if (!stepOutput || !stepOutput.trim()) {
+      setError("再生成には前回の出力が必要です。先にSTEPを実行して出力を生成してください。");
+      return;
+    }
+
+    setError("");
+    setRegenerating(true);
+    setRegeneratePhase("summarizing");
+
+    try {
+      // Step 1: 議論ログをAIに要約させる（discussion Chatflowに対して「まとめて」と指示）
+      const summarizeRequest = "ここまでの議論を踏まえ、再生成用の改善要望を1段落で整理してください。" +
+        "形式は『どの部分を、どう修正するか』を明確に書く。" +
+        "変更しない案・部分には『そのまま維持』と明示する。" +
+        "あなたの返答全文がそのまま改善要望テキストとして使われるので、前置きや確認の問いかけは含めず、改善要望本文のみを返してください。";
+
+      const summarizeResponse = await fetch("/api/discuss", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stepNum,
+          stepName,
+          stepRules,
+          stepInputSummary,
+          stepOutput,
+          authorProfile,
+          workProfile,
+          message: summarizeRequest,
+          conversationId,
+        }),
+      });
+      const summarizeData = await summarizeResponse.json();
+      if (!summarizeResponse.ok) {
+        throw new Error(summarizeData.error || "要約に失敗しました");
+      }
+      const improvementRequest = (summarizeData.answer || "").trim();
+      if (!improvementRequest) {
+        throw new Error("AIからの要約が空でした");
+      }
+      // 議論ログにも追加（ユーザーから見える形にする）
+      setMessages((prev) => [
+        ...prev,
+        { role: "user", content: "[システム] この方針で再生成します", _system: true },
+        { role: "assistant", content: improvementRequest, _summary: true },
+      ]);
+      if (summarizeData.conversation_id) setConversationId(summarizeData.conversation_id);
+
+      // Step 2: 確認ダイアログ
+      const confirmMsg = `以下の改善要望でSTEP${stepNum}「${stepName}」を再生成します。よろしいですか？\n\n` +
+        `【改善要望】\n${improvementRequest.length > 500 ? improvementRequest.slice(0, 500) + "..." : improvementRequest}\n\n` +
+        `（既存の出力データは上書きされます。コピー履歴は手動で別途残してください）`;
+      if (!confirm(confirmMsg)) {
+        setRegenerating(false);
+        setRegeneratePhase("");
+        return;
+      }
+
+      // Step 3: STEP本体の再生成APIを呼ぶ
+      setRegeneratePhase("regenerating");
+      await onRegenerateWithRequest(improvementRequest);
+
+      setApplyMsg("✓ 再生成が完了しました（出力データを確認してください）");
+      setTimeout(() => setApplyMsg(""), 4000);
+    } catch (e) {
+      setError(`再生成中にエラー：${e.message}`);
+    } finally {
+      setRegenerating(false);
+      setRegeneratePhase("");
+    }
   };
 
   // 折りたたみ時のヘッダー表示
@@ -381,42 +464,66 @@ export default function DiscussionPanel({
           {/* アクションボタン群 */}
           <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              {/* メインアクション：出力データへ転記（onTransferToOutputが供給されていれば） */}
-              {onTransferToOutput && (
+              {/* Phase 2: メインアクション「✨ この方針で再生成」 */}
+              {/* onRegenerateWithRequest が供給されている場合のみ表示。STEP本体を改善要望付きで再実行する */}
+              {onRegenerateWithRequest && (
                 <button
-                  onClick={handleTransferToOutput}
-                  disabled={!hasAssistantMessage}
+                  onClick={handleRegenerate}
+                  disabled={!hasAssistantMessage || regenerating}
                   style={{
                     fontSize: 13,
                     fontWeight: 700,
-                    color: hasAssistantMessage ? C.white : C.textLight,
-                    background: hasAssistantMessage ? C.gold : "rgba(0,0,0,0.06)",
+                    color: (!hasAssistantMessage || regenerating) ? C.textLight : C.white,
+                    background: (!hasAssistantMessage || regenerating) ? "rgba(0,0,0,0.06)" : C.navy,
                     border: "none",
                     borderRadius: 3,
-                    padding: "8px 18px",
-                    cursor: hasAssistantMessage ? "pointer" : "default",
+                    padding: "9px 20px",
+                    cursor: (!hasAssistantMessage || regenerating) ? "default" : "pointer",
+                    boxShadow: (!hasAssistantMessage || regenerating) ? "none" : "0 2px 4px rgba(36,61,92,0.25)",
                   }}
                 >
-                  ↓ 直近のAI回答を出力データへ転記
+                  {regenerating
+                    ? (regeneratePhase === "summarizing" ? "📝 議論を要約中..." : "🔄 再生成中...")
+                    : "✨ この方針で再生成"}
+                </button>
+              )}
+
+              {/* サブアクション：出力データへ転記（onTransferToOutputが供給されていれば） */}
+              {onTransferToOutput && (
+                <button
+                  onClick={handleTransferToOutput}
+                  disabled={!hasAssistantMessage || regenerating}
+                  style={{
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    color: (!hasAssistantMessage || regenerating) ? C.textLight : C.gold,
+                    background: (!hasAssistantMessage || regenerating) ? "rgba(0,0,0,0.04)" : C.white,
+                    border: `1px solid ${(!hasAssistantMessage || regenerating) ? C.border : C.gold}`,
+                    borderRadius: 3,
+                    padding: "7px 14px",
+                    cursor: (!hasAssistantMessage || regenerating) ? "default" : "pointer",
+                  }}
+                >
+                  ↓ AI回答を出力へ転記
                 </button>
               )}
 
               {/* サブアクション：改善要望欄へ転記 or クリップボードコピー */}
               <button
                 onClick={handleApply}
-                disabled={!hasAssistantMessage}
+                disabled={!hasAssistantMessage || regenerating}
                 style={{
                   fontSize: 12.5,
                   fontWeight: 600,
-                  color: hasAssistantMessage ? C.navy : C.textLight,
-                  background: hasAssistantMessage ? C.white : "rgba(0,0,0,0.04)",
-                  border: `1px solid ${hasAssistantMessage ? C.navy : C.border}`,
+                  color: (!hasAssistantMessage || regenerating) ? C.textLight : C.navy,
+                  background: (!hasAssistantMessage || regenerating) ? "rgba(0,0,0,0.04)" : C.white,
+                  border: `1px solid ${(!hasAssistantMessage || regenerating) ? C.border : C.navy}`,
                   borderRadius: 3,
                   padding: "7px 14px",
-                  cursor: hasAssistantMessage ? "pointer" : "default",
+                  cursor: (!hasAssistantMessage || regenerating) ? "default" : "pointer",
                 }}
               >
-                {onApplyToImprovementRequest ? "↓ 改善要望欄へ転記" : "↓ クリップボードにコピー"}
+                {onApplyToImprovementRequest ? "↓ 改善要望欄へ転記" : "↓ コピー"}
               </button>
 
               {applyMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>{applyMsg}</span>}

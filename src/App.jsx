@@ -2108,6 +2108,52 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     finally { setChatLoading(false); }
   };
 
+  // Phase 2: 相談機能から渡された改善要望をもとにSTEP本体を再実行する
+  // DiscussionPanel の onRegenerateWithRequest として渡される。
+  // STEP YML の【6】改善要望機構が previous_output と improvement_request を読んで
+  // 部分修正版を生成する。
+  const handleRegenerateWithRequest = async (improvementRequest) => {
+    if (!improvementRequest || !improvementRequest.trim()) {
+      throw new Error("改善要望が空です");
+    }
+    if (!outputText || !outputText.trim()) {
+      throw new Error("再生成には前回の出力が必要です");
+    }
+    setRunError("");
+    // workflow型のSTEPでのみ動作（chat型のSTEP1, 3はメインチャットを使うため対象外）
+    // 既存の inputs に previous_output と improvement_request を加えて再実行
+    let execInputs = { ...inputs };
+    if (step.num === 2 && execInputs.amazon_html) {
+      const cleaned = cleanHtmlMinimal(execInputs.amazon_html);
+      if (cleaned) execInputs.amazon_html = cleaned;
+    }
+    if (step.num >= 3) { execInputs = { ...getAutoInjectedProfiles(), ...execInputs }; }
+    execInputs.previous_output = outputText;
+    execInputs.improvement_request = improvementRequest;
+
+    const response = await fetch("/api/dify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stepNum: step.num, inputs: execInputs }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || "再生成に失敗しました");
+    }
+    const newOutput = data.output || "";
+    if (!newOutput || newOutput.length < 50) {
+      throw new Error(`Difyから有効な出力が返りませんでした（出力長 ${newOutput.length} 文字）`);
+    }
+    setOutputText(newOutput);
+    // 再生成入力もログとして残す（previous_output等は除外）
+    const inputsForSave = { ...execInputs };
+    delete inputsForSave.previous_output;
+    delete inputsForSave.improvement_request;
+    delete inputsForSave.author_profile;
+    delete inputsForSave.work_profile;
+    await onSaveInput(step.num, inputsForSave);
+  };
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
@@ -2413,6 +2459,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
 
       {/* 出力相談パネル：全STEP共通。チャット型STEP（既にメインのチャット会話を持つ）でも、出力サマリの再検討用に有用なため表示 */}
       {/* workProfile は軽量化版を渡す：STEP2の出力60KBから市場分析データを除き、相談に必要な核情報のみに圧縮（コスト削減） */}
+      {/* onRegenerateWithRequest: Phase 2の「✨ この方針で再生成」機能。STEP3〜9（workflow型）でのみ提供、STEP3はchat型なので対象外 */}
       <DiscussionPanel
         stepNum={step.num}
         stepName={step.title}
@@ -2421,6 +2468,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         workProfile={extractDiscussionContext(getAutoInjectedProfiles().work_profile || "")}
         projectId={project?.id || ""}
         onTransferToOutput={(text) => setOutputText(text)}
+        onRegenerateWithRequest={step.type !== "chat" ? handleRegenerateWithRequest : undefined}
       />
 
       {step.help && step.help.length > 0 && (
