@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { extractTextFromFile, buildSourceText, ACCEPTED_EXTENSIONS } from "./utils/extractText";
+import DiscussionPanel from "./DiscussionPanel";
 
 // ============================================================
 // デザイントークン（ネイビー × ゴールド × ホワイト）
@@ -2343,6 +2344,16 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           {!nextStep && <BtnSecondary onClick={() => onNavigate("saved")} style={{ background: C.greenLight, color: C.green, border: `1px solid rgba(45,122,79,0.25)` }}>完了 → 保存データを見る</BtnSecondary>}
         </div>
       </div>
+
+      {/* 出力相談パネル：全STEP共通。チャット型STEP（既にメインのチャット会話を持つ）でも、出力サマリの再検討用に有用なため表示 */}
+      <DiscussionPanel
+        stepNum={step.num}
+        stepName={step.title}
+        stepOutput={outputText}
+        authorProfile={getAutoInjectedProfiles().author_profile || ""}
+        workProfile={getAutoInjectedProfiles().work_profile || ""}
+        projectId={project?.id || ""}
+      />
 
       {step.help && step.help.length > 0 && (
         <div style={{ marginBottom: 16 }}>
