@@ -2052,25 +2052,61 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   const [selectedSection, setSelectedSection] = useState(null);
   const [sectionProgress, setSectionProgress] = useState(null);
   // STEP4専用: 案ごとのフォーカスモード（"" = 全案表示、"1" | "2" | "3" = 該当案のみ表示）
-  // outputText は常に完全な3案併記を保持し、表示時のみ抽出する。
+  // フォーカスモード中は focusedDraft を直接編集対象とし、毎回 outputText とマージするラウンドトリップを避ける。
+  // outputText は「フォーカス変更時／再生成時／保存時」など節目でのみ更新する。
   const [focusedCase, setFocusedCase] = useState("");
+  const [focusedDraft, setFocusedDraft] = useState("");
 
-  // 表示用の出力テキスト（フォーカスモード時は該当案のみ抽出して表示）
-  const displayedOutput = useMemo(() => {
-    if (step.num === 4 && focusedCase) {
-      return extractStep4Case(outputText, focusedCase);
-    }
-    return outputText;
-  }, [step.num, focusedCase, outputText]);
+  // 表示用の出力テキスト（フォーカスモード時は focusedDraft を表示、それ以外は outputText）
+  const displayedOutput = (step.num === 4 && focusedCase) ? focusedDraft : outputText;
 
-  // textareaが編集された時、フォーカスモード中なら該当案だけを更新してマージし、
-  // それ以外なら全文をそのまま保存する。
+  // textareaが編集された時の処理
   const handleOutputTextareaChange = (newDisplayedText) => {
     if (step.num === 4 && focusedCase) {
-      setOutputText(mergeStep4Case(outputText, focusedCase, newDisplayedText));
+      // フォーカスモード中は focusedDraft だけを更新（outputTextは触らない）
+      setFocusedDraft(newDisplayedText);
     } else {
       setOutputText(newDisplayedText);
     }
+  };
+
+  // フォーカス対象を変更する時のロジック
+  // - 既存のフォーカスがあれば、その案の編集を outputText にマージしてから次のフォーカスへ
+  // - 新しいフォーカスがあれば、その案を outputText から抽出して focusedDraft に投入
+  const changeFocusedCase = (newFocus) => {
+    if (newFocus === focusedCase) return;
+    if (step.num !== 4) {
+      setFocusedCase(newFocus);
+      return;
+    }
+    // 旧フォーカスの編集内容を outputText にマージ
+    let newOutputText = outputText;
+    if (focusedCase && focusedDraft !== undefined) {
+      newOutputText = mergeStep4Case(outputText, focusedCase, focusedDraft);
+    }
+    if (newOutputText !== outputText) {
+      setOutputText(newOutputText);
+    }
+    // 新フォーカスがあれば該当案を抽出
+    if (newFocus) {
+      setFocusedDraft(extractStep4Case(newOutputText, newFocus));
+    } else {
+      setFocusedDraft("");
+    }
+    setFocusedCase(newFocus);
+  };
+
+  // 保存・再生成など outputText を最新化する必要がある時に呼ぶ
+  // フォーカスモード中の編集を outputText に反映する
+  const flushFocusedDraftToOutputText = () => {
+    if (step.num === 4 && focusedCase && focusedDraft !== undefined) {
+      const merged = mergeStep4Case(outputText, focusedCase, focusedDraft);
+      if (merged !== outputText) {
+        setOutputText(merged);
+        return merged;
+      }
+    }
+    return outputText;
   };
 
   useEffect(() => {
@@ -2081,7 +2117,16 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     setChatMessages([]); setChatInput(""); setChatLoading(false);
     setChatConversationId(""); setChatError(""); setChatCopyMsg(false); setChatTransferMsg(false); setChatSelectOptions([]); setChatSelectMsg(false);
     setFocusedCase("");  // STEP切り替え時はフォーカスモード解除
+    setFocusedDraft("");
   }, [step.num]);
+
+  // outputTextが外部要因で変更された時（再生成完了など）、フォーカスモードなら該当案を再抽出して focusedDraft を更新
+  useEffect(() => {
+    if (step.num === 4 && focusedCase) {
+      setFocusedDraft(extractStep4Case(outputText, focusedCase));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outputText]);
 
   const prevStep = step.num > 1 ? STEPS[step.num - 2] : null;
   const nextStep = step.num < 9 ? STEPS[step.num] : null;
@@ -2109,7 +2154,9 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   };
 
   const handleSaveOutput = async () => {
-    await onSaveOutput(step.num, outputText);
+    // フォーカスモード中の編集を outputText に反映してから保存
+    const merged = flushFocusedDraftToOutputText();
+    await onSaveOutput(step.num, merged);
     setSaveOutputMsg("saved"); setTimeout(() => setSaveOutputMsg(false), 2000);
   };
 
@@ -2193,7 +2240,9 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     if (!improvementRequest || !improvementRequest.trim()) {
       throw new Error("改善要望が空です");
     }
-    if (!outputText || !outputText.trim()) {
+    // フォーカスモード中の編集を outputText に反映してから再生成（previous_output として正しい値を渡すため）
+    const baseOutput = flushFocusedDraftToOutputText();
+    if (!baseOutput || !baseOutput.trim()) {
       throw new Error("再生成には前回の出力が必要です");
     }
     setRunError("");
@@ -2222,7 +2271,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                 detailed_plot_text: inputs.detailed_plot_text || "",
                 target_heading: currentItem,
                 past_writing_text: inputs.past_writing_text || "",
-                previous_output: outputText,
+                previous_output: baseOutput,
                 improvement_request: improvementRequest,
               },
             }),
@@ -2251,7 +2300,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
       if (cleaned) execInputs.amazon_html = cleaned;
     }
     if (step.num >= 3) { execInputs = { ...getAutoInjectedProfiles(), ...execInputs }; }
-    execInputs.previous_output = outputText;
+    execInputs.previous_output = baseOutput;
     execInputs.improvement_request = improvementRequest;
 
     const response = await fetch("/api/dify", {
@@ -2625,7 +2674,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
               return;
             }
           }
-          setFocusedCase(newFocus);
+          changeFocusedCase(newFocus);
         }}
       />
 
