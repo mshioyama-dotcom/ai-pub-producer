@@ -46,7 +46,8 @@ export default function DiscussionPanel({
   authorProfile = "",
   workProfile = "",
   projectId = "",
-  onApplyToImprovementRequest, // 任意
+  onApplyToImprovementRequest, // 任意（Phase 2用）
+  onTransferToOutput,          // 任意：直近のAI回答を出力データへ転記する関数
 }) {
   const storageKey = discussionStorageKey(projectId, stepNum);
 
@@ -156,16 +157,34 @@ export default function DiscussionPanel({
     try { localStorage.removeItem(storageKey); } catch (e) {}
   };
 
-  // AIの直近の発言から「改善要望」候補（最後のassistantメッセージ）を抽出して、
-  // App.jsx 側の改善要望欄に流し込むか、クリップボードにコピーする
-  const handleApply = () => {
+  // AIの直近の発言を取得するヘルパー
+  const getLastAIContent = () => {
     const lastAI = [...messages].reverse().find((m) => m.role === "assistant");
-    if (!lastAI) return;
+    return lastAI ? lastAI.content : "";
+  };
+  const hasAssistantMessage = messages.some((m) => m.role === "assistant");
+
+  // 直近のAI回答を出力データへ直接転記（既存の出力を上書き）
+  const handleTransferToOutput = () => {
+    const content = getLastAIContent();
+    if (!content || !onTransferToOutput) return;
+    if (stepOutput && stepOutput.trim()) {
+      if (!confirm("既存の出力データを上書きします。よろしいですか？\n\n（コピー履歴は手動で別途残してください）")) return;
+    }
+    onTransferToOutput(content);
+    setApplyMsg("✓ 出力データへ転記しました（保存ボタンで確定してください）");
+    setTimeout(() => setApplyMsg(""), 3500);
+  };
+
+  // 改善要望欄へ転記（Phase 2用 / 現状はpropsが未供給ならクリップボードコピーにフォールバック）
+  const handleApply = () => {
+    const content = getLastAIContent();
+    if (!content) return;
     if (onApplyToImprovementRequest) {
-      onApplyToImprovementRequest(lastAI.content);
+      onApplyToImprovementRequest(content);
       setApplyMsg("✓ 改善要望欄に転記しました");
     } else {
-      navigator.clipboard.writeText(lastAI.content).then(() => {
+      navigator.clipboard.writeText(content).then(() => {
         setApplyMsg("✓ クリップボードにコピーしました");
       });
     }
@@ -322,22 +341,44 @@ export default function DiscussionPanel({
           {/* アクションボタン群 */}
           <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              {/* メインアクション：出力データへ転記（onTransferToOutputが供給されていれば） */}
+              {onTransferToOutput && (
+                <button
+                  onClick={handleTransferToOutput}
+                  disabled={!hasAssistantMessage}
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: hasAssistantMessage ? C.white : C.textLight,
+                    background: hasAssistantMessage ? C.gold : "rgba(0,0,0,0.06)",
+                    border: "none",
+                    borderRadius: 3,
+                    padding: "8px 18px",
+                    cursor: hasAssistantMessage ? "pointer" : "default",
+                  }}
+                >
+                  ↓ 直近のAI回答を出力データへ転記
+                </button>
+              )}
+
+              {/* サブアクション：改善要望欄へ転記 or クリップボードコピー */}
               <button
                 onClick={handleApply}
-                disabled={!messages.some((m) => m.role === "assistant")}
+                disabled={!hasAssistantMessage}
                 style={{
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: messages.some((m) => m.role === "assistant") ? C.white : C.textLight,
-                  background: messages.some((m) => m.role === "assistant") ? C.gold : "rgba(0,0,0,0.06)",
-                  border: "none",
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  color: hasAssistantMessage ? C.navy : C.textLight,
+                  background: hasAssistantMessage ? C.white : "rgba(0,0,0,0.04)",
+                  border: `1px solid ${hasAssistantMessage ? C.navy : C.border}`,
                   borderRadius: 3,
-                  padding: "8px 18px",
-                  cursor: messages.some((m) => m.role === "assistant") ? "pointer" : "default",
+                  padding: "7px 14px",
+                  cursor: hasAssistantMessage ? "pointer" : "default",
                 }}
               >
-                {onApplyToImprovementRequest ? "↓ 直近のAI回答を改善要望欄へ転記" : "↓ 直近のAI回答をコピー"}
+                {onApplyToImprovementRequest ? "↓ 改善要望欄へ転記" : "↓ クリップボードにコピー"}
               </button>
+
               {applyMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>{applyMsg}</span>}
             </div>
             <div>

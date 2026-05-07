@@ -2353,6 +2353,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         authorProfile={getAutoInjectedProfiles().author_profile || ""}
         workProfile={getAutoInjectedProfiles().work_profile || ""}
         projectId={project?.id || ""}
+        onTransferToOutput={(text) => setOutputText(text)}
       />
 
       {step.help && step.help.length > 0 && (
