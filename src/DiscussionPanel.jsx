@@ -16,6 +16,11 @@
 
 import { useState, useRef, useEffect } from "react";
 
+// 1スレッドあたりの最大往復数（コスト管理のため）
+// ユーザー往復1 + AI往復1 = 1ターン。MAX_TURNS=5なら 10メッセージで打ち切り。
+// サブスクのプランごとに動的に変えられるよう、将来は props で受け取る想定。
+const MAX_TURNS = 5;
+
 // 色トークン（App.jsxと同期）
 const C = {
   navy:       "#243d5c",
@@ -108,11 +113,21 @@ export default function DiscussionPanel({
 
   const hasOutput = !!(stepOutput || "").trim();
 
+  // ターン数管理（コスト制御）
+  // user メッセージの数 = 既に消費したターン数。AI返信が来てなくてもユーザー発言時点でターン消費とみなす。
+  const turnsUsed = messages.filter((m) => m.role === "user").length;
+  const turnsLeft = Math.max(0, MAX_TURNS - turnsUsed);
+  const turnLimitReached = turnsLeft === 0;
+
   const handleSend = async () => {
     const text = input.trim();
     if (!text || loading) return;
     if (!hasOutput) {
       setError("先に出力データを生成・保存してから相談してください。");
+      return;
+    }
+    if (turnLimitReached) {
+      setError(`このスレッドは上限の${MAX_TURNS}往復に達しました。続けて相談したい場合は、相談履歴をリセットしてから新しいスレッドを開始してください。`);
       return;
     }
 
@@ -227,6 +242,24 @@ export default function DiscussionPanel({
             生成された出力について、AIに相談しながら改善方針を一緒に練れます。違和感を感じた点を自由に書いてください（例：「案2の『ベストセラー』はKDP規約的に大丈夫？」「案3のターゲットがぼやけている気がする」）。
           </div>
 
+          {/* ターン数表示（コスト管理のため上限付き） */}
+          <div style={{
+            fontSize: 12, color: turnLimitReached ? C.red : C.textLight,
+            background: turnLimitReached ? "#fef2f2" : "#f8f8f8",
+            border: `1px solid ${turnLimitReached ? "rgba(192,57,43,0.25)" : C.border}`,
+            borderRadius: 4, padding: "6px 10px", marginBottom: 10,
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+          }}>
+            <span>
+              {turnLimitReached
+                ? `⚠ このスレッドは上限の${MAX_TURNS}往復に達しました。リセットして新しいスレッドを開始してください。`
+                : `📊 残り ${turnsLeft} / ${MAX_TURNS} 往復`}
+            </span>
+            <span style={{ fontSize: 11, color: C.textLight }}>
+              ※ コスト管理のため1スレッド{MAX_TURNS}往復までです
+            </span>
+          </div>
+
           {!hasOutput && (
             <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginBottom: 12, fontSize: 13, color: C.red }}>
               先に出力データを生成・保存してから相談してください。
@@ -303,9 +336,11 @@ export default function DiscussionPanel({
                     handleSend();
                   }
                 }}
-                placeholder="気になる点を入力（Enterで送信 / Shift+Enterで改行）"
+                placeholder={turnLimitReached
+                  ? `上限の${MAX_TURNS}往復に達しました。リセットしてください`
+                  : "気になる点を入力（Enterで送信 / Shift+Enterで改行）"}
                 rows={3}
-                disabled={!hasOutput}
+                disabled={!hasOutput || turnLimitReached}
                 style={{
                   flex: 1,
                   padding: "12px 14px",
@@ -316,20 +351,20 @@ export default function DiscussionPanel({
                   fontFamily: "inherit",
                   lineHeight: 1.65,
                   boxSizing: "border-box",
-                  background: hasOutput ? C.white : "#f5f5f5",
+                  background: (!hasOutput || turnLimitReached) ? "#f5f5f5" : C.white,
                 }}
               />
               <button
                 onClick={handleSend}
-                disabled={loading || !input.trim() || !hasOutput}
+                disabled={loading || !input.trim() || !hasOutput || turnLimitReached}
                 style={{
                   width: 80,
-                  background: loading || !input.trim() || !hasOutput ? "#ccc" : C.navy,
+                  background: (loading || !input.trim() || !hasOutput || turnLimitReached) ? "#ccc" : C.navy,
                   color: C.white,
                   border: "none",
                   fontWeight: 700,
                   fontSize: 13,
-                  cursor: loading || !input.trim() || !hasOutput ? "default" : "pointer",
+                  cursor: (loading || !input.trim() || !hasOutput || turnLimitReached) ? "default" : "pointer",
                   flexShrink: 0,
                 }}
               >

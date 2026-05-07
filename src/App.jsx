@@ -438,6 +438,47 @@ function splitStep2Output(text) {
   };
 }
 
+// 相談機能（DiscussionPanel）に渡す書籍プロファイルの軽量版を抽出。
+// STEP2の出力は60KB相当になるが、相談AIに必要なのは「核メッセージ・想定読者・狙い目」程度。
+// 市場分析データ（市場像・需要診断・勝率診断・参照競合）は除外して入力トークンを大幅削減する。
+//
+// 効果: 60KB → 10〜15KB 程度（約1/4〜1/6）に軽量化
+//       Anthropic Prompt Caching と併用で1往復あたり数十円の節約
+//
+// 入力が STEP1 の書籍プロファイル草案の場合は短いのでそのまま返す（フォールバック）。
+function extractDiscussionContext(workProfile) {
+  if (!workProfile) return "";
+  const text = workProfile;
+
+  // STEP2の出力（確定版）かを判定：## 書籍プロファイル確定版 が含まれているか
+  const hasConfirmed = /(?:^|\n)##\s*書籍プロファイル確定版/.test(text);
+  if (!hasConfirmed) {
+    // STEP1草案の場合はサイズが小さいのでそのまま渡す
+    return text;
+  }
+
+  // STEP2出力から「核となる」セクションだけを抽出
+  const extractSection = (heading) => {
+    const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`(?:^|\\n)##\\s*${escaped}\\s*\\n([\\s\\S]*?)(?=\\n##\\s|$)`);
+    const m = text.match(re);
+    return m ? m[1].trim() : "";
+  };
+
+  const sections = [];
+  const confirmed = extractSection("書籍プロファイル確定版");
+  const intent = extractSection("検索者の意図（仮説）");
+  const market = extractSection("狙い目の切り口");
+
+  if (confirmed) sections.push(`## 書籍プロファイル確定版\n\n${confirmed}`);
+  if (intent) sections.push(`## 検索者の意図（仮説）\n\n${intent}`);
+  if (market) sections.push(`## 狙い目の切り口\n\n${market}`);
+
+  // 何も抽出できなかった場合は念のため原文返却
+  if (sections.length === 0) return text;
+  return sections.join("\n\n---\n\n");
+}
+
 function extractMotivation(workProfileDraft) {
   if (!workProfileDraft) return "";
   // ■ 動機 セクションを抽出（次の ■ または末尾まで）
@@ -2346,12 +2387,13 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
       </div>
 
       {/* 出力相談パネル：全STEP共通。チャット型STEP（既にメインのチャット会話を持つ）でも、出力サマリの再検討用に有用なため表示 */}
+      {/* workProfile は軽量化版を渡す：STEP2の出力60KBから市場分析データを除き、相談に必要な核情報のみに圧縮（コスト削減） */}
       <DiscussionPanel
         stepNum={step.num}
         stepName={step.title}
         stepOutput={outputText}
         authorProfile={getAutoInjectedProfiles().author_profile || ""}
-        workProfile={getAutoInjectedProfiles().work_profile || ""}
+        workProfile={extractDiscussionContext(getAutoInjectedProfiles().work_profile || "")}
         projectId={project?.id || ""}
         onTransferToOutput={(text) => setOutputText(text)}
       />
