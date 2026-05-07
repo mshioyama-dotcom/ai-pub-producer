@@ -10,7 +10,7 @@ dependencies:
 - current_identifier: null
   type: marketplace
   value:
-    marketplace_plugin_unique_identifier: langgenius/anthropic:0.0.40@d56e80fc6f1d5dabc3e95cdaf1eda7e4a0c4f07e5a4a3a99f1a2cb4a6ae9c0ff
+    marketplace_plugin_unique_identifier: langgenius/openai:0.2.10@7ca552fb9e48caa4deddfdef5aa71c200d06d03c26c2e8bb428b3250101b9cb3
     version: null
 kind: app
 model_config:
