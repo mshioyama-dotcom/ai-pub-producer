@@ -68,12 +68,10 @@ model_config:
   model:
     completion_params:
       max_tokens: 5000
-      reasoning_effort: low
       stop: []
-      verbosity: low
     mode: chat
-    name: gpt-5.2
-    provider: langgenius/openai/openai
+    name: claude-sonnet-4-6
+    provider: langgenius/anthropic/anthropic
   more_like_this:
     enabled: false
   opening_statement: |
