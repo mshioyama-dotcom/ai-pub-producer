@@ -438,6 +438,61 @@ function splitStep2Output(text) {
   };
 }
 
+// STEP4 タイトル・サブタイトル作成の出力（3案併記Markdown）をパースして、
+// ヘッダー / 案1 / 案2 / 案3 / 推し案フッター に分解する。
+// パースに失敗（フォーマット崩れ等）した場合は null を返す。
+function parseStep4CaseStructure(text) {
+  if (!text || typeof text !== "string") return null;
+  const case1Idx = text.indexOf("## 【案1】");
+  const case2Idx = text.indexOf("## 【案2】");
+  const case3Idx = text.indexOf("## 【案3】");
+  const oshiIdx = text.indexOf("## 【推し案】");
+  // 3案すべて存在し、順序が正しいことを確認
+  if (case1Idx === -1 || case2Idx === -1 || case3Idx === -1) return null;
+  if (!(case1Idx < case2Idx && case2Idx < case3Idx)) return null;
+  // 推し案がある場合は案3より後ろであることも確認（崩れ検出）
+  if (oshiIdx !== -1 && oshiIdx < case3Idx) return null;
+  return {
+    header: text.slice(0, case1Idx).trim(),
+    cases: {
+      "1": text.slice(case1Idx, case2Idx).trim(),
+      "2": text.slice(case2Idx, case3Idx).trim(),
+      "3": text.slice(case3Idx, oshiIdx === -1 ? text.length : oshiIdx).trim(),
+    },
+    footer: oshiIdx === -1 ? "" : text.slice(oshiIdx).trim(),
+  };
+}
+
+// パース済み構造から完全な3案併記出力を再構築する。
+function buildStep4FullOutput(parsed) {
+  if (!parsed) return "";
+  const sep = "\n\n---\n\n";
+  const parts = [];
+  if (parsed.header) parts.push(parsed.header);
+  parts.push(parsed.cases["1"]);
+  parts.push(parsed.cases["2"]);
+  parts.push(parsed.cases["3"]);
+  if (parsed.footer) parts.push(parsed.footer);
+  return parts.join(sep);
+}
+
+// 完全な3案併記出力の中で、特定の案だけを新しい内容に置き換える。
+// パース失敗時は新しい内容をそのまま返す（フォールバック）。
+function mergeStep4Case(fullText, caseNum, newCaseContent) {
+  const parsed = parseStep4CaseStructure(fullText);
+  if (!parsed) return newCaseContent;
+  parsed.cases[caseNum] = (newCaseContent || "").trim();
+  return buildStep4FullOutput(parsed);
+}
+
+// 完全な3案併記出力から、特定の案だけを抽出する。
+// パース失敗時は元の全文を返す（フォールバック）。
+function extractStep4Case(fullText, caseNum) {
+  const parsed = parseStep4CaseStructure(fullText);
+  if (!parsed || !parsed.cases[caseNum]) return fullText;
+  return parsed.cases[caseNum];
+}
+
 // 相談機能（DiscussionPanel）に渡す書籍プロファイルの軽量版を抽出。
 // STEP2の出力は60KB相当になるが、相談AIに必要なのは「核メッセージ・想定読者・狙い目」程度。
 // 市場分析データ（市場像・需要診断・勝率診断・参照競合）は除外して入力トークンを大幅削減する。
@@ -1996,6 +2051,27 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   const [sectionOptions, setSectionOptions] = useState([]);
   const [selectedSection, setSelectedSection] = useState(null);
   const [sectionProgress, setSectionProgress] = useState(null);
+  // STEP4専用: 案ごとのフォーカスモード（"" = 全案表示、"1" | "2" | "3" = 該当案のみ表示）
+  // outputText は常に完全な3案併記を保持し、表示時のみ抽出する。
+  const [focusedCase, setFocusedCase] = useState("");
+
+  // 表示用の出力テキスト（フォーカスモード時は該当案のみ抽出して表示）
+  const displayedOutput = useMemo(() => {
+    if (step.num === 4 && focusedCase) {
+      return extractStep4Case(outputText, focusedCase);
+    }
+    return outputText;
+  }, [step.num, focusedCase, outputText]);
+
+  // textareaが編集された時、フォーカスモード中なら該当案だけを更新してマージし、
+  // それ以外なら全文をそのまま保存する。
+  const handleOutputTextareaChange = (newDisplayedText) => {
+    if (step.num === 4 && focusedCase) {
+      setOutputText(mergeStep4Case(outputText, focusedCase, newDisplayedText));
+    } else {
+      setOutputText(newDisplayedText);
+    }
+  };
 
   useEffect(() => {
     setInputs(stepData.inputData || {}); setOutputText(stepData.outputText || "");
@@ -2004,6 +2080,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     setSectionOptions([]); setSelectedSection(null); setSectionProgress(null);
     setChatMessages([]); setChatInput(""); setChatLoading(false);
     setChatConversationId(""); setChatError(""); setChatCopyMsg(false); setChatTransferMsg(false); setChatSelectOptions([]); setChatSelectMsg(false);
+    setFocusedCase("");  // STEP切り替え時はフォーカスモード解除
   }, [step.num]);
 
   const prevStep = step.num > 1 ? STEPS[step.num - 2] : null;
@@ -2490,9 +2567,32 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           {step.type === "chat" ? <>チャットの会話から得た結果をコピーして、下の欄に貼り付けてください。{nextStep && ` この出力は次のステップ（STEP${nextStep.num}）の入力になります。`}</> : <>AIの実行結果が自動で表示されます。内容を確認してから保存してください。{nextStep && ` この出力は次のステップ（STEP${nextStep.num}）の入力になります。`}</>}
           <br />出力はそのまま使っても、自分で修正したり、AIチャットで整えてから使うこともできます。
         </div>
-        <textarea value={outputText} onChange={(e) => setOutputText(e.target.value)}
+        {step.num === 4 && focusedCase && (
+          <div style={{
+            padding: "8px 12px",
+            background: C.goldPale,
+            border: `1px solid ${C.goldLight}`,
+            borderTop: `1px solid ${C.gold}`,
+            borderRadius: "4px 4px 0 0",
+            fontSize: 12,
+            color: C.navy,
+            fontWeight: 600,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}>
+            <span>🎯 案{focusedCase} のみ表示中（他案はバックグラウンドで保持されています）</span>
+            <button
+              onClick={() => setFocusedCase("")}
+              style={{ fontSize: 11.5, background: C.white, color: C.navy, border: `1px solid ${C.navy}`, borderRadius: 3, padding: "3px 10px", cursor: "pointer" }}
+            >
+              全案表示に戻す
+            </button>
+          </div>
+        )}
+        <textarea value={displayedOutput} onChange={(e) => handleOutputTextareaChange(e.target.value)}
           placeholder={step.type === "chat" ? "チャットで得た結果をここに貼り付けてください" : "実行するボタンを押すと結果が自動で表示されます"} rows={10}
-          style={{ width: "100%", padding: "12px 14px", fontSize: 14, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.7, minHeight: 220 }} />
+          style={{ width: "100%", padding: "12px 14px", fontSize: 14, border: `1px solid ${C.border}`, borderRadius: (step.num === 4 && focusedCase) ? "0 0 4px 4px" : 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.7, minHeight: 220 }} />
         <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
           <BtnPrimary onClick={handleSaveOutput}>出力データを保存</BtnPrimary>
           {saveOutputMsg === "saved" && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました</span>}
@@ -2506,6 +2606,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
       {/* 出力相談パネル：全STEP共通。チャット型STEP（既にメインのチャット会話を持つ）でも、出力サマリの再検討用に有用なため表示 */}
       {/* workProfile は軽量化版を渡す：STEP2の出力60KBから市場分析データを除き、相談に必要な核情報のみに圧縮（コスト削減） */}
       {/* onRegenerateWithRequest: Phase 2の「✨ この方針で再生成」機能。STEP3〜9（workflow型）でのみ提供、STEP3はchat型なので対象外 */}
+      {/* focusedCase / onFocusedCaseChange: STEP4専用のフォーカスモード。outputTextは常にフル3案を保持し、表示時のみ抽出 */}
       <DiscussionPanel
         stepNum={step.num}
         stepName={step.title}
@@ -2513,8 +2614,19 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         authorProfile={getAutoInjectedProfiles().author_profile || ""}
         workProfile={extractDiscussionContext(getAutoInjectedProfiles().work_profile || "")}
         projectId={project?.id || ""}
-        onTransferToOutput={(text) => setOutputText(text)}
         onRegenerateWithRequest={step.type !== "chat" ? handleRegenerateWithRequest : undefined}
+        focusedCase={focusedCase}
+        onFocusedCaseChange={(newFocus) => {
+          // フォーカス指定時、出力データから3案を抽出できることを確認
+          if (newFocus && step.num === 4) {
+            const parsed = parseStep4CaseStructure(outputText);
+            if (!parsed) {
+              alert("出力データから3案を抽出できませんでした。\n\n出力フォーマットが崩れているか、まだ生成されていない可能性があります。先に出力を生成してから「案ごと」フォーカスを使ってください。");
+              return;
+            }
+          }
+          setFocusedCase(newFocus);
+        }}
       />
 
       {step.help && step.help.length > 0 && (

@@ -57,8 +57,10 @@ export default function DiscussionPanel({
   workProfile = "",
   projectId = "",
   onApplyToImprovementRequest, // 任意（Phase 2用）
-  onTransferToOutput,          // 任意：直近のAI回答を出力データへ転記する関数
+  onTransferToOutput,          // 任意：直近のAI回答を出力データへ転記する関数（現在未使用）
   onRegenerateWithRequest,     // Phase 2: 議論ログを要約してSTEP本体を再生成する関数 (improvementRequest: string) => Promise
+  focusedCase = "",            // STEP4専用: 親コンポーネントから渡されるフォーカス対象（"" | "1" | "2" | "3"）
+  onFocusedCaseChange,         // STEP4専用: フォーカス変更時のコールバック (newFocus: string) => void
 }) {
   const storageKey = discussionStorageKey(projectId, stepNum);
 
@@ -87,9 +89,9 @@ export default function DiscussionPanel({
   // Phase 2: 「✨ この方針で再生成」ボタン用の状態
   const [regenerating, setRegenerating] = useState(false);
   const [regeneratePhase, setRegeneratePhase] = useState(""); // "summarizing" | "regenerating" | ""
-  // STEP4専用: 案ごとのフォーカス（"" = 全案、"1" | "2" | "3" = 該当案のみブラッシュアップ対象）
-  // 改善要望に「この再生成は案◯のみが対象」を強制付加し、AIが他案を新規生成しないよう誘導する。
-  const [focusedCase, setFocusedCase] = useState("");
+  // focusedCase は親コンポーネント（StepPage）から props として受け取る形に変更。
+  // 親側で「outputText の表示を該当案のみに切り替える」処理が必要なため。
+  const setFocusedCase = onFocusedCaseChange || (() => {});
   const chatAreaRef = useRef(null);
 
   // STEP変更時に状態を読み直す
