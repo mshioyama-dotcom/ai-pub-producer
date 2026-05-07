@@ -66,48 +66,28 @@ const STEPS = [
     ]
   },
   {
-    id: "step_03", num: 3, title: "読者・価値設計",
-    description: "この本を「誰に」「何を」届けるかを設計します。読者像・読者が抱えている悩み・読後の変化までを一気に作ります。本全体の方向性が決まる重要なSTEPです。",
-    category: "企画設計", type: "workflow",
-    url: "https://udify.app/workflow/V0yHio0PcP42yJjQ",
-    inputs: [
-      { name: "keyword1", label: "検索キーワード1", desc: "STEP2で確定した1語目", source: "STEP2", required: true, type: "text", autoFill: false, maxChars: 128 },
-      { name: "keyword2", label: "検索キーワード2", desc: "STEP2で確定した2語目", source: "STEP2", required: true, type: "text", autoFill: false, maxChars: 256 },
-      { name: "intent_lock", label: "検索意図仮説", desc: "書籍プロファイル確定版の「■ 検索者の意図（仮説）」セクションから自動入力できます（「自動振り分け」ボタン）。または手動で記入してください（読者がこのキーワードで何を知りたいかを1文で）。", source: "STEP2", required: true, type: "textarea", autoFill: false, maxChars: 256 },
-      { name: "market_report", label: "狙い目切り口（任意）", desc: "書籍プロファイル確定版の「■ 狙い目の切り口」から、書きたい切り口を1つ選んでください（「自動振り分け」で候補表示）。", source: "STEP2", required: false, type: "textarea", autoFill: false, maxChars: 256 }
-    ],
-    outputTitle: "設計結果",
-    help: [
-      "章数はデフォルト7章で生成されます",
-      "章数を変えたい場合は、出力をClaude/ChatGPTなどに貼り付けて「6章構成に再構成して」と指示してください",
-      "読者像がしっくりこない場合は、検索意図や切り口を変えて再実行できます"
-    ]
-  },
-  {
-    id: "step_04", num: 4, title: "エピソードインタビュー",
-    description: "AIがあなたに質問しながら、本の素材となる体験談やエピソードを引き出します。他の本にはない差別化ポイントが、ここで集まる素材から生まれます。",
+    id: "step_03", num: 3, title: "エピソードインタビュー",
+    description: "AIがあなたに質問しながら、本の素材となる体験談やエピソードを引き出します。書籍プロファイルから読者像は把握済みなので、すぐに質問が始まります。他の本にはない差別化ポイントが、ここで集まる素材から生まれます。",
     category: "企画設計", type: "chat",
     url: "https://udify.app/chat/qbB9SNU5UG3gryYp",
-    inputs: [
-      { name: "blueprint_text", label: "読者・価値設計のアウトプット", desc: "STEP3の出力を全文コピーして、まず最初にAIに貼り付けます。", source: "STEP3", required: true, type: "textarea", autoFill: true, maxChars: 5000 }
-    ],
+    inputs: [],
     outputTitle: "インタビュー要約",
     help: [
+      "「開始」「準備できました」など、内容は何でも送信するとAIが質問1から始めます",
       "AIは1回に1つだけ質問します。焦らず具体的に答えてください",
       "「数字は出せない」場合は「体感では◯◯くらい」でOKです",
-      "質問が終わったら、AIが要約を出してくれます。その要約を保存してSTEP5以降で使います"
+      "質問が終わったら、AIが要約を出してくれます。その要約を保存してSTEP4以降で使います"
     ]
   },
   {
-    id: "step_05", num: 5, title: "タイトル・サブタイトル作成",
+    id: "step_04", num: 4, title: "タイトル・サブタイトル作成",
     description: "Amazonで検索されやすく、かつ読者がクリックしたくなるタイトル案を複数作ります。2語キーワードは必ずタイトルかサブタイトルに含まれます。",
     category: "企画設計", type: "workflow",
     url: "https://udify.app/workflow/z7djuT4RLqfAbEqY",
     inputs: [
       { name: "keyword1", label: "検索キーワード1", desc: "確定した1語目", source: "STEP2", required: true, type: "text", autoFill: false, maxChars: 256 },
       { name: "keyword2", label: "検索キーワード2", desc: "確定した2語目", source: "STEP2", required: true, type: "text", autoFill: false, maxChars: 256 },
-      { name: "blueprint_text", label: "読者・価値設計のアウトプット", desc: "STEP3の出力を貼り付け（「自動振り分け」ボタンで自動入力できます）", source: "STEP3", required: true, type: "textarea", autoFill: true, maxChars: 5000 },
-      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "STEP4のインタビュー要約を貼り付け（「自動振り分け」ボタンで自動入力できます）", source: "STEP4", required: true, type: "textarea", autoFill: true, maxChars: 5000 }
+      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "STEP3のインタビュー要約を貼り付け（「自動振り分け」ボタンで自動入力できます）", source: "STEP3", required: true, type: "textarea", autoFill: true, maxChars: 5000 }
     ],
     outputTitle: "タイトル案",
     help: [
@@ -117,62 +97,61 @@ const STEPS = [
     ]
   },
   {
-    id: "step_06", num: 6, title: "目次作成",
-    description: "本全体の目次（章見出し+節見出し）を作ります。ここで本の骨格が決まります。",
+    id: "step_05", num: 5, title: "目次作成",
+    description: "本全体の章構成（章タイトル）と目次（節見出し）を一気に作ります。書籍プロファイルから章構造を設計し、エピソードから節見出しの具体性を出します。デフォルトは7章構成。",
     category: "執筆設計", type: "workflow",
     url: "https://udify.app/workflow/tcqNIyr8wpCBAJhb",
     inputs: [
-      { name: "blueprint_text", label: "読者・価値設計のアウトプット", desc: "STEP3の出力を貼り付け（「自動振り分け」で自動入力）", source: "STEP3", required: true, type: "textarea", autoFill: true, maxChars: 5000 },
-      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "STEP4のインタビュー要約を貼り付け（「自動振り分け」で自動入力）", source: "STEP4", required: true, type: "textarea", autoFill: true, maxChars: 5000 }
+      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "STEP3のインタビュー要約を貼り付け（「自動振り分け」で自動入力）", source: "STEP3", required: true, type: "textarea", autoFill: true, maxChars: 5000 }
     ],
-    outputTitle: "完成目次",
+    outputTitle: "完成目次（章構造＋節見出し）",
     help: [
       "「はじめに」と「おわりに」は自動で付きます",
+      "デフォルトは7章構成（章タイトル＋各章4〜5節）",
       "特定の章だけ修正したい場合は、出力をAIチャットに貼り付けて指示してください",
-      "目次が気に入らない場合は、STEP3の読者・価値設計を見直すと改善することがあります"
+      "目次が気に入らない場合は、書籍プロファイル確定版（STEP2）を見直すと改善することがあります"
     ]
   },
   {
-    id: "step_07", num: 7, title: "章構成作成",
+    id: "step_06", num: 6, title: "章構成作成",
     description: "目次の各節に「この節で何を書くか」の要約を付けます。本文執筆前の最後の設計図になります。",
     category: "執筆設計", type: "workflow",
     url: "https://udify.app/workflow/4KDXsPKSlgk5qMu8",
     inputs: [
-      { name: "toc_text", label: "目次作成のアウトプット", desc: "STEP6の目次を貼り付け（「自動振り分け」で自動入力）", source: "STEP6", required: true, type: "textarea", autoFill: true, maxChars: 5000 },
-      { name: "blueprint_text", label: "読者・価値設計のアウトプット", desc: "STEP3の出力を貼り付け（「自動振り分け」で自動入力）", source: "STEP3", required: true, type: "textarea", autoFill: true, maxChars: 5000 },
-      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "STEP4のインタビュー要約を貼り付け（「自動振り分け」で自動入力）", source: "STEP4", required: true, type: "textarea", autoFill: true, maxChars: 5000 }
+      { name: "toc_text", label: "目次作成のアウトプット", desc: "STEP5の目次を貼り付け（「自動振り分け」で自動入力）", source: "STEP5", required: true, type: "textarea", autoFill: true, maxChars: 5000 },
+      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "STEP3のインタビュー要約を貼り付け（「自動振り分け」で自動入力）", source: "STEP3", required: true, type: "textarea", autoFill: true, maxChars: 5000 }
     ],
     outputTitle: "章構成",
     help: [
       "全ての章の構成を1回で作ります",
       "特定の節だけ修正したい場合は、出力をAIチャットに貼り付けて指示してください",
-      "次のSTEP8では、ここで作った章構成を1章ずつ細かく分解していきます"
+      "次のSTEP7では、ここで作った章構成を1章ずつ細かく分解していきます"
     ]
   },
   {
-    id: "step_08", num: 8, title: "詳細プロット作成",
+    id: "step_07", num: 7, title: "詳細プロット作成",
     description: "1章分の節を、本文執筆に必要な細かさ（項）まで分解します。節の中をさらに①②③の項に分けて、各項で何を書くかの要約を作ります。本文作成の直前の工程です。",
     category: "執筆設計", type: "workflow",
     url: "https://udify.app/workflow/Ka9gpeDvAnkPV9hW",
     inputs: [
-      { name: "chapter_outline_text", label: "1章分のアウトライン", desc: "STEP7の出力から、今回分解したい1章分だけをコピーして貼り付けてください。", source: "STEP7", required: true, type: "textarea", autoFill: false, maxChars: 2048 },
+      { name: "chapter_outline_text", label: "1章分のアウトライン", desc: "STEP6の出力から、今回分解したい1章分だけをコピーして貼り付けてください。", source: "STEP6", required: true, type: "textarea", autoFill: false, maxChars: 2048 },
       { name: "added_episode_text", label: "著者が入れたいエピソード（任意）", desc: "この章でとくに入れたい体験談やエピソードがあれば書いてください。空欄でもOKです。", source: null, required: false, type: "textarea", maxChars: 1024 }
     ],
     outputTitle: "詳細プロット",
     help: [
-      "1章ずつ処理します。「参照」ボタンでSTEP7の出力を開き、該当の章だけをコピーして貼り付けましょう",
+      "1章ずつ処理します。「参照」ボタンでSTEP6の出力を開き、該当の章だけをコピーして貼り付けましょう",
       "出力の形式：(1)(2)(3)...が節、①②③...が項になります",
-      "次のSTEP9で、この詳細プロットをもとに本文を作ります"
+      "次のSTEP8で、この詳細プロットをもとに本文を作ります"
     ]
   },
   {
-    id: "step_09", num: 9, title: "本文作成",
+    id: "step_08", num: 8, title: "本文作成",
     description: "詳細プロットから節を選ぶと、その節の中の項（①②③...）の本文を連続で生成します。1節ずつ着実に本文を積み上げていくSTEPです。",
     category: "執筆設計", type: "workflow",
     url: "https://udify.app/workflow/lRAWtZGuVL4bqHM9",
     inputs: [
-      { name: "detailed_plot_text", label: "詳細プロット作成のアウトプット（1章分）", desc: "STEP8の詳細プロットを貼り付け（「自動振り分け」で自動入力）", source: "STEP8", required: true, type: "textarea", autoFill: true, maxChars: 5000 },
-      { name: "target_section", label: "執筆対象の節（1節分）", desc: "今回書きたい節を1つ選びます。下の「STEP8から節を抽出」ボタンを押すと、節の候補が一覧表示されます。", source: "STEP8", required: true, type: "text", autoFill: false, maxChars: 256 },
+      { name: "detailed_plot_text", label: "詳細プロット作成のアウトプット（1章分）", desc: "STEP7の詳細プロットを貼り付け（「自動振り分け」で自動入力）", source: "STEP7", required: true, type: "textarea", autoFill: true, maxChars: 5000 },
+      { name: "target_section", label: "執筆対象の節（1節分）", desc: "今回書きたい節を1つ選びます。下の「STEP7から節を抽出」ボタンを押すと、節の候補が一覧表示されます。", source: "STEP7", required: true, type: "text", autoFill: false, maxChars: 256 },
       { name: "past_writing_text", label: "著者の過去の執筆データ（任意）", desc: "あなたの過去の記事や原稿があれば貼り付けてください。AIが文体を真似て書いてくれます。空欄でもOKです。", source: null, required: false, type: "textarea", maxChars: 4000 }
     ],
     outputTitle: "生成された本文",
@@ -183,16 +162,15 @@ const STEPS = [
     ]
   },
   {
-    id: "step_10", num: 10, title: "Amazon説明文作成",
+    id: "step_09", num: 9, title: "Amazon説明文作成",
     description: "Amazonの商品ページに載せる本の紹介文を作ります。読者が「買いたい」と思う文章に仕上げます。",
     category: "販売準備", type: "workflow",
     url: "https://udify.app/workflow/6yWZfOGGU76ciJBI",
     inputs: [
-      { name: "title_text", label: "タイトル", desc: "STEP5で確定したメインタイトル", source: "STEP5", required: true, type: "text", autoFill: false, maxChars: 128 },
-      { name: "subtitle_text", label: "サブタイトル", desc: "STEP5で確定したサブタイトル", source: "STEP5", required: true, type: "text", autoFill: false, maxChars: 256 },
-      { name: "blueprint_text", label: "読者・価値設計のアウトプット", desc: "STEP3の出力を貼り付け（「自動振り分け」で自動入力）", source: "STEP3", required: true, type: "textarea", autoFill: true, maxChars: 5000 },
-      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "STEP4のインタビュー要約を貼り付け（「自動振り分け」で自動入力）", source: "STEP4", required: true, type: "textarea", autoFill: true, maxChars: 5000 },
-      { name: "outline_text", label: "章構成作成のアウトプット", desc: "STEP7の章構成を貼り付け（「自動振り分け」で自動入力）", source: "STEP7", required: true, type: "textarea", autoFill: true, maxChars: 20000 },
+      { name: "title_text", label: "タイトル", desc: "STEP4で確定したメインタイトル", source: "STEP4", required: true, type: "text", autoFill: false, maxChars: 128 },
+      { name: "subtitle_text", label: "サブタイトル", desc: "STEP4で確定したサブタイトル", source: "STEP4", required: true, type: "text", autoFill: false, maxChars: 256 },
+      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "STEP3のインタビュー要約を貼り付け（「自動振り分け」で自動入力）", source: "STEP3", required: true, type: "textarea", autoFill: true, maxChars: 5000 },
+      { name: "outline_text", label: "章構成作成のアウトプット", desc: "STEP6の章構成を貼り付け（「自動振り分け」で自動入力）", source: "STEP6", required: true, type: "textarea", autoFill: true, maxChars: 20000 },
       { name: "author_profile_text", label: "著者プロフィール（任意）", desc: "著者の経歴や実績があれば書いてください。空欄でもOKです。", source: null, required: false, type: "textarea", maxChars: 2000 }
     ],
     outputTitle: "Amazon説明文",
@@ -204,9 +182,9 @@ const STEPS = [
 ];
 
 const CATEGORIES = [
-  { label: "企画設計", steps: [1, 2, 3, 4, 5] },
-  { label: "執筆設計", steps: [6, 7, 8, 9] },
-  { label: "販売準備", steps: [10] }
+  { label: "企画設計", steps: [1, 2, 3, 4] },
+  { label: "執筆設計", steps: [5, 6, 7, 8] },
+  { label: "販売準備", steps: [9] }
 ];
 
 const STATUS_LABELS = { not_started: "未着手", in_progress: "進行中", completed: "完了" };
@@ -241,6 +219,61 @@ const defaultStepData = (num) => ({
   isSaved: false
 });
 
+// localStorage マイグレーション (v1)
+// 旧 STEP4-10 を 新 STEP3-9 に詰める。旧 STEP3（読者・価値設計）は破棄。
+// 起動時に 1 回だけ実行（aipub:migration:v1 フラグで管理）。
+const MIGRATION_KEY_V1 = "aipub:migration:v1";
+function migrateLocalStorageV1() {
+  try {
+    if (typeof window === "undefined") return;
+    if (localStorage.getItem(MIGRATION_KEY_V1) === "done") return;
+
+    const get = (k) => localStorage.getItem(k);
+    const set = (k, v) => { if (v !== null && v !== undefined) localStorage.setItem(k, v); };
+    const del = (k) => localStorage.removeItem(k);
+
+    // 旧 step:4..10 のデータを退避
+    const buffered = {};
+    for (let i = 4; i <= 10; i++) {
+      const key = STEPS_KEY_PREFIX + i;
+      const v = get(key);
+      if (v !== null) buffered[i] = v;
+    }
+    // 旧 step:3（読者・価値設計）を削除
+    del(STEPS_KEY_PREFIX + 3);
+    // 旧 step:4..10 → 新 step:3..9
+    for (let i = 4; i <= 10; i++) {
+      const newIdx = i - 1;
+      if (buffered[i] !== undefined) {
+        set(STEPS_KEY_PREFIX + newIdx, buffered[i]);
+      } else {
+        del(STEPS_KEY_PREFIX + newIdx);
+      }
+    }
+    // 旧 step:10 を片付け
+    del(STEPS_KEY_PREFIX + 10);
+
+    // currentStep / lastUpdatedStep を持つプロジェクトデータも調整
+    try {
+      const raw = get(STORAGE_KEY);
+      if (raw) {
+        const proj = JSON.parse(raw);
+        if (proj.currentStep === 3) proj.currentStep = 1; // 旧STEP3にいた場合はSTEP1に戻す（読者・価値設計は廃止）
+        else if (typeof proj.currentStep === "number" && proj.currentStep >= 4 && proj.currentStep <= 10) proj.currentStep = proj.currentStep - 1;
+        if (proj.lastUpdatedStep === 3) proj.lastUpdatedStep = null;
+        else if (typeof proj.lastUpdatedStep === "number" && proj.lastUpdatedStep >= 4 && proj.lastUpdatedStep <= 10) proj.lastUpdatedStep = proj.lastUpdatedStep - 1;
+        set(STORAGE_KEY, JSON.stringify(proj));
+      }
+    } catch (e) { console.error("migration: project parse failed", e); }
+
+    localStorage.setItem(MIGRATION_KEY_V1, "done");
+    console.log("[MIGRATION v1] STEP3 廃止 + STEP4-10→STEP3-9 番号繰り上げを完了");
+  } catch (e) {
+    console.error("migrateLocalStorageV1 failed:", e);
+  }
+}
+if (typeof window !== "undefined") migrateLocalStorageV1();
+
 async function loadProject() {
   try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
 }
@@ -270,13 +303,15 @@ async function saveStepData(num, data) {
 }
 async function loadAllSteps() {
   const all = {};
-  for (let i = 1; i <= 10; i++) { all[i] = (await loadStepData(i)) || defaultStepData(i); }
+  for (let i = 1; i <= 9; i++) { all[i] = (await loadStepData(i)) || defaultStepData(i); }
   return all;
 }
 async function resetAllData() {
   try {
     localStorage.removeItem(STORAGE_KEY);
-    for (let i = 1; i <= 10; i++) { localStorage.removeItem(STEPS_KEY_PREFIX + i); }
+    for (let i = 1; i <= 9; i++) { localStorage.removeItem(STEPS_KEY_PREFIX + i); }
+    // 旧STEP10データもクリア（マイグレーション後の残骸対策）
+    localStorage.removeItem(STEPS_KEY_PREFIX + 10);
     localStorage.removeItem(AUTHOR_PROFILE_KEY);
     localStorage.removeItem(WORK_PROFILE_KEY);
     localStorage.removeItem(WORK_PROFILE_CONFIRMED_KEY);
@@ -428,43 +463,15 @@ function extractKeywords3Axes(workProfileDraft) {
   };
 }
 
-function parseWorkProfileForStep3(workProfile) {
-  const empty = { keyword1: "", keyword2: "", intent: "", markets: [] };
+// 書籍プロファイル確定版から検索キーワード3軸（主題軸の最初2語）を抽出
+// 新STEP4（タイトル作成）の自動振り分けで keyword1 / keyword2 に流し込む
+function parseWorkProfileKeywords(workProfile) {
+  const empty = { keyword1: "", keyword2: "" };
   if (!workProfile) return empty;
-  // 主題軸キーワード（半角空白区切り→keyword1/keyword2）
   const axes = extractKeywords3Axes(workProfile);
   const themePhrase = (axes.theme || "").trim();
   const themeParts = themePhrase.split(/[\s　]+/).filter(Boolean);
-  const keyword1 = themeParts[0] || "";
-  const keyword2 = themeParts[1] || "";
-  // セクション抽出ヘルパー（■/##/### 等いずれの見出しでも拾う）
-  const sectionOf = (label) => {
-    const re = new RegExp(`(?:^|\\n)\\s*[■#＃]+\\s*${label}\\s*\\n([\\s\\S]*?)(?=\\n\\s*[■#＃]+\\s|\\n\\s*##\\s|$)`);
-    const m = workProfile.match(re);
-    return m ? m[1].trim() : "";
-  };
-  // 確定版の「■ 検索者の意図（仮説）」セクションから抽出
-  // 旧版（市場検証セクション側に「## 検索者の意図」があった頃）は parseStep2Output 側でカバー
-  const intentSection = sectionOf("検索者の意図（仮説）") || sectionOf("検索者の意図");
-  const intent = intentSection ? intentSection.split(/\n+/).map((l) => l.trim()).filter(Boolean).join(" ") : "";
-  // 確定版の「■ 狙い目の切り口」セクションから抽出
-  const posSection = sectionOf("狙い目の切り口") || sectionOf("狙い目切り口") || sectionOf("ポジショニング仮説") || sectionOf("ポジショニング") || sectionOf("差別化軸");
-  const markets = [];
-  if (posSection) {
-    const lines = posSection.split("\n").map((l) => l.trim()).filter(Boolean);
-    let current = [];
-    const flush = () => {
-      if (current.length) markets.push(current.join("\n").replace(/^[-・*•\d.\s]+/, "").trim());
-      current = [];
-    };
-    for (const line of lines) {
-      if (/^[-・*•]\s/.test(line) || /^\d+[.\s]/.test(line)) { flush(); current.push(line); }
-      else { current.push(line); }
-    }
-    flush();
-    if (markets.length === 0) markets.push(posSection.trim());
-  }
-  return { keyword1, keyword2, intent, markets };
+  return { keyword1: themeParts[0] || "", keyword2: themeParts[1] || "" };
 }
 
 function parseStep2Output(text) {
@@ -663,6 +670,102 @@ const Card = ({ children, style, onClick }) => (
 const StepBadge = ({ num }) => (
   <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: "50%", background: C.navy, color: C.white, fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{num}</span>
 );
+
+// STEP3+ で AI に自動転記される「著者プロファイル」「書籍プロファイル確定版」を可視化するパネル
+// デフォルトは折りたたみ。展開時は全文を表示
+const AutoInjectedProfilesPanel = ({ onNavigate }) => {
+  const [expanded, setExpanded] = useState(false);
+  const [authorProfile, setAuthorProfile] = useState("");
+  const [workProfile, setWorkProfile] = useState("");
+  const [workProfileSource, setWorkProfileSource] = useState(""); // "confirmed" | "draft" | ""
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const a = localStorage.getItem(AUTHOR_PROFILE_KEY) || "";
+    const wpConfirmed = localStorage.getItem(WORK_PROFILE_CONFIRMED_KEY) || "";
+    const wpDraft = localStorage.getItem(WORK_PROFILE_KEY) || "";
+    setAuthorProfile(a);
+    if (wpConfirmed) { setWorkProfile(wpConfirmed); setWorkProfileSource("confirmed"); }
+    else if (wpDraft) { setWorkProfile(wpDraft); setWorkProfileSource("draft"); }
+    else { setWorkProfile(""); setWorkProfileSource(""); }
+  }, [expanded]);
+
+  const hasAuthor = !!authorProfile.trim();
+  const hasWork = !!workProfile.trim();
+
+  return (
+    <div style={{ marginBottom: 16, border: `1px solid ${C.border}`, borderRadius: 4, background: C.bg }}>
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        style={{ width: "100%", textAlign: "left", padding: "10px 14px", background: "transparent", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}
+      >
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: C.navyMid }}>
+          📎 自動転記される参照情報（AIに渡されます）
+          <span style={{ marginLeft: 8, fontSize: 11.5, color: C.textLight, fontWeight: 400 }}>
+            著者プロファイル: {hasAuthor ? "✓" : "未設定"} ／ 書籍プロファイル: {hasWork ? (workProfileSource === "confirmed" ? "✓ 確定版" : "△ 草案のみ") : "未設定"}
+          </span>
+        </span>
+        <span style={{ fontSize: 13, color: C.textLight }}>{expanded ? "▲ 閉じる" : "▼ 展開"}</span>
+      </button>
+      {expanded && (
+        <div style={{ padding: "0 14px 14px 14px", borderTop: `1px solid ${C.border}` }}>
+          <div style={{ fontSize: 12, color: C.textSub, marginTop: 12, marginBottom: 10, lineHeight: 1.7 }}>
+            このSTEPでは、入力欄の内容に加えて、以下の2つの情報も自動的にAIに渡されます。内容を確認・編集したい場合は元のSTEPに戻ってください。
+          </div>
+
+          {/* 著者プロファイル */}
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: C.navy }}>【著者プロファイル】</span>
+              <button onClick={() => onNavigate?.("step_0")}
+                style={{ fontSize: 11.5, color: C.navyMid, background: "transparent", border: `1px solid ${C.border}`, borderRadius: 3, padding: "4px 10px", cursor: "pointer" }}>
+                STEP0 で編集 ›
+              </button>
+            </div>
+            {hasAuthor ? (
+              <pre style={{ fontSize: 12, color: C.textSub, background: C.white, border: `1px solid ${C.border}`, borderRadius: 3, padding: "10px 12px", margin: 0, maxHeight: 320, overflow: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word", fontFamily: "inherit", lineHeight: 1.6 }}>
+                {authorProfile}
+              </pre>
+            ) : (
+              <div style={{ fontSize: 12.5, color: C.red, padding: "10px 12px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.2)`, borderRadius: 3 }}>
+                ⚠ 未設定。STEP0で著者プロファイルを生成してください。
+              </div>
+            )}
+          </div>
+
+          {/* 書籍プロファイル */}
+          <div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: C.navy }}>
+                【書籍プロファイル{workProfileSource === "confirmed" ? "確定版（STEP2）" : workProfileSource === "draft" ? "草案（STEP1）" : ""}】
+              </span>
+              <button onClick={() => onNavigate?.(workProfileSource === "draft" ? "step_1" : "step_2")}
+                style={{ fontSize: 11.5, color: C.navyMid, background: "transparent", border: `1px solid ${C.border}`, borderRadius: 3, padding: "4px 10px", cursor: "pointer" }}>
+                {workProfileSource === "draft" ? "STEP1 で編集" : "STEP2 で編集"} ›
+              </button>
+            </div>
+            {hasWork ? (
+              <>
+                {workProfileSource === "draft" && (
+                  <div style={{ fontSize: 11.5, color: C.gold, marginBottom: 6, padding: "6px 10px", background: C.goldPale, border: `1px solid ${C.goldLight}`, borderRadius: 3 }}>
+                    ⚠ STEP2 を未実行のため、STEP1 草案が使われます。市場検証で精度を上げるため STEP2 を実行することを推奨します。
+                  </div>
+                )}
+                <pre style={{ fontSize: 12, color: C.textSub, background: C.white, border: `1px solid ${C.border}`, borderRadius: 3, padding: "10px 12px", margin: 0, maxHeight: 480, overflow: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word", fontFamily: "inherit", lineHeight: 1.6 }}>
+                  {workProfile}
+                </pre>
+              </>
+            ) : (
+              <div style={{ fontSize: 12.5, color: C.red, padding: "10px 12px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.2)`, borderRadius: 3 }}>
+                ⚠ 未設定。STEP1〜2 で書籍プロファイルを生成してください。
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 function cleanHtmlMinimal(html) {
   const results = []; const seen = new Set();
@@ -1005,7 +1108,7 @@ const Step0Page = ({ savedProfile, onSaveProfile, onNavigate }) => {
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: C.gold, marginBottom: 4, letterSpacing: "0.08em" }}>STEP 0</div>
           <h1 style={{ fontSize: 20, fontWeight: 700, color: C.navy, margin: "0 0 6px", letterSpacing: "-0.01em" }}>著者プロファイル</h1>
-          <p style={{ fontSize: 13.5, color: C.textSub, margin: 0, lineHeight: 1.7 }}>過去の出版物・SNS投稿などからAIが著者の作家性を抽出します。生成したプロファイルはSTEP1〜14の各ステップで自動的に活用されます。</p>
+          <p style={{ fontSize: 13.5, color: C.textSub, margin: 0, lineHeight: 1.7 }}>過去の出版物・SNS投稿などからAIが著者の作家性を抽出します。生成したプロファイルはSTEP1〜9の各ステップで自動的に活用されます。</p>
         </div>
       </div>
       <div style={{ height: 1, background: `linear-gradient(to right, ${C.gold}, ${C.goldLight}, transparent)`, width: "100%", opacity: 0.9, marginBottom: 20 }} />
@@ -1085,7 +1188,7 @@ const Step0Page = ({ savedProfile, onSaveProfile, onNavigate }) => {
           style={{ width: "100%", padding: "12px 14px", fontSize: 13.5, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.85 }} />
         <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
           <BtnPrimary onClick={handleSaveProfile} disabled={!outputText.trim()}>プロファイルを保存</BtnPrimary>
-          {saveMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました（STEP1〜14で利用できます）</span>}
+          {saveMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました（STEP1〜9で利用できます）</span>}
         </div>
       </div>
     </div>
@@ -1747,7 +1850,7 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
           <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>出力：書籍プロファイル確定版（保存対象・編集可能）</h2>
         </div>
         <div style={{ fontSize: 12, color: C.textSub, marginBottom: 8, lineHeight: 1.7 }}>
-          STEP3以降の各STEPに自動転記される最終データです。保存したものがSTEP3〜10で使われます。
+          STEP3以降の各STEPに自動転記される最終データです。保存したものがSTEP3〜9で使われます。
         </div>
         <textarea value={confirmedDraft} onChange={(e) => setConfirmedDraft(e.target.value)}
           rows={20}
@@ -1837,7 +1940,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   }, [step.num]);
 
   const prevStep = step.num > 1 ? STEPS[step.num - 2] : null;
-  const nextStep = step.num < 10 ? STEPS[step.num] : null;
+  const nextStep = step.num < 9 ? STEPS[step.num] : null;
 
   const handleInputChange = (name, value) => {
     setInputs((prev) => { const updated = { ...prev, [name]: value }; onInputChange?.(step.num, updated); return updated; });
@@ -1869,10 +1972,10 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   const handleRunDify = async () => {
     if (validateInputs().length > 0) return;
     setIsRunning(true); setRunError("");
-    if (step.num === 9) {
+    if (step.num === 8) {
       const sectionToRun = selectedSection !== null ? sectionOptions[selectedSection] : null;
       if (!sectionToRun || !sectionToRun.items || sectionToRun.items.length === 0) {
-        setRunError("執筆する節が選ばれていません。\n\n上の「📋 STEP8から節を抽出」ボタンを押して、書きたい節を1つ選んでください。");
+        setRunError("執筆する節が選ばれていません。\n\n上の「📋 STEP7から節を抽出」ボタンを押して、書きたい節を1つ選んでください。");
         setIsRunning(false); return;
       }
       const items = sectionToRun.items; const total = items.length; const results = [];
@@ -1880,7 +1983,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         for (let i = 0; i < total; i++) {
           const currentItem = items[i];
           setSectionProgress({ total, current: i + 1, currentItemName: currentItem });
-          const response = await fetch("/api/dify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stepNum: 9, inputs: { ...getAutoInjectedProfiles(), detailed_plot_text: inputs.detailed_plot_text || "", target_heading: currentItem, past_writing_text: inputs.past_writing_text || "" } }) });
+          const response = await fetch("/api/dify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stepNum: 8, inputs: { ...getAutoInjectedProfiles(), detailed_plot_text: inputs.detailed_plot_text || "", target_heading: currentItem, past_writing_text: inputs.past_writing_text || "" } }) });
           const data = await response.json();
           if (!response.ok) {
             setRunError(`節の生成中にエラーが発生しました。\n\n${total}項目中、${i + 1}項目目（${currentItem}）の生成で失敗しました。途中までの生成結果は破棄されます。\n\n少し時間をおいてから、もう一度「実行する」を押してください。\n\n（エラー詳細：${data.error || "不明なエラー"}）`);
@@ -1982,20 +2085,16 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           <StepBadge num="①" />
           <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>入力データ</h2>
         </div>
+        {step.num >= 3 && <AutoInjectedProfilesPanel onNavigate={onNavigate} />}
         {validationErrors.length > 0 && (
           <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginBottom: 12, fontSize: 13, color: C.red, fontWeight: 500 }}>必須の項目がまだ空欄です。赤くなっている欄を入力してから、もう一度お試しください。</div>
         )}
-        {step.num === 3 && (
+        {step.num === 4 && (
           <div style={{ fontSize: 12.5, color: C.textSub, marginBottom: 12, padding: "10px 14px", background: C.goldPale, border: `1px solid ${C.goldLight}`, borderRadius: 4, lineHeight: 1.8 }}>
-            💡 「検索意図仮説」と「狙い目切り口」の欄にある<span style={{ fontWeight: 700, color: C.gold }}>「自動振り分け」</span>ボタンを押すと、STEP2の出力から自動で該当箇所を抽出して入力してくれます。
+            💡 「検索キーワード1・2」の欄にある<span style={{ fontWeight: 700, color: C.gold }}>「自動振り分け」</span>ボタンを押すと、書籍プロファイル確定版（STEP2）の主題軸キーワードを自動で入力してくれます。
           </div>
         )}
-        {step.num === 5 && (
-          <div style={{ fontSize: 12.5, color: C.textSub, marginBottom: 12, padding: "10px 14px", background: C.goldPale, border: `1px solid ${C.goldLight}`, borderRadius: 4, lineHeight: 1.8 }}>
-            💡 「検索キーワード1・2」の欄にある<span style={{ fontWeight: 700, color: C.gold }}>「自動振り分け」</span>ボタンを押すと、STEP2の出力からキーワードを自動で入力してくれます。
-          </div>
-        )}
-        {step.num !== 3 && step.num !== 5 && step.inputs.some((f) => f.source) && (
+        {step.num !== 4 && step.inputs.some((f) => f.source) && (
           <div style={{ fontSize: 12.5, color: C.textSub, marginBottom: 12, padding: "8px 12px", background: C.blueLight, border: `1px solid rgba(42,68,104,0.12)`, borderRadius: 4, lineHeight: 1.7 }}>左メニューの「保存データ」から前のステップの出力をコピーし、各欄に貼り付けてください。</div>
         )}
 
@@ -2003,53 +2102,25 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           const hasError = validationErrors.includes(field.name);
           const currentLen = (inputs[field.name] || "").length;
           const isOverLimit = field.maxChars && currentLen > field.maxChars;
-          const isStep3ParsedField = (step.num === 3 || step.num === 5) && (field.name === "keyword1" || field.name === "keyword2" || field.name === "intent_lock" || field.name === "market_report");
-          const handleAutoFillParsed = isStep3ParsedField ? () => {
-            // 優先：STEP2 全文（新C案出力に「## 検索者の意図（仮説）」「## 狙い目の切り口」を明示的に含む）
-            const step2Output = allSteps?.[2]?.outputText || "";
-            let parsed = step2Output ? parseStep2Output(step2Output) : null;
-            // 補完：書籍プロファイル確定版／草案（STEP2出力が無いか、抽出できなかった項目を補う）
+          const isKeywordParsedField = step.num === 4 && (field.name === "keyword1" || field.name === "keyword2");
+          const handleAutoFillParsed = isKeywordParsedField ? () => {
+            // 書籍プロファイル確定版／草案／STEP2全文 から主題軸キーワードを抽出
             const wp = (typeof window !== "undefined")
               ? (localStorage.getItem(WORK_PROFILE_CONFIRMED_KEY) || localStorage.getItem(WORK_PROFILE_KEY) || "")
               : "";
-            const fromWp = wp ? parseWorkProfileForStep3(wp) : null;
-            if (!parsed) parsed = fromWp;
-            else if (fromWp) {
-              if (!parsed.keyword1) parsed.keyword1 = fromWp.keyword1;
-              if (!parsed.keyword2) parsed.keyword2 = fromWp.keyword2;
-              if (!parsed.intent) parsed.intent = fromWp.intent;
-              if (!parsed.markets || parsed.markets.length === 0) parsed.markets = fromWp.markets;
+            let parsed = wp ? parseWorkProfileKeywords(wp) : { keyword1: "", keyword2: "" };
+            if (!parsed.keyword1 || !parsed.keyword2) {
+              const step2Output = allSteps?.[2]?.outputText || "";
+              if (step2Output) {
+                const fromStep2 = parseStep2Output(step2Output);
+                if (!parsed.keyword1) parsed.keyword1 = fromStep2.keyword1 || "";
+                if (!parsed.keyword2) parsed.keyword2 = fromStep2.keyword2 || "";
+              }
             }
-            if (!parsed) { alert("STEP2の出力（または書籍プロファイル）が見つかりません。\n\nSTEP2を実行して保存してから、もう一度お試しください。"); return; }
-            if (field.name === "keyword1") { if (parsed.keyword1) handleInputChange("keyword1", parsed.keyword1); else alert("STEP2出力／書籍プロファイルから「主題軸キーワード1」が見つかりませんでした。手動で入力してください。"); }
-            if (field.name === "keyword2") { if (parsed.keyword2) handleInputChange("keyword2", parsed.keyword2); else alert("STEP2出力／書籍プロファイルから「主題軸キーワード2」が見つかりませんでした。手動で入力してください。"); }
-            if (field.name === "intent_lock") { if (parsed.intent) handleInputChange("intent_lock", parsed.intent); else alert("書籍プロファイル確定版に「■ 検索者の意図（仮説）」セクションが見つかりませんでした。\n\n対処：\n・Dify cloud の STEP2 アプリで最新の YML が公開済みか確認し、STEP2 を再実行してください（最新版では確定版の中に「■ 検索者の意図（仮説）」が含まれます）\n・または、STEP1の書籍プロファイル確定版に手動で『■ 検索者の意図（仮説）』セクションを追加するか、この欄に直接記入してください（読者がこのキーワードで何を知りたいかを1文で）"); }
-            if (field.name === "market_report") { if (parsed.markets && parsed.markets.length > 0) { setMarketOptions(parsed.markets); setSelectedMarket(null); handleInputChange("market_report", ""); } else { alert("書籍プロファイル確定版に「■ 狙い目の切り口」セクションが見つかりませんでした。\n\n対処：\n・Dify cloud の STEP2 アプリで最新の YML が公開済みか確認し、STEP2 を再実行してください（最新版では確定版の中に「■ 狙い目の切り口」が含まれます）\n・または、手動で入力してください（任意項目）"); } }
+            if (!parsed.keyword1 && !parsed.keyword2) { alert("書籍プロファイル確定版（またはSTEP2出力）からキーワードを抽出できませんでした。\n\nSTEP2を実行して保存してから、もう一度お試しください。"); return; }
+            if (field.name === "keyword1") { if (parsed.keyword1) handleInputChange("keyword1", parsed.keyword1); else alert("「主題軸キーワード1」が見つかりませんでした。手動で入力してください。"); }
+            if (field.name === "keyword2") { if (parsed.keyword2) handleInputChange("keyword2", parsed.keyword2); else alert("「主題軸キーワード2」が見つかりませんでした。手動で入力してください。"); }
           } : undefined;
-
-          if (field.name === "market_report") {
-            return (
-              <div key={field.name} style={{ marginBottom: 16 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
-                  <label style={{ fontSize: 13.5, fontWeight: 600, color: C.navy }}>{field.label}</label>
-                  <SourceLabel source={field.source} autoFill={field.autoFill} onAutoFill={() => {}}
-                    onRef={() => { const s = allSteps?.[2]?.outputText; if (s) onRefPanel({ stepNum: 2, text: s, targetField: "market_report" }); else alert("STEP2の出力データがまだ保存されていません。"); }}
-                    onAutoFillParsed={handleAutoFillParsed} />
-                </div>
-                <div style={{ fontSize: 13, color: "#444444", marginBottom: 6 }}>{field.desc}</div>
-                {marketOptions.length === 0 && (
-                  <textarea value={inputs[field.name] || ""} onChange={(e) => handleInputChange(field.name, e.target.value)} placeholder="「自動振り分け」ボタンで候補を表示するか、直接入力してください" rows={4}
-                    style={{ width: "100%", padding: "10px 12px", fontSize: 14, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.7 }} />
-                )}
-                {marketOptions.length > 0 && (
-                  <MarketReportSelector options={marketOptions} selected={selectedMarket}
-                    onSelect={(i, opt) => { setSelectedMarket(i); handleInputChange("market_report", opt); }}
-                    onReselect={() => { setSelectedMarket(null); handleInputChange("market_report", ""); }}
-                    value={inputs["market_report"] || ""} onChange={(v) => handleInputChange("market_report", v)} />
-                )}
-              </div>
-            );
-          }
 
           if (field.name === "target_section") {
             const hasSectionErr = validationErrors.includes(field.name);
@@ -2059,19 +2130,19 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                   <label style={{ fontSize: 13.5, fontWeight: 600, color: hasSectionErr ? C.red : C.navy }}>{field.label}</label>
                   {field.required && <RequiredMark />}
                   <SourceLabel source={field.source} autoFill={false} onAutoFill={() => {}}
-                    onRef={() => { const s = allSteps?.[8]?.outputText; if (s) onRefPanel({ stepNum: 8, text: s, targetField: "target_section" }); else alert("STEP8の出力データがまだ保存されていません。"); }} />
+                    onRef={() => { const s = allSteps?.[7]?.outputText; if (s) onRefPanel({ stepNum: 7, text: s, targetField: "target_section" }); else alert("STEP7の出力データがまだ保存されていません。"); }} />
                   {hasSectionErr && <span style={{ fontSize: 12, color: C.red, fontWeight: 500 }}>← 節を選んでください</span>}
                 </div>
                 <div style={{ fontSize: 13, color: "#444444", marginBottom: 8 }}>{field.desc}</div>
                 <div style={{ marginBottom: 10 }}>
                   <button onClick={() => {
-                    const srcOutput = allSteps?.[8]?.outputText;
-                    if (!srcOutput) { alert("STEP8の出力データがまだ保存されていません。\n\nSTEP8を完了して「出力データを保存」ボタンを押してから、もう一度お試しください。"); return; }
+                    const srcOutput = allSteps?.[7]?.outputText;
+                    if (!srcOutput) { alert("STEP7の出力データがまだ保存されていません。\n\nSTEP7を完了して「出力データを保存」ボタンを押してから、もう一度お試しください。"); return; }
                     const extracted = extractSections(srcOutput);
-                    if (extracted.length === 0) { alert("STEP8の出力から「(1)(2)(3)...」形式の節を検出できませんでした。STEP8の出力をもう一度確認してください。"); return; }
+                    if (extracted.length === 0) { alert("STEP7の出力から「(1)(2)(3)...」形式の節を検出できませんでした。STEP7の出力をもう一度確認してください。"); return; }
                     setSectionOptions(extracted); setSelectedSection(null); handleInputChange("target_section", "");
                   }} style={{ fontSize: 12.5, fontWeight: 600, color: C.white, background: C.gold, border: "none", borderRadius: 3, padding: "7px 14px", cursor: "pointer" }}>
-                    📋 STEP8から節を抽出
+                    📋 STEP7から節を抽出
                   </button>
                   {sectionOptions.length > 0 && (
                     <button onClick={() => { setSectionOptions([]); setSelectedSection(null); handleInputChange("target_section", ""); }}
@@ -2137,7 +2208,10 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           {step.type === "chat" && (
             <>
               <BtnSecondary onClick={async () => {
-                const text = step.inputs.length === 1 ? (inputs[step.inputs[0].name] || "") : step.inputs.map((f) => `【${f.label}】\n${inputs[f.name] || ""}`).join("\n\n");
+                // 入力欄がある場合はその内容、ない場合は「開始」を送って質問1から始めさせる
+                const text = step.inputs.length > 0
+                  ? (step.inputs.length === 1 ? (inputs[step.inputs[0].name] || "") : step.inputs.map((f) => `【${f.label}】\n${inputs[f.name] || ""}`).join("\n\n"))
+                  : "開始";
                 if (!text.trim()) return;
                 setChatTransferMsg(true); setTimeout(() => setChatTransferMsg(false), 2500);
                 setChatError(""); setChatMessages((prev) => [...prev, { role: "user", content: text }]); setChatLoading(true);
@@ -2149,8 +2223,8 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                   else { if (data.conversation_id) setChatConversationId(data.conversation_id); setChatMessages((prev) => [...prev, { role: "assistant", content: data.answer }]); setTimeout(() => { if (chatAreaRef.current) chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight; }, 50); }
                 } catch (e) { setChatError("通信エラーが発生しました。"); }
                 finally { setChatLoading(false); }
-              }} style={{ fontSize: 13 }}>チャットに転記して開始</BtnSecondary>
-              {chatTransferMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ チャットに転記しました</span>}
+              }} style={{ fontSize: 13 }}>{step.inputs.length > 0 ? "チャットに転記して開始" : "チャットを開始"}</BtnSecondary>
+              {chatTransferMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ {step.inputs.length > 0 ? "チャットに転記しました" : "チャットを開始しました"}</span>}
             </>
           )}
         </div>
@@ -2226,7 +2300,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
             <div>
               <div style={{ fontSize: 13, color: C.textSub, lineHeight: 1.8, marginBottom: 12 }}>入力データが揃ったら「実行する」ボタンを押してください。AIが処理して、結果が下の出力欄に自動で表示されます。</div>
               {runError && <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginBottom: 12, fontSize: 13, color: C.red }}>{runError}</div>}
-              {step.num === 9 && sectionProgress && (
+              {step.num === 8 && sectionProgress && (
                 <div style={{ marginBottom: 12, padding: "12px 14px", background: C.navyLight, border: `1px solid rgba(42,68,104,0.2)`, borderRadius: 4 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, fontSize: 12.5, color: C.navyMid, fontWeight: 600 }}>
                     <span>節の一括生成中：{sectionProgress.current} / {sectionProgress.total} 項</span>
@@ -2240,9 +2314,9 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
               )}
               <button onClick={handleRunDify} disabled={isRunning}
                 style={{ padding: "12px 36px", background: isRunning ? "#93c5fd" : C.navy, color: C.white, border: "none", borderRadius: 3, fontWeight: 700, fontSize: 14, cursor: isRunning ? "default" : "pointer", letterSpacing: "0.04em" }}>
-                {isRunning ? (step.num === 9 ? "節を生成中..." : "実行中...") : "▶ 実行する"}
+                {isRunning ? (step.num === 8 ? "節を生成中..." : "実行中...") : "▶ 実行する"}
               </button>
-              {isRunning && step.num !== 9 && <span style={{ fontSize: 13, color: C.navyMid, marginLeft: 12 }}>AIが処理しています。少々お待ちください...</span>}
+              {isRunning && step.num !== 8 && <span style={{ fontSize: 13, color: C.navyMid, marginLeft: 12 }}>AIが処理しています。少々お待ちください...</span>}
             </div>
           )}
         </Card>
@@ -2345,23 +2419,23 @@ const GuidePage = ({ onNavigate }) => {
       <p style={{ fontSize: 13.5, color: C.textSub, marginBottom: 28 }}>AI出版プロデューサーの進め方を、短く確認できます</p>
       <Section title="全体の流れ">
         <ul style={{ margin: 0, paddingLeft: 18 }}>
-          <li>STEP1からSTEP10まで順番に進めます</li>
+          <li>STEP1からSTEP9まで順番に進めます</li>
           <li>前のステップの出力を次のステップの入力に使います</li>
           <li>途中で止まっても、保存データからいつでも再開できます</li>
         </ul>
       </Section>
-      <Section title="操作方法（ワークフロー型:STEP1〜3・5〜10）">
+      <Section title="操作方法（ワークフロー型:STEP1〜2・4〜9）">
         <ul style={{ margin: 0, paddingLeft: 18 }}>
           <li>① 入力データ欄に情報を入力する。「自動転記」「参照」「自動振り分け」ボタンを活用してください</li>
           <li style={{ marginTop: 4 }}><span style={{ fontWeight: 700 }}>自動転記（ネイビー）</span>：押すと前のSTEPの出力が自動で入力欄に入る</li>
           <li style={{ marginTop: 4 }}><span style={{ fontWeight: 700 }}>参照（薄ネイビー）</span>：押すと画面右側に前のSTEPの出力が表示される</li>
-          <li style={{ marginTop: 4 }}><span style={{ fontWeight: 700 }}>自動振り分け（ゴールド）</span>：STEP3専用。STEP2出力（検索者の意図／狙い目の切り口）と書籍プロファイル確定版から該当箇所を自動で抽出</li>
+          <li style={{ marginTop: 4 }}><span style={{ fontWeight: 700 }}>自動振り分け（ゴールド）</span>：STEP4のキーワード入力欄専用。書籍プロファイル確定版（STEP2）から主題軸キーワードを自動抽出</li>
           <li style={{ marginTop: 8 }}>② 「実行する」ボタンを押すとAIが自動で処理し、結果が出力欄に表示される</li>
           <li>③ 内容を確認・修正して「出力データを保存」を押す</li>
         </ul>
         <div style={{ marginTop: 8, fontSize: 12.5, color: "#b8922a", fontWeight: 600 }}>⚠️ 出力を修正した場合も必ず「出力データを保存」を押してから次のステップへ。</div>
       </Section>
-      <Section title="操作方法（チャット型:STEP4）">
+      <Section title="操作方法（チャット型:STEP3）">
         <ul style={{ margin: 0, paddingLeft: 18 }}>
           <li>① 入力データ欄に情報を入力して「入力データを保存」を押す</li>
           <li>② 「チャットに転記して開始」を押すと入力データがそのまま送信され、AIから最初の質問が届く</li>

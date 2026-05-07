@@ -1,61 +1,72 @@
 // Vercel Serverless Function - Dify API Proxy
 const DIFY_API_BASE = "https://api.dify.ai/v1";
 
+// STEP3 廃止 + STEP4-10 を STEP3-9 に番号繰り上げ後の対応表
+//   旧STEP4 (エピソードインタビュー)   → 新STEP3
+//   旧STEP5 (タイトル・サブタイトル)   → 新STEP4
+//   旧STEP6 (目次作成)                 → 新STEP5
+//   旧STEP7 (章構成作成)               → 新STEP6
+//   旧STEP8 (詳細プロット作成)         → 新STEP7
+//   旧STEP9 (本文作成)                 → 新STEP8
+//   旧STEP10 (Amazon説明文作成)        → 新STEP9
+// 環境変数 DIFY_API_KEY_STEP03〜09 には新STEPに対応する API Key を設定してください。
 const API_KEYS = {
-  0:  process.env.DIFY_API_KEY_STEP00_A,
-  1:  process.env.DIFY_API_KEY_STEP01,
-  2:  process.env.DIFY_API_KEY_STEP02,
-  3:  process.env.DIFY_API_KEY_STEP03,
-  4:  process.env.DIFY_API_KEY_STEP04,
-  5:  process.env.DIFY_API_KEY_STEP05,
-  6:  process.env.DIFY_API_KEY_STEP06,
-  7:  process.env.DIFY_API_KEY_STEP07,
-  8:  process.env.DIFY_API_KEY_STEP08,
-  9:  process.env.DIFY_API_KEY_STEP09,
-  10: process.env.DIFY_API_KEY_STEP10,
+  0: process.env.DIFY_API_KEY_STEP00_A,
+  1: process.env.DIFY_API_KEY_STEP01,
+  2: process.env.DIFY_API_KEY_STEP02,
+  3: process.env.DIFY_API_KEY_STEP03,
+  4: process.env.DIFY_API_KEY_STEP04,
+  5: process.env.DIFY_API_KEY_STEP05,
+  6: process.env.DIFY_API_KEY_STEP06,
+  7: process.env.DIFY_API_KEY_STEP07,
+  8: process.env.DIFY_API_KEY_STEP08,
+  9: process.env.DIFY_API_KEY_STEP09,
 };
 
 function mapInputs(stepNum, inputs) {
   const m = { ...inputs };
 
   // STEP1: theme をそのまま渡す（変換不要）
-  // 何もしない
 
   if (stepNum === 2) {
     if (m.amazon_html !== undefined) { m.HTML = m.amazon_html; delete m.amazon_html; }
   }
 
-  if (stepNum === 5) {
+  // STEP3 (旧STEP4 エピソードインタビュー): チャット型のため API_KEYS のみ使用、入力変換は dify-chat.js 側
+
+  if (stepNum === 4) {
+    // 旧STEP5 タイトル・サブタイトル作成。theme_output 入力は廃止
     if (m.keyword1 !== undefined)       { m.kw1 = m.keyword1; delete m.keyword1; }
     if (m.keyword2 !== undefined)       { m.kw2 = m.keyword2; delete m.keyword2; }
-    if (m.blueprint_text !== undefined) { m.theme_output = m.blueprint_text; delete m.blueprint_text; }
     if (m.interview_text !== undefined) { m.diff_elements = m.interview_text; delete m.interview_text; }
   }
 
-  if (stepNum === 6) {
-    if (m.blueprint_text !== undefined) { m.blueprint = m.blueprint_text; delete m.blueprint_text; }
+  if (stepNum === 5) {
+    // 旧STEP6 目次作成。blueprint 入力は廃止
     if (m.interview_text !== undefined) { m.interview_notes = m.interview_text; delete m.interview_text; }
   }
 
-  if (stepNum === 7) {
+  if (stepNum === 6) {
+    // 旧STEP7 章構成作成。blueprint 入力は廃止
     if (m.toc_text !== undefined)       { m.refined_toc = m.toc_text; delete m.toc_text; }
-    if (m.blueprint_text !== undefined) { m.blueprint = m.blueprint_text; delete m.blueprint_text; }
     if (m.interview_text !== undefined) { m.nterview_notes = m.interview_text; delete m.interview_text; }
   }
 
-  if (stepNum === 8) {
+  if (stepNum === 7) {
+    // 旧STEP8 詳細プロット作成
     if (m.chapter_outline_text !== undefined) { m.plot_instruction = m.chapter_outline_text; delete m.chapter_outline_text; }
     if (m.added_episode_text !== undefined)   { m.added_episodes = m.added_episode_text; delete m.added_episode_text; }
   }
 
-  if (stepNum === 9) {
+  if (stepNum === 8) {
+    // 旧STEP9 本文作成
     if (m.past_writing_text !== undefined) { m.past_writing_data = m.past_writing_text; delete m.past_writing_text; }
   }
 
-  if (stepNum === 10) {
+  if (stepNum === 9) {
+    // 旧STEP10 Amazon説明文作成。reader_value_design 入力は廃止
     if (m.title_text !== undefined)          { m.title = m.title_text; delete m.title_text; }
     if (m.subtitle_text !== undefined)       { m.subtitle = m.subtitle_text; delete m.subtitle_text; }
-    if (m.blueprint_text !== undefined)      { m.reader_value_design = m.blueprint_text; delete m.blueprint_text; }
     if (m.interview_text !== undefined)      { m.author_episode = m.interview_text; delete m.interview_text; }
     if (m.outline_text !== undefined)        { m.toc_text = m.outline_text; delete m.outline_text; }
     if (m.author_profile_text !== undefined) { m.author_profile = m.author_profile_text; delete m.author_profile_text; }

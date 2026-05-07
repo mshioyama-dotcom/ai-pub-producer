@@ -1,9 +1,10 @@
-// Vercel Serverless Function - Dify Chat API Proxy（STEP1・4用）
+// Vercel Serverless Function - Dify Chat API Proxy（STEP1・3用）
+// STEP3 (旧STEP4) はエピソードインタビュー（チャット型）
 const DIFY_API_BASE = "https://api.dify.ai/v1";
 
 const CHAT_API_KEYS = {
   1: process.env.DIFY_API_KEY_STEP01,
-  4: process.env.DIFY_API_KEY_STEP04,
+  3: process.env.DIFY_API_KEY_STEP03,
 };
 
 export default async function handler(req, res) {
