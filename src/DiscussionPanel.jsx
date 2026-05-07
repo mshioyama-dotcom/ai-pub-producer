@@ -87,6 +87,9 @@ export default function DiscussionPanel({
   // Phase 2: 「✨ この方針で再生成」ボタン用の状態
   const [regenerating, setRegenerating] = useState(false);
   const [regeneratePhase, setRegeneratePhase] = useState(""); // "summarizing" | "regenerating" | ""
+  // STEP4専用: 案ごとのフォーカス（"" = 全案、"1" | "2" | "3" = 該当案のみブラッシュアップ対象）
+  // 改善要望に「この再生成は案◯のみが対象」を強制付加し、AIが他案を新規生成しないよう誘導する。
+  const [focusedCase, setFocusedCase] = useState("");
   const chatAreaRef = useRef(null);
 
   // STEP変更時に状態を読み直す
@@ -196,18 +199,11 @@ export default function DiscussionPanel({
   };
   const hasAssistantMessage = messages.some((m) => m.role === "assistant");
 
-  // 直近のAI回答を出力データへ直接転記（既存の出力を上書き）
-  const handleTransferToOutput = () => {
-    const content = getLastAIContent();
-    if (!content || !onTransferToOutput) return;
-    if (stepOutput && stepOutput.trim()) {
-      if (!confirm("既存の出力データを上書きします。よろしいですか？\n\n（コピー履歴は手動で別途残してください）")) return;
-    }
-    onTransferToOutput(content);
-    setApplyMsg("✓ 出力データへ転記しました（保存ボタンで確定してください）");
-    setTimeout(() => setApplyMsg(""), 3500);
-  };
-
+  // 「直近のAI回答を出力データへ転記」機能は削除。
+  // 理由: AIの自然文回答（例: 議論の要約や提案）をそのまま出力textareaに入れると、
+  // 3案構造などのフォーマットが崩壊するため危険。
+  // ✨「この方針で再生成」がフォーマット保証付きの正式な反映手段。
+  // クリップボードコピー（↓コピー）は引き続き利用可能。
   // 改善要望欄へ転記（Phase 2用 / 現状はpropsが未供給ならクリップボードコピーにフォールバック）
   const handleApply = () => {
     const content = getLastAIContent();
@@ -295,13 +291,26 @@ export default function DiscussionPanel({
   // ユーザーがインライン確認パネルで「OK」を押したときの処理
   const handleConfirmRegenerate = async () => {
     if (!pendingSummary) return;
-    const improvementRequest = pendingSummary;
+    let improvementRequest = pendingSummary;
+
+    // STEP4 フォーカスモード: 「案◯のみブラッシュアップ」が指定されている場合、
+    // 改善要望の冒頭に強い指示を追加して、AIが他案を勝手に変えないようにする。
+    if (stepNum === 4 && focusedCase) {
+      const focusDirective = `【再生成スコープ：案${focusedCase}のみ】\n` +
+        `この再生成は案${focusedCase}だけが対象です。改善要望機構の手順に従い、案${focusedCase}以外（案1・案${focusedCase === "1" ? "2" : "1"}以外の他案）は前回出力からそのままコピーして一字も変更しないでください。修正対象は案${focusedCase}のみです。\n\n` +
+        `[ユーザーとAIで合意した改善方針]\n${pendingSummary}`;
+      improvementRequest = focusDirective;
+    }
+
     setPendingSummary(null);
     setRegenerating(true);
     setRegeneratePhase("regenerating");
     try {
       await onRegenerateWithRequest(improvementRequest);
-      setApplyMsg("✓ 再生成が完了しました（出力データを確認してください）");
+      const focusedLabel = stepNum === 4 && focusedCase ? `案${focusedCase}のみ` : "";
+      setApplyMsg(focusedLabel
+        ? `✓ ${focusedLabel}を再生成しました（出力データを確認してください）`
+        : "✓ 再生成が完了しました（出力データを確認してください）");
       setTimeout(() => setApplyMsg(""), 4000);
     } catch (e) {
       setError(`再生成中にエラー：${e.message}`);
@@ -350,6 +359,49 @@ export default function DiscussionPanel({
           <div style={{ fontSize: 12.5, color: C.textSub, lineHeight: 1.7, marginBottom: 10 }}>
             生成された出力について、AIに相談しながら改善方針を一緒に練れます。違和感を感じた点を自由に書いてください（例：「案2の『ベストセラー』はKDP規約的に大丈夫？」「案3のターゲットがぼやけている気がする」）。
           </div>
+
+          {/* STEP4専用: 案ごとのフォーカスモード（軽量版・改善要望への自動付加だけ） */}
+          {stepNum === 4 && onRegenerateWithRequest && (
+            <div style={{
+              padding: "8px 12px",
+              background: focusedCase ? C.goldPale : "#f8f8f8",
+              border: `1px solid ${focusedCase ? C.goldLight : C.border}`,
+              borderRadius: 4,
+              marginBottom: 10,
+              fontSize: 12.5,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              flexWrap: "wrap",
+            }}>
+              <span style={{ fontWeight: 700, color: C.navy }}>🎯 ブラッシュアップ対象：</span>
+              <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                <input type="radio" name={`focus-${stepNum}`} value="" checked={focusedCase === ""}
+                  onChange={() => setFocusedCase("")} disabled={regenerating} />
+                <span>全案</span>
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                <input type="radio" name={`focus-${stepNum}`} value="1" checked={focusedCase === "1"}
+                  onChange={() => setFocusedCase("1")} disabled={regenerating} />
+                <span>案1のみ</span>
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                <input type="radio" name={`focus-${stepNum}`} value="2" checked={focusedCase === "2"}
+                  onChange={() => setFocusedCase("2")} disabled={regenerating} />
+                <span>案2のみ</span>
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                <input type="radio" name={`focus-${stepNum}`} value="3" checked={focusedCase === "3"}
+                  onChange={() => setFocusedCase("3")} disabled={regenerating} />
+                <span>案3のみ</span>
+              </label>
+              {focusedCase && (
+                <span style={{ fontSize: 11, color: C.gold, marginLeft: "auto" }}>
+                  ✨再生成時は案{focusedCase}にだけ集中します（他案は維持）
+                </span>
+              )}
+            </div>
+          )}
 
           {/* ターン数表示（コスト管理のため上限付き） */}
           <div style={{
@@ -616,26 +668,6 @@ export default function DiscussionPanel({
                   {regenerating
                     ? (regeneratePhase === "summarizing" ? "📝 議論を要約中..." : "🔄 再生成中...")
                     : "✨ この方針で再生成"}
-                </button>
-              )}
-
-              {/* サブアクション：出力データへ転記（onTransferToOutputが供給されていれば） */}
-              {onTransferToOutput && (
-                <button
-                  onClick={handleTransferToOutput}
-                  disabled={!hasAssistantMessage || regenerating}
-                  style={{
-                    fontSize: 12.5,
-                    fontWeight: 600,
-                    color: (!hasAssistantMessage || regenerating) ? C.textLight : C.gold,
-                    background: (!hasAssistantMessage || regenerating) ? "rgba(0,0,0,0.04)" : C.white,
-                    border: `1px solid ${(!hasAssistantMessage || regenerating) ? C.border : C.gold}`,
-                    borderRadius: 3,
-                    padding: "7px 14px",
-                    cursor: (!hasAssistantMessage || regenerating) ? "default" : "pointer",
-                  }}
-                >
-                  ↓ AI回答を出力へ転記
                 </button>
               )}
 
