@@ -2120,8 +2120,54 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
       throw new Error("再生成には前回の出力が必要です");
     }
     setRunError("");
-    // workflow型のSTEPでのみ動作（chat型のSTEP1, 3はメインチャットを使うため対象外）
-    // 既存の inputs に previous_output と improvement_request を加えて再実行
+
+    // STEP8（本文作成）はloop型のため、再生成もループで処理
+    // 各節の生成時に同じ improvement_request と previous_output（全章本文）を渡す
+    if (step.num === 8) {
+      const sectionToRun = selectedSection !== null ? sectionOptions[selectedSection] : null;
+      if (!sectionToRun || !sectionToRun.items || sectionToRun.items.length === 0) {
+        throw new Error("再生成する節が選ばれていません。先にSTEP7から節を抽出して節を選んでください。");
+      }
+      const items = sectionToRun.items;
+      const total = items.length;
+      const results = [];
+      try {
+        for (let i = 0; i < total; i++) {
+          const currentItem = items[i];
+          setSectionProgress({ total, current: i + 1, currentItemName: currentItem });
+          const response = await fetch("/api/dify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              stepNum: 8,
+              inputs: {
+                ...getAutoInjectedProfiles(),
+                detailed_plot_text: inputs.detailed_plot_text || "",
+                target_heading: currentItem,
+                past_writing_text: inputs.past_writing_text || "",
+                previous_output: outputText,
+                improvement_request: improvementRequest,
+              },
+            }),
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            setSectionProgress(null);
+            throw new Error(`節${i + 1}/${total}（${currentItem}）の再生成で失敗：${data.error || "不明なエラー"}`);
+          }
+          results.push(data.output || "");
+        }
+        const cleaned = results.map((out, idx) => stripChapterSection(out, idx === 0));
+        setOutputText(cleaned.join("\n\n"));
+        setSectionProgress(null);
+      } catch (e) {
+        setSectionProgress(null);
+        throw e;
+      }
+      return;
+    }
+
+    // workflow型の単発STEP（STEP4-7, 9）の通常処理
     let execInputs = { ...inputs };
     if (step.num === 2 && execInputs.amazon_html) {
       const cleaned = cleanHtmlMinimal(execInputs.amazon_html);
