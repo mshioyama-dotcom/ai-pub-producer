@@ -887,11 +887,9 @@ workflow:
         model:
           completion_params:
             max_tokens: 8192
-            reasoning_effort: low
-            verbosity: medium
           mode: chat
-          name: gpt-5.2
-          provider: langgenius/openai/openai
+          name: claude-sonnet-4-6
+          provider: langgenius/anthropic/anthropic
         prompt_template:
         - id: b34a598c-ad59-4838-8d35-0f33605e0db0
           role: system

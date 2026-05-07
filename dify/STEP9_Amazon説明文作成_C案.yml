@@ -196,8 +196,8 @@ workflow:
             temperature: 0.2
             top_p: 0.9
           mode: chat
-          name: gpt-4o
-          provider: langgenius/openai/openai
+          name: claude-sonnet-4-6
+          provider: langgenius/anthropic/anthropic
         prompt_template:
         - id: 76b5efe0-4f0a-43eb-a1f6-109c4589c4cf
           role: system
@@ -378,11 +378,9 @@ workflow:
         model:
           completion_params:
             max_tokens: 2500
-            reasoning_effort: low
-            verbosity: medium
           mode: chat
-          name: gpt-5.2
-          provider: langgenius/openai/openai
+          name: claude-sonnet-4-6
+          provider: langgenius/anthropic/anthropic
         prompt_template:
         - id: 81a2d729-d492-4272-a03e-897c699f0227
           role: system

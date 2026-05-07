@@ -164,11 +164,9 @@ workflow:
           completion_params:
             enable_stream: false
             max_tokens: 3000
-            reasoning_effort: medium
-            verbosity: low
           mode: chat
-          name: gpt-5.2
-          provider: langgenius/openai/openai
+          name: claude-sonnet-4-6
+          provider: langgenius/anthropic/anthropic
         prompt_template:
         - id: 392a08df-b5de-4bbb-a09a-f3a0139c98ee
           role: system
