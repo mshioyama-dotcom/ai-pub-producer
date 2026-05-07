@@ -1237,7 +1237,7 @@ const Step0Page = ({ savedProfile, onSaveProfile, onNavigate }) => {
   );
 };
 
-const Step1Page = ({ savedAuthorProfile, savedWorkProfile, onSaveWorkProfile, onNavigate, pendingApply }) => {
+const Step1Page = ({ savedAuthorProfile, savedWorkProfile, onSaveWorkProfile, onNavigate, pendingApply, project }) => {
   // pendingApply は親 App が navigate 時に 1 回だけ consume したものを props で受け渡す
   const pending = pendingApply || {};
 
@@ -1451,6 +1451,18 @@ const Step1Page = ({ savedAuthorProfile, savedWorkProfile, onSaveWorkProfile, on
           {saveMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました（STEP2で使えます）</span>}
         </div>
       </div>
+
+      {/* 出力相談パネル：STEP1（書籍プロファイル草案）の出力について議論できる */}
+      {/* 注: STEP1ではまだwork_profileが未確定なので、相談時のworkProfileには現在の出力(outputText)を渡す（自己参照ループにならないよう、AIには「相談対象出力」として認識させる） */}
+      <DiscussionPanel
+        stepNum={1}
+        stepName="書籍プロファイル草案"
+        stepOutput={outputText}
+        authorProfile={savedAuthorProfile || ""}
+        workProfile=""
+        projectId={project?.id || ""}
+        onTransferToOutput={(text) => setOutputText(text)}
+      />
     </div>
   );
 };
@@ -1494,7 +1506,7 @@ const ApplyToStep1Button = ({ title, proposal, onApply }) => {
   );
 };
 
-const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfileConfirmed, onSaveWorkProfileConfirmed, onNavigate, onApplyToStep1Pending }) => {
+const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfileConfirmed, onSaveWorkProfileConfirmed, onNavigate, onApplyToStep1Pending, project }) => {
   const initialKeywords = useMemo(() => extractKeywords3Axes(savedWorkProfileDraft), [savedWorkProfileDraft]);
 
   // localStorage から永続化された入力データを読む
@@ -1903,6 +1915,19 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
           {saveMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました（STEP3以降で使えます）</span>}
         </div>
       </div>
+
+      {/* 出力相談パネル：STEP2（市場検証→書籍プロファイル確定）の出力について議論できる */}
+      {/* 相談ニーズが最も高いSTEP（市場分析を見ながら「この切り口で勝てそうか」「読者軸を広げるべきか」等の議論が発生しやすい） */}
+      {/* workProfileには相談対象である現在の確定版（confirmedDraft）を渡す。AIには「これを相談している」と認識される */}
+      <DiscussionPanel
+        stepNum={2}
+        stepName="市場検証→書籍プロファイル確定"
+        stepOutput={confirmedDraft}
+        authorProfile={savedAuthorProfile || ""}
+        workProfile={extractDiscussionContext(confirmedDraft || "")}
+        projectId={project?.id || ""}
+        onTransferToOutput={(text) => setConfirmedDraft(text)}
+      />
 
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
@@ -2669,8 +2694,8 @@ export default function App() {
     if (page === "guide") return <GuidePage onNavigate={nav} />;
     if (page === "saved") return <SavedPage project={project} stepStatuses={stepStatuses} allSteps={allSteps} onNavigate={nav} />;
     if (page === "step_0") return <Step0Page savedProfile={authorProfile} onSaveProfile={handleSaveAuthorProfile} onNavigate={nav} />;
-    if (page === "step_1") return <Step1Page savedAuthorProfile={authorProfile} savedWorkProfile={workProfile} onSaveWorkProfile={handleSaveWorkProfile} onNavigate={nav} pendingApply={step1PendingApply} />;
-    if (page === "step_2") return <Step2Page savedAuthorProfile={authorProfile} savedWorkProfileDraft={workProfile} savedWorkProfileConfirmed={workProfileConfirmed} onSaveWorkProfileConfirmed={handleSaveWorkProfileConfirmed} onNavigate={nav} onApplyToStep1Pending={handleApplyToStep1Pending} />;
+    if (page === "step_1") return <Step1Page savedAuthorProfile={authorProfile} savedWorkProfile={workProfile} onSaveWorkProfile={handleSaveWorkProfile} onNavigate={nav} pendingApply={step1PendingApply} project={project} />;
+    if (page === "step_2") return <Step2Page savedAuthorProfile={authorProfile} savedWorkProfileDraft={workProfile} savedWorkProfileConfirmed={workProfileConfirmed} onSaveWorkProfileConfirmed={handleSaveWorkProfileConfirmed} onNavigate={nav} onApplyToStep1Pending={handleApplyToStep1Pending} project={project} />;
     if (page.startsWith("step_")) {
       const num = parseInt(page.replace("step_", ""), 10);
       const step = STEPS[num - 1];
