@@ -2044,63 +2044,9 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   const [sectionOptions, setSectionOptions] = useState([]);
   const [selectedSection, setSelectedSection] = useState(null);
   const [sectionProgress, setSectionProgress] = useState(null);
-  // STEP4専用: 案ごとのフォーカスモード（"" = 全案表示、"1" | "2" | "3" = 該当案のみ表示）
-  // フォーカスモード中は focusedDraft を直接編集対象とし、毎回 outputText とマージするラウンドトリップを避ける。
-  // outputText は「フォーカス変更時／再生成時／保存時」など節目でのみ更新する。
-  const [focusedCase, setFocusedCase] = useState("");
-  const [focusedDraft, setFocusedDraft] = useState("");
-
-  // 表示用の出力テキスト（フォーカスモード時は focusedDraft を表示、それ以外は outputText）
-  const displayedOutput = (step.num === 4 && focusedCase) ? focusedDraft : outputText;
-
-  // textareaが編集された時の処理
-  const handleOutputTextareaChange = (newDisplayedText) => {
-    if (step.num === 4 && focusedCase) {
-      // フォーカスモード中は focusedDraft だけを更新（outputTextは触らない）
-      setFocusedDraft(newDisplayedText);
-    } else {
-      setOutputText(newDisplayedText);
-    }
-  };
-
-  // フォーカス対象を変更する時のロジック
-  // - 既存のフォーカスがあれば、その案の編集を outputText にマージしてから次のフォーカスへ
-  // - 新しいフォーカスがあれば、その案を outputText から抽出して focusedDraft に投入
-  const changeFocusedCase = (newFocus) => {
-    if (newFocus === focusedCase) return;
-    if (step.num !== 4) {
-      setFocusedCase(newFocus);
-      return;
-    }
-    // 旧フォーカスの編集内容を outputText にマージ
-    let newOutputText = outputText;
-    if (focusedCase && focusedDraft !== undefined) {
-      newOutputText = mergeStep4Case(outputText, focusedCase, focusedDraft);
-    }
-    if (newOutputText !== outputText) {
-      setOutputText(newOutputText);
-    }
-    // 新フォーカスがあれば該当案を抽出
-    if (newFocus) {
-      setFocusedDraft(extractStep4Case(newOutputText, newFocus));
-    } else {
-      setFocusedDraft("");
-    }
-    setFocusedCase(newFocus);
-  };
-
-  // 保存・再生成など outputText を最新化する必要がある時に呼ぶ
-  // フォーカスモード中の編集を outputText に反映する
-  const flushFocusedDraftToOutputText = () => {
-    if (step.num === 4 && focusedCase && focusedDraft !== undefined) {
-      const merged = mergeStep4Case(outputText, focusedCase, focusedDraft);
-      if (merged !== outputText) {
-        setOutputText(merged);
-        return merged;
-      }
-    }
-    return outputText;
-  };
+  // フォーカスモード（案ごと表示切替）は、外部AIプロンプト生成方式への移行に伴い廃止しました。
+  // 関連していた parseStep4CaseStructure / mergeStep4Case / extractStep4Case ユーティリティ関数は
+  // 将来用途のためコード上は維持していますが、ここでは未使用です。
 
   useEffect(() => {
     setInputs(stepData.inputData || {}); setOutputText(stepData.outputText || "");
@@ -2109,17 +2055,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     setSectionOptions([]); setSelectedSection(null); setSectionProgress(null);
     setChatMessages([]); setChatInput(""); setChatLoading(false);
     setChatConversationId(""); setChatError(""); setChatCopyMsg(false); setChatTransferMsg(false); setChatSelectOptions([]); setChatSelectMsg(false);
-    setFocusedCase("");  // STEP切り替え時はフォーカスモード解除
-    setFocusedDraft("");
   }, [step.num]);
-
-  // outputTextが外部要因で変更された時（再生成完了など）、フォーカスモードなら該当案を再抽出して focusedDraft を更新
-  useEffect(() => {
-    if (step.num === 4 && focusedCase) {
-      setFocusedDraft(extractStep4Case(outputText, focusedCase));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [outputText]);
 
   const prevStep = step.num > 1 ? STEPS[step.num - 2] : null;
   const nextStep = step.num < 9 ? STEPS[step.num] : null;
@@ -2147,9 +2083,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   };
 
   const handleSaveOutput = async () => {
-    // フォーカスモード中の編集を outputText に反映してから保存
-    const merged = flushFocusedDraftToOutputText();
-    await onSaveOutput(step.num, merged);
+    await onSaveOutput(step.num, outputText);
     setSaveOutputMsg("saved"); setTimeout(() => setSaveOutputMsg(false), 2000);
   };
 
@@ -2233,8 +2167,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     if (!improvementRequest || !improvementRequest.trim()) {
       throw new Error("改善要望が空です");
     }
-    // フォーカスモード中の編集を outputText に反映してから再生成（previous_output として正しい値を渡すため）
-    const baseOutput = flushFocusedDraftToOutputText();
+    const baseOutput = outputText;
     if (!baseOutput || !baseOutput.trim()) {
       throw new Error("再生成には前回の出力が必要です");
     }
@@ -2609,32 +2542,9 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           {step.type === "chat" ? <>チャットの会話から得た結果をコピーして、下の欄に貼り付けてください。{nextStep && ` この出力は次のステップ（STEP${nextStep.num}）の入力になります。`}</> : <>AIの実行結果が自動で表示されます。内容を確認してから保存してください。{nextStep && ` この出力は次のステップ（STEP${nextStep.num}）の入力になります。`}</>}
           <br />出力はそのまま使っても、自分で修正したり、AIチャットで整えてから使うこともできます。
         </div>
-        {step.num === 4 && focusedCase && (
-          <div style={{
-            padding: "8px 12px",
-            background: C.goldPale,
-            border: `1px solid ${C.goldLight}`,
-            borderTop: `1px solid ${C.gold}`,
-            borderRadius: "4px 4px 0 0",
-            fontSize: 12,
-            color: C.navy,
-            fontWeight: 600,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}>
-            <span>🎯 案{focusedCase} のみ表示中（他案はバックグラウンドで保持されています）</span>
-            <button
-              onClick={() => setFocusedCase("")}
-              style={{ fontSize: 11.5, background: C.white, color: C.navy, border: `1px solid ${C.navy}`, borderRadius: 3, padding: "3px 10px", cursor: "pointer" }}
-            >
-              全案表示に戻す
-            </button>
-          </div>
-        )}
-        <textarea value={displayedOutput} onChange={(e) => handleOutputTextareaChange(e.target.value)}
+        <textarea value={outputText} onChange={(e) => setOutputText(e.target.value)}
           placeholder={step.type === "chat" ? "チャットで得た結果をここに貼り付けてください" : "実行するボタンを押すと結果が自動で表示されます"} rows={10}
-          style={{ width: "100%", padding: "12px 14px", fontSize: 14, border: `1px solid ${C.border}`, borderRadius: (step.num === 4 && focusedCase) ? "0 0 4px 4px" : 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.7, minHeight: 220 }} />
+          style={{ width: "100%", padding: "12px 14px", fontSize: 14, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.7, minHeight: 220 }} />
         <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
           <BtnPrimary onClick={handleSaveOutput}>出力データを保存</BtnPrimary>
           {saveOutputMsg === "saved" && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました</span>}
@@ -2647,24 +2557,12 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
 
       {/* 外部AIで相談するためのプロンプト生成パネル（全STEP共通） */}
       {/* workProfile は軽量化版を渡す：STEP2の出力60KBから市場分析データを除き、相談に必要な核情報のみに圧縮 */}
-      {/* focusedCase / onFocusedCaseChange: STEP4専用のフォーカスモード。outputTextは常にフル3案を保持し、表示時のみ抽出 */}
       <DiscussionPanel
         stepNum={step.num}
         stepName={step.title}
         stepOutput={outputText}
         authorProfile={getAutoInjectedProfiles().author_profile || ""}
         workProfile={extractDiscussionContext(getAutoInjectedProfiles().work_profile || "")}
-        focusedCase={focusedCase}
-        onFocusedCaseChange={(newFocus) => {
-          if (newFocus && step.num === 4) {
-            const parsed = parseStep4CaseStructure(outputText);
-            if (!parsed) {
-              alert("出力データから3案を抽出できませんでした。\n\n出力フォーマットが崩れているか、まだ生成されていない可能性があります。先に出力を生成してから「案ごと」フォーカスを使ってください。");
-              return;
-            }
-          }
-          changeFocusedCase(newFocus);
-        }}
       />
 
       {step.help && step.help.length > 0 && (

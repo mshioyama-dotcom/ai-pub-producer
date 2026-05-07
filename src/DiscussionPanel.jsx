@@ -1,7 +1,7 @@
 // DiscussionPanel
 // 各STEPの出力エリア下に表示する「外部AIで相談する用プロンプト生成」パネル。
 //
-// 設計判断（v2）:
+// 設計判断（v3）:
 //   - 当初は内蔵チャットUIで議論する設計だったが、ユーザーフィードバックで方針転換
 //   - 内蔵チャットは「狭いテキストエリア」「永遠のラリー」「APIコスト発生」が課題
 //   - 代わりに ChatGPT/Claude などの個人AIで議論してもらう運用に変更
@@ -12,14 +12,6 @@
 //   - ChatGPT/Claude のフル画面で快適に議論できる
 //   - 我々のDify chat API料金がかからない
 //   - サブスク商品としての差別化（「外部AIと連携するワークフロー」）
-//
-// 残した機能:
-//   - フォーカスモード（STEP4専用・案ごとに表示切替＆編集）
-//
-// 削除した機能:
-//   - 内蔵チャット
-//   - ✨「この方針で再生成」（議論ログがないため）
-//   - 議論履歴の永続化
 
 import { useState } from "react";
 
@@ -146,8 +138,6 @@ export default function DiscussionPanel({
   stepOutput,
   authorProfile = "",
   workProfile = "",
-  focusedCase = "",
-  onFocusedCaseChange,
 }) {
   const [open, setOpen] = useState(false);
   const [copyMsg, setCopyMsg] = useState("");
@@ -170,16 +160,6 @@ export default function DiscussionPanel({
       setCopyMsg("⚠ コピーに失敗しました。テキストを手動で選択してコピーしてください");
       setTimeout(() => setCopyMsg(""), 4000);
     });
-  };
-
-  const handleOpenClaude = () => {
-    handleCopyPrompt();
-    window.open("https://claude.ai/new", "_blank", "noopener,noreferrer");
-  };
-
-  const handleOpenChatGPT = () => {
-    handleCopyPrompt();
-    window.open("https://chatgpt.com/", "_blank", "noopener,noreferrer");
   };
 
   const hasOutput = !!(stepOutput || "").trim();
@@ -220,49 +200,6 @@ export default function DiscussionPanel({
           {!hasOutput && (
             <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginBottom: 12, fontSize: 13, color: C.red }}>
               先に出力データを生成してから、外部AIで相談してください。
-            </div>
-          )}
-
-          {/* STEP4専用: 案ごとのフォーカスモード */}
-          {stepNum === 4 && onFocusedCaseChange && (
-            <div style={{
-              padding: "8px 12px",
-              background: focusedCase ? C.goldPale : "#f8f8f8",
-              border: `1px solid ${focusedCase ? C.goldLight : C.border}`,
-              borderRadius: 4,
-              marginBottom: 10,
-              fontSize: 12.5,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              flexWrap: "wrap",
-            }}>
-              <span style={{ fontWeight: 700, color: C.navy }}>🎯 出力欄の表示切替：</span>
-              <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
-                <input type="radio" name={`focus-${stepNum}`} value="" checked={focusedCase === ""}
-                  onChange={() => onFocusedCaseChange("")} />
-                <span>全案</span>
-              </label>
-              <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
-                <input type="radio" name={`focus-${stepNum}`} value="1" checked={focusedCase === "1"}
-                  onChange={() => onFocusedCaseChange("1")} />
-                <span>案1のみ</span>
-              </label>
-              <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
-                <input type="radio" name={`focus-${stepNum}`} value="2" checked={focusedCase === "2"}
-                  onChange={() => onFocusedCaseChange("2")} />
-                <span>案2のみ</span>
-              </label>
-              <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
-                <input type="radio" name={`focus-${stepNum}`} value="3" checked={focusedCase === "3"}
-                  onChange={() => onFocusedCaseChange("3")} />
-                <span>案3のみ</span>
-              </label>
-              {focusedCase && (
-                <span style={{ fontSize: 11, color: C.gold, marginLeft: "auto" }}>
-                  出力欄を案{focusedCase}だけに絞り込んで編集できます
-                </span>
-              )}
             </div>
           )}
 
@@ -313,38 +250,6 @@ export default function DiscussionPanel({
               }}
             >
               📋 プロンプトをコピー
-            </button>
-            <button
-              onClick={handleOpenClaude}
-              disabled={!hasOutput}
-              style={{
-                fontSize: 12.5,
-                fontWeight: 600,
-                color: hasOutput ? C.gold : C.textLight,
-                background: hasOutput ? C.white : "rgba(0,0,0,0.04)",
-                border: `1px solid ${hasOutput ? C.gold : C.border}`,
-                borderRadius: 3,
-                padding: "8px 16px",
-                cursor: hasOutput ? "pointer" : "default",
-              }}
-            >
-              🤖 コピーしてClaude.aiを開く
-            </button>
-            <button
-              onClick={handleOpenChatGPT}
-              disabled={!hasOutput}
-              style={{
-                fontSize: 12.5,
-                fontWeight: 600,
-                color: hasOutput ? C.navy : C.textLight,
-                background: hasOutput ? C.white : "rgba(0,0,0,0.04)",
-                border: `1px solid ${hasOutput ? C.navy : C.border}`,
-                borderRadius: 3,
-                padding: "8px 16px",
-                cursor: hasOutput ? "pointer" : "default",
-              }}
-            >
-              🤖 コピーしてChatGPTを開く
             </button>
             {copyMsg && <span style={{ fontSize: 12, color: copyMsg.startsWith("✓") ? C.green : C.red, fontWeight: 600 }}>{copyMsg}</span>}
           </div>
