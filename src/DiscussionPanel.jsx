@@ -356,6 +356,50 @@ export default function DiscussionPanel({
             </span>
           </div>
 
+          {/* 再生成中の進捗バナー（目立つように） */}
+          {regenerating && (
+            <div style={{
+              padding: "12px 14px",
+              background: "#fff8e7",
+              border: `1px solid ${C.gold}`,
+              borderRadius: 6,
+              marginBottom: 10,
+              fontSize: 13.5,
+              color: C.navy,
+              fontWeight: 600,
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+            }}>
+              <span style={{ fontSize: 18 }}>{regeneratePhase === "summarizing" ? "📝" : "🔄"}</span>
+              <span>
+                {regeneratePhase === "summarizing"
+                  ? "議論を要約しています...（数秒）"
+                  : "STEP本体を再生成しています...（30秒〜1分）"}
+              </span>
+            </div>
+          )}
+
+          {/* 成功時の通知バナー（目立つように） */}
+          {!regenerating && applyMsg && applyMsg.includes("再生成が完了") && (
+            <div style={{
+              padding: "12px 14px",
+              background: "#e8f5e9",
+              border: `1px solid ${C.green}`,
+              borderRadius: 6,
+              marginBottom: 10,
+              fontSize: 13.5,
+              color: C.green,
+              fontWeight: 600,
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+            }}>
+              <span style={{ fontSize: 18 }}>✅</span>
+              <span>{applyMsg} ↑ 上の出力データ欄を確認してください</span>
+            </div>
+          )}
+
           {!hasOutput && (
             <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginBottom: 12, fontSize: 13, color: C.red }}>
               先に出力データを生成・保存してから相談してください。
