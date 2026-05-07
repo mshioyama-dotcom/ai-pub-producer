@@ -142,7 +142,9 @@ export default function DiscussionPanel({
 
     setError("");
     setInput("");
-    setMessages((prev) => [...prev, { role: "user", content: text }]);
+    // ユーザーメッセージを楽観的に追加（送信中の見た目用）。エラー時はrollbackする。
+    const userMessage = { role: "user", content: text };
+    setMessages((prev) => [...prev, userMessage]);
     setLoading(true);
 
     try {
@@ -163,12 +165,18 @@ export default function DiscussionPanel({
       });
       const data = await response.json();
       if (!response.ok) {
+        // エラー時はユーザーメッセージをロールバック（ターン数も消費しない）
+        setMessages((prev) => prev.filter((m) => m !== userMessage));
+        setInput(text); // 入力欄に戻して再試行を容易にする
         setError(data.error || "送信に失敗しました。");
       } else {
         if (data.conversation_id) setConversationId(data.conversation_id);
         setMessages((prev) => [...prev, { role: "assistant", content: data.answer || "" }]);
       }
     } catch (e) {
+      // 通信エラー時もロールバック
+      setMessages((prev) => prev.filter((m) => m !== userMessage));
+      setInput(text);
       setError(`通信エラーが発生しました：${e.message}`);
     } finally {
       setLoading(false);
