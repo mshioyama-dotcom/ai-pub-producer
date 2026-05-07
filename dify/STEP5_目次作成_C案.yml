@@ -321,6 +321,9 @@ workflow:
             -節の見出し
 
             -節の見出し'
+        - id: b1b2c3d4-5000-4001-9000-000000000002
+          role: user
+          text: 上記の入力情報をもとに、章構造込みの目次を生成してください。
         selected: false
         title: 目次生成
         type: llm

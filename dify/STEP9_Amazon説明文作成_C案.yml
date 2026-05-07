@@ -353,6 +353,9 @@ workflow:
             "difference_points": "",
 
             }'
+        - id: b1b2c3d4-9000-4001-9000-000000000002
+          role: user
+          text: 上記の入力情報を整理してください。
         selected: false
         title: 説明材料整理
         type: llm
@@ -491,6 +494,9 @@ workflow:
             簡易目次は【本書の内容】の見出しの下に入れる。
 
             著者プロフィールは【著者プロフィール】の見出しの下に入れる（入力がある場合のみ）。'
+        - id: b1b2c3d4-9000-4001-9000-000000000003
+          role: user
+          text: 上記の整理素材から、Amazon説明文を生成してください。
         selected: true
         title: Amazon説明文生成
         type: llm

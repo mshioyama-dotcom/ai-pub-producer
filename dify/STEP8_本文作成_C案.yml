@@ -246,6 +246,9 @@ workflow:
             1章分の詳細プロット：{{#1773099539029.detailed_plot_text#}}
 
             著者の過去原稿（任意）：{{#1773099539029.past_writing_data#}}'
+        - id: b1b2c3d4-8000-4001-9000-000000000002
+          role: user
+          text: 上記の入力情報をもとに、本文を生成してください。
         selected: true
         title: 本文作成
         type: llm

@@ -388,6 +388,9 @@ workflow:
             - 余計な説明は一切つけない
 
             '
+        - id: b1b2c3d4-7000-4001-9000-000000000002
+          role: user
+          text: 上記の入力情報をもとに、詳細プロットを生成してください。
         selected: true
         title: 詳細プロット設計
         type: llm
