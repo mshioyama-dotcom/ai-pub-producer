@@ -888,7 +888,7 @@ workflow:
           completion_params:
             max_tokens: 8192
           mode: chat
-          name: claude-sonnet-4-6
+          name: claude-haiku-4-5
           provider: langgenius/anthropic/anthropic
         prompt_template:
         - id: b34a598c-ad59-4838-8d35-0f33605e0db0
