@@ -225,6 +225,9 @@ export default function DiscussionPanel({
 
   // Phase 2: 「✨ この方針で再生成」ボタン
   // 議論ログをAIに要約させ、それを improvement_request として STEP本体の再生成APIに渡す
+  // インライン確認パネル（pendingSummary state）を使って、ブラウザのconfirm()ダイアログ依存を排除
+  const [pendingSummary, setPendingSummary] = useState(null);
+
   const handleRegenerate = async () => {
     if (!onRegenerateWithRequest) return;
     if (!hasAssistantMessage) {
@@ -278,20 +281,26 @@ export default function DiscussionPanel({
       ]);
       if (summarizeData.conversation_id) setConversationId(summarizeData.conversation_id);
 
-      // Step 2: 確認ダイアログ
-      const confirmMsg = `以下の改善要望でSTEP${stepNum}「${stepName}」を再生成します。よろしいですか？\n\n` +
-        `【改善要望】\n${improvementRequest.length > 500 ? improvementRequest.slice(0, 500) + "..." : improvementRequest}\n\n` +
-        `（既存の出力データは上書きされます。コピー履歴は手動で別途残してください）`;
-      if (!confirm(confirmMsg)) {
-        setRegenerating(false);
-        setRegeneratePhase("");
-        return;
-      }
+      // Step 2: インライン確認パネルを表示（confirm() ではなく state で制御）
+      setPendingSummary(improvementRequest);
+      setRegenerating(false);  // 一旦ローディング解除（ユーザー入力待ち）
+      setRegeneratePhase("");
+    } catch (e) {
+      setError(`要約中にエラー：${e.message}`);
+      setRegenerating(false);
+      setRegeneratePhase("");
+    }
+  };
 
-      // Step 3: STEP本体の再生成APIを呼ぶ
-      setRegeneratePhase("regenerating");
+  // ユーザーがインライン確認パネルで「OK」を押したときの処理
+  const handleConfirmRegenerate = async () => {
+    if (!pendingSummary) return;
+    const improvementRequest = pendingSummary;
+    setPendingSummary(null);
+    setRegenerating(true);
+    setRegeneratePhase("regenerating");
+    try {
       await onRegenerateWithRequest(improvementRequest);
-
       setApplyMsg("✓ 再生成が完了しました（出力データを確認してください）");
       setTimeout(() => setApplyMsg(""), 4000);
     } catch (e) {
@@ -300,6 +309,10 @@ export default function DiscussionPanel({
       setRegenerating(false);
       setRegeneratePhase("");
     }
+  };
+
+  const handleCancelRegenerate = () => {
+    setPendingSummary(null);
   };
 
   // 折りたたみ時のヘッダー表示
@@ -377,6 +390,72 @@ export default function DiscussionPanel({
                   ? "議論を要約しています...（数秒）"
                   : "STEP本体を再生成しています...（30秒〜1分）"}
               </span>
+            </div>
+          )}
+
+          {/* インライン確認パネル：要約完了後にここで「再生成する／キャンセル」を選ぶ */}
+          {pendingSummary && (
+            <div style={{
+              padding: 14,
+              background: "#fff8e7",
+              border: `2px solid ${C.gold}`,
+              borderRadius: 6,
+              marginBottom: 10,
+            }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.navy, marginBottom: 8 }}>
+                ✨ 以下の改善要望でSTEP{stepNum}「{stepName}」を再生成します
+              </div>
+              <div style={{
+                fontSize: 12.5,
+                color: C.text,
+                lineHeight: 1.7,
+                background: C.white,
+                padding: "10px 12px",
+                borderRadius: 4,
+                border: `1px solid ${C.border}`,
+                marginBottom: 10,
+                maxHeight: 180,
+                overflowY: "auto",
+                whiteSpace: "pre-wrap",
+              }}>
+                {pendingSummary}
+              </div>
+              <div style={{ fontSize: 11.5, color: C.textSub, marginBottom: 10, lineHeight: 1.6 }}>
+                ⚠ 既存の出力データは上書きされます。必要なら事前に「出力をコピー」しておいてください。
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={handleConfirmRegenerate}
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: C.white,
+                    background: C.navy,
+                    border: "none",
+                    borderRadius: 3,
+                    padding: "9px 22px",
+                    cursor: "pointer",
+                    boxShadow: "0 2px 4px rgba(36,61,92,0.25)",
+                  }}
+                >
+                  ✓ 再生成する
+                </button>
+                <button
+                  onClick={handleCancelRegenerate}
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: C.navy,
+                    background: C.white,
+                    border: `1px solid ${C.navy}`,
+                    borderRadius: 3,
+                    padding: "9px 18px",
+                    cursor: "pointer",
+                  }}
+                >
+                  キャンセル
+                </button>
+              </div>
             </div>
           )}
 
