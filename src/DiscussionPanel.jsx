@@ -1,30 +1,27 @@
 // DiscussionPanel
-// 各STEPの出力エリア下に表示する「この出力について相談する」共通チャットパネル。
-// /api/discuss を叩き、Difyの「STEP_共通_出力相談」Chatflowと対話する。
+// 各STEPの出力エリア下に表示する「外部AIで相談する用プロンプト生成」パネル。
 //
-// 使い方:
-//   <DiscussionPanel
-//     stepNum={4}
-//     stepName="タイトル・サブタイトル作成"
-//     stepOutput={outputText}
-//     stepInputSummary="kw1: ~~ / kw2: ~~ / 差分要素: ~~"  (任意)
-//     stepRules={STEP_RULES_EXCERPT[4]}                    (任意)
-//     authorProfile={savedAuthorProfile}
-//     workProfile={savedWorkProfile}
-//     onApplyToImprovementRequest={(text) => setImprovementRequest(text)}  (任意・Phase 2用)
-//   />
-
-import { useState, useRef, useEffect } from "react";
-
-// 1スレッドあたりの最大往復数（コスト管理のため）
-// ユーザー往復1 + AI往復1 = 1ターン。MAX_TURNS=10なら 20メッセージで打ち切り。
+// 設計判断（v2）:
+//   - 当初は内蔵チャットUIで議論する設計だったが、ユーザーフィードバックで方針転換
+//   - 内蔵チャットは「狭いテキストエリア」「永遠のラリー」「APIコスト発生」が課題
+//   - 代わりに ChatGPT/Claude などの個人AIで議論してもらう運用に変更
+//   - このパネルは「外部AIに渡すと最適に動くプロンプト」を生成して提示する
+//   - 外部AIが返す改訂版は、ユーザーが直接出力textareaに貼り付ける
 //
-// 設計判断（履歴）:
-// - 当初 5往復 → Anthropic Prompt Caching 有効化により1往復コスト$0.10→$0.02に削減
-// - キャッシュ後は10往復でも$0.20程度なので、議論の質を優先して10に緩和
-// - サブスクのTier別に動的化する場合は props で受け取る形に変更予定
-//   （例: Lite=5, Standard=10, Pro=20）
-const MAX_TURNS = 10;
+// 利点:
+//   - ChatGPT/Claude のフル画面で快適に議論できる
+//   - 我々のDify chat API料金がかからない
+//   - サブスク商品としての差別化（「外部AIと連携するワークフロー」）
+//
+// 残した機能:
+//   - フォーカスモード（STEP4専用・案ごとに表示切替＆編集）
+//
+// 削除した機能:
+//   - 内蔵チャット
+//   - ✨「この方針で再生成」（議論ログがないため）
+//   - 議論履歴の永続化
+
+import { useState } from "react";
 
 // 色トークン（App.jsxと同期）
 const C = {
@@ -42,294 +39,150 @@ const C = {
   red:        "#b52b1e",
 };
 
-// localStorage キー（プロジェクト×STEP単位）
-function discussionStorageKey(projectId, stepNum) {
-  return `discussion_${projectId || "default"}_step${stepNum}`;
+// STEPごとに「外部AIに渡す役割」と「特有の制約」を定義
+const STEP_ROLE_HINTS = {
+  1: {
+    role: "出版プロデューサーとして、書籍プロファイル草案（テーマ・想定読者・読了後の状態・狙い目の切り口）の改善を一緒に練ってください",
+    constraints: "Amazon検索で実在するキーワード3軸（主題軸・読者軸・差分軸）を必ず維持してください",
+  },
+  2: {
+    role: "出版プロデューサーとして、市場検証結果と書籍プロファイル確定版の改善を一緒に練ってください",
+    constraints: "市場像・需要診断・勝率診断の数値や分析は維持し、確定版テキスト本文の改善に集中してください",
+  },
+  3: {
+    role: "編集者として、エピソードインタビュー要約の改善を一緒に練ってください",
+    constraints: "差別化軸・タイトル訴求素材・読者の思い込みなどの構造を維持してください",
+  },
+  4: {
+    role: "Amazon Kindleタイトル設計に強い出版プロデューサーとして、タイトル・サブタイトル3案の改善を一緒に練ってください",
+    constraints: "Amazon KDP規約違反語（「ベストセラー」「1位」「No.1」「無料」「セール」「期間限定」等）は事実述語であっても禁止です。タイトル＋サブタイトル合計200文字以下、kw1とkw2を必ず含むこと。",
+  },
+  5: {
+    role: "シニア編集者として、目次（章構成＋節見出し）の改善を一緒に練ってください",
+    constraints: "章タイトルは ** で囲んで太字に、節見出しは行頭に - を付ける形式を維持してください",
+  },
+  6: {
+    role: "シニア編集者として、章構成（各章の節構成案）の改善を一緒に練ってください",
+    constraints: "「章タイトル / ・節タイトル / > 構成案」というMarkdown形式と、1節80〜140文字程度の分量を維持してください",
+  },
+  7: {
+    role: "シニア編集者として、詳細プロット（章→節→項の階層）の改善を一緒に練ってください",
+    constraints: "章番号・節番号(1)(2)・項番号①②③のテキスト形式と階層構造を維持してください",
+  },
+  8: {
+    role: "プロのライターとして、本文の改善を一緒に練ってください",
+    constraints: "文字数は前回の±20%以内、文体・段落構成を維持しつつ改善してください",
+  },
+  9: {
+    role: "Amazon説明文設計に強いコピーライターとして、本書の説明文の改善を一緒に練ってください",
+    constraints: "7段落構成（読者の悩み→得られること→内容→著者の理由→価値→目次→プロフィール）を維持。「ベストセラー」「No.1」等の禁止語、URL、絵文字、ハッシュタグ、断定表現は使わないこと。",
+  },
+};
+
+// 外部AIに渡すプロンプトを生成
+function generateExternalAIPrompt({ stepNum, stepName, authorProfile, workProfile, currentOutput }) {
+  const hint = STEP_ROLE_HINTS[stepNum] || {
+    role: "出版プロデューサーとして、ユーザーの本作りを一緒に伴走してください",
+    constraints: "（特になし）",
+  };
+
+  return `あなたは ${hint.role}。
+
+【背景】
+このセッションでは、AI出版プロデューサーというツールが既に生成した
+**STEP${stepNum}「${stepName}」**の出力について、ユーザーがあなたと
+一緒に改善方針を練ろうとしています。ユーザーは最終的に、あなたが返した
+改訂版の完全な出力をツールの出力欄にそのまま貼り付けます。
+
+そのため、あなたが最終出力を返す時は、**形式・順序・見出しレベル・
+Markdown構造を完全に維持**してください（コピーアンドペーストできる必要があります）。
+
+
+【著者プロファイル】
+
+${(authorProfile || "（未登録）").trim()}
+
+
+【書籍プロファイル】
+
+${(workProfile || "（未登録）").trim()}
+
+
+【現在の出力（議論対象・改善前）】
+
+${(currentOutput || "（未生成）").trim()}
+
+
+【対話ルール】
+
+1. ユーザーの質問・懸念に丁寧に答える。一度に質問は1つまで（畳みかけない）。
+
+2. 議論の早い段階で、改善方針を2〜3個の選択肢として提示し、トレードオフと共に並べる。
+
+3. ユーザーが「これでOK」「最終版を出して」「採用する」と言ったら、改訂された完全な出力を **「現在の出力」と完全に同じ形式・順序・Markdown構造で** 出力する。
+
+4. 修正不要な部分は、現在の出力からそのままコピーする（一字も変更しない）。
+
+5. 修正対象の部分のみ、合意した方針に従って修正する。
+
+
+【守ってほしい制約】
+
+- 本書の核メッセージ（書籍プロファイルから読み取れる中心主張）と矛盾する改訂はしない
+- 著者プロファイルから外れる改訂はしない
+- ${hint.constraints}
+
+
+【ユーザーの最初の発言】
+
+ユーザーが現在の出力について、気になる点や改善したい方向性を伝えます。
+ユーザーの発言を待ってから、対話を始めてください。
+`;
 }
 
 export default function DiscussionPanel({
   stepNum,
   stepName,
   stepOutput,
-  stepInputSummary = "",
-  stepRules = "",
   authorProfile = "",
   workProfile = "",
-  projectId = "",
-  onApplyToImprovementRequest, // 任意（Phase 2用）
-  onTransferToOutput,          // 任意：直近のAI回答を出力データへ転記する関数（現在未使用）
-  onRegenerateWithRequest,     // Phase 2: 議論ログを要約してSTEP本体を再生成する関数 (improvementRequest: string) => Promise
-  focusedCase = "",            // STEP4専用: 親コンポーネントから渡されるフォーカス対象（"" | "1" | "2" | "3"）
-  onFocusedCaseChange,         // STEP4専用: フォーカス変更時のコールバック (newFocus: string) => void
+  focusedCase = "",
+  onFocusedCaseChange,
 }) {
-  const storageKey = discussionStorageKey(projectId, stepNum);
-
-  // localStorage から復元
-  const initialState = (() => {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (!raw) return { messages: [], conversationId: "" };
-      const parsed = JSON.parse(raw);
-      return {
-        messages: Array.isArray(parsed.messages) ? parsed.messages : [],
-        conversationId: parsed.conversationId || "",
-      };
-    } catch {
-      return { messages: [], conversationId: "" };
-    }
-  })();
-
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState(initialState.messages);
-  const [conversationId, setConversationId] = useState(initialState.conversationId);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [applyMsg, setApplyMsg] = useState("");
-  // Phase 2: 「✨ この方針で再生成」ボタン用の状態
-  const [regenerating, setRegenerating] = useState(false);
-  const [regeneratePhase, setRegeneratePhase] = useState(""); // "summarizing" | "regenerating" | ""
-  // focusedCase は親コンポーネント（StepPage）から props として受け取る形に変更。
-  // 親側で「outputText の表示を該当案のみに切り替える」処理が必要なため。
-  const setFocusedCase = onFocusedCaseChange || (() => {});
-  const chatAreaRef = useRef(null);
+  const [copyMsg, setCopyMsg] = useState("");
 
-  // STEP変更時に状態を読み直す
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (!raw) {
-        setMessages([]); setConversationId("");
-      } else {
-        const parsed = JSON.parse(raw);
-        setMessages(Array.isArray(parsed.messages) ? parsed.messages : []);
-        setConversationId(parsed.conversationId || "");
-      }
-    } catch {
-      setMessages([]); setConversationId("");
-    }
-    setInput(""); setError(""); setApplyMsg("");
-  }, [storageKey]);
+  // 生成されるプロンプト（毎回計算でOK・軽い）
+  const generatedPrompt = generateExternalAIPrompt({
+    stepNum,
+    stepName,
+    authorProfile,
+    workProfile,
+    currentOutput: stepOutput,
+  });
 
-  // メッセージ追加時に永続化
-  useEffect(() => {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify({ messages, conversationId }));
-    } catch (e) { /* 容量超過時はサイレントに失敗 */ }
-  }, [storageKey, messages, conversationId]);
+  const handleCopyPrompt = () => {
+    if (!generatedPrompt) return;
+    navigator.clipboard.writeText(generatedPrompt).then(() => {
+      setCopyMsg("✓ プロンプトをコピーしました（外部AIに貼り付けてください）");
+      setTimeout(() => setCopyMsg(""), 4000);
+    }).catch(() => {
+      setCopyMsg("⚠ コピーに失敗しました。テキストを手動で選択してコピーしてください");
+      setTimeout(() => setCopyMsg(""), 4000);
+    });
+  };
 
-  // メッセージ追加時にスクロール
-  useEffect(() => {
-    if (chatAreaRef.current) {
-      chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight;
-    }
-  }, [messages, loading]);
+  const handleOpenClaude = () => {
+    handleCopyPrompt();
+    window.open("https://claude.ai/new", "_blank", "noopener,noreferrer");
+  };
+
+  const handleOpenChatGPT = () => {
+    handleCopyPrompt();
+    window.open("https://chatgpt.com/", "_blank", "noopener,noreferrer");
+  };
 
   const hasOutput = !!(stepOutput || "").trim();
-
-  // ターン数管理（コスト制御）
-  // user メッセージの数 = 既に消費したターン数。AI返信が来てなくてもユーザー発言時点でターン消費とみなす。
-  const turnsUsed = messages.filter((m) => m.role === "user").length;
-  const turnsLeft = Math.max(0, MAX_TURNS - turnsUsed);
-  const turnLimitReached = turnsLeft === 0;
-
-  const handleSend = async () => {
-    const text = input.trim();
-    if (!text || loading) return;
-    if (!hasOutput) {
-      setError("先に出力データを生成・保存してから相談してください。");
-      return;
-    }
-    if (turnLimitReached) {
-      setError(`このスレッドは上限の${MAX_TURNS}往復に達しました。続けて相談したい場合は、相談履歴をリセットしてから新しいスレッドを開始してください。`);
-      return;
-    }
-
-    setError("");
-    setInput("");
-    // ユーザーメッセージを楽観的に追加（送信中の見た目用）。エラー時はrollbackする。
-    const userMessage = { role: "user", content: text };
-    setMessages((prev) => [...prev, userMessage]);
-    setLoading(true);
-
-    try {
-      const response = await fetch("/api/discuss", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          stepNum,
-          stepName,
-          stepRules,
-          stepInputSummary,
-          stepOutput,
-          authorProfile,
-          workProfile,
-          message: text,
-          conversationId,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        // エラー時はユーザーメッセージをロールバック（ターン数も消費しない）
-        setMessages((prev) => prev.filter((m) => m !== userMessage));
-        setInput(text); // 入力欄に戻して再試行を容易にする
-        setError(data.error || "送信に失敗しました。");
-      } else {
-        if (data.conversation_id) setConversationId(data.conversation_id);
-        setMessages((prev) => [...prev, { role: "assistant", content: data.answer || "" }]);
-      }
-    } catch (e) {
-      // 通信エラー時もロールバック
-      setMessages((prev) => prev.filter((m) => m !== userMessage));
-      setInput(text);
-      setError(`通信エラーが発生しました：${e.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleReset = () => {
-    if (!confirm("この相談スレッドを削除して新しく始めますか？")) return;
-    setMessages([]); setConversationId(""); setInput(""); setError(""); setApplyMsg("");
-    try { localStorage.removeItem(storageKey); } catch (e) {}
-  };
-
-  // AIの直近の発言を取得するヘルパー
-  const getLastAIContent = () => {
-    const lastAI = [...messages].reverse().find((m) => m.role === "assistant");
-    return lastAI ? lastAI.content : "";
-  };
-  const hasAssistantMessage = messages.some((m) => m.role === "assistant");
-
-  // 「直近のAI回答を出力データへ転記」機能は削除。
-  // 理由: AIの自然文回答（例: 議論の要約や提案）をそのまま出力textareaに入れると、
-  // 3案構造などのフォーマットが崩壊するため危険。
-  // ✨「この方針で再生成」がフォーマット保証付きの正式な反映手段。
-  // クリップボードコピー（↓コピー）は引き続き利用可能。
-  // 改善要望欄へ転記（Phase 2用 / 現状はpropsが未供給ならクリップボードコピーにフォールバック）
-  const handleApply = () => {
-    const content = getLastAIContent();
-    if (!content) return;
-    if (onApplyToImprovementRequest) {
-      onApplyToImprovementRequest(content);
-      setApplyMsg("✓ 改善要望欄に転記しました");
-    } else {
-      navigator.clipboard.writeText(content).then(() => {
-        setApplyMsg("✓ クリップボードにコピーしました");
-      });
-    }
-    setTimeout(() => setApplyMsg(""), 2500);
-  };
-
-  // Phase 2: 「✨ この方針で再生成」ボタン
-  // 議論ログをAIに要約させ、それを improvement_request として STEP本体の再生成APIに渡す
-  // インライン確認パネル（pendingSummary state）を使って、ブラウザのconfirm()ダイアログ依存を排除
-  const [pendingSummary, setPendingSummary] = useState(null);
-
-  const handleRegenerate = async () => {
-    if (!onRegenerateWithRequest) return;
-    if (!hasAssistantMessage) {
-      setError("先にAIと議論してから再生成してください。");
-      return;
-    }
-    if (!stepOutput || !stepOutput.trim()) {
-      setError("再生成には前回の出力が必要です。先にSTEPを実行して出力を生成してください。");
-      return;
-    }
-
-    setError("");
-    setRegenerating(true);
-    setRegeneratePhase("summarizing");
-
-    try {
-      // Step 1: 議論ログをAIに要約させる（discussion Chatflowに対して「まとめて」と指示）
-      const summarizeRequest = "ここまでの議論を踏まえ、再生成用の改善要望を1段落で整理してください。" +
-        "形式は『どの部分を、どう修正するか』を明確に書く。" +
-        "変更しない案・部分には『そのまま維持』と明示する。" +
-        "あなたの返答全文がそのまま改善要望テキストとして使われるので、前置きや確認の問いかけは含めず、改善要望本文のみを返してください。";
-
-      const summarizeResponse = await fetch("/api/discuss", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          stepNum,
-          stepName,
-          stepRules,
-          stepInputSummary,
-          stepOutput,
-          authorProfile,
-          workProfile,
-          message: summarizeRequest,
-          conversationId,
-        }),
-      });
-      const summarizeData = await summarizeResponse.json();
-      if (!summarizeResponse.ok) {
-        throw new Error(summarizeData.error || "要約に失敗しました");
-      }
-      const improvementRequest = (summarizeData.answer || "").trim();
-      if (!improvementRequest) {
-        throw new Error("AIからの要約が空でした");
-      }
-      // 議論ログにも追加（ユーザーから見える形にする）
-      setMessages((prev) => [
-        ...prev,
-        { role: "user", content: "[システム] この方針で再生成します", _system: true },
-        { role: "assistant", content: improvementRequest, _summary: true },
-      ]);
-      if (summarizeData.conversation_id) setConversationId(summarizeData.conversation_id);
-
-      // Step 2: インライン確認パネルを表示（confirm() ではなく state で制御）
-      setPendingSummary(improvementRequest);
-      setRegenerating(false);  // 一旦ローディング解除（ユーザー入力待ち）
-      setRegeneratePhase("");
-    } catch (e) {
-      setError(`要約中にエラー：${e.message}`);
-      setRegenerating(false);
-      setRegeneratePhase("");
-    }
-  };
-
-  // ユーザーがインライン確認パネルで「OK」を押したときの処理
-  const handleConfirmRegenerate = async () => {
-    if (!pendingSummary) return;
-    let improvementRequest = pendingSummary;
-
-    // STEP4 フォーカスモード: 「案◯のみブラッシュアップ」が指定されている場合、
-    // 改善要望の冒頭に強い指示を追加して、AIが他案を勝手に変えないようにする。
-    if (stepNum === 4 && focusedCase) {
-      const focusDirective = `【再生成スコープ：案${focusedCase}のみ】\n` +
-        `この再生成は案${focusedCase}だけが対象です。改善要望機構の手順に従い、案${focusedCase}以外（案1・案${focusedCase === "1" ? "2" : "1"}以外の他案）は前回出力からそのままコピーして一字も変更しないでください。修正対象は案${focusedCase}のみです。\n\n` +
-        `[ユーザーとAIで合意した改善方針]\n${pendingSummary}`;
-      improvementRequest = focusDirective;
-    }
-
-    setPendingSummary(null);
-    setRegenerating(true);
-    setRegeneratePhase("regenerating");
-    try {
-      await onRegenerateWithRequest(improvementRequest);
-      const focusedLabel = stepNum === 4 && focusedCase ? `案${focusedCase}のみ` : "";
-      setApplyMsg(focusedLabel
-        ? `✓ ${focusedLabel}を再生成しました（出力データを確認してください）`
-        : "✓ 再生成が完了しました（出力データを確認してください）");
-      setTimeout(() => setApplyMsg(""), 4000);
-    } catch (e) {
-      setError(`再生成中にエラー：${e.message}`);
-    } finally {
-      setRegenerating(false);
-      setRegeneratePhase("");
-    }
-  };
-
-  const handleCancelRegenerate = () => {
-    setPendingSummary(null);
-  };
-
-  // 折りたたみ時のヘッダー表示
-  const headerLabel = messages.length > 0
-    ? `💬 この出力について相談する（${Math.ceil(messages.length / 2)}往復中）`
-    : "💬 この出力について相談する";
 
   return (
     <div style={{ marginTop: 24, marginBottom: 16, border: `1px solid ${C.border}`, borderRadius: 6, background: C.white }}>
@@ -338,7 +191,7 @@ export default function DiscussionPanel({
         onClick={() => setOpen(!open)}
         style={{
           padding: "12px 16px",
-          background: messages.length > 0 ? C.goldPale : "#f8f8f8",
+          background: "#f8f8f8",
           borderBottom: open ? `1px solid ${C.border}` : "none",
           borderRadius: open ? "6px 6px 0 0" : 6,
           cursor: "pointer",
@@ -349,7 +202,7 @@ export default function DiscussionPanel({
         }}
       >
         <div style={{ fontSize: 13.5, fontWeight: 700, color: C.navy }}>
-          {headerLabel}
+          📋 外部AIで相談する用プロンプトを取得
         </div>
         <div style={{ fontSize: 12, color: C.textSub }}>
           {open ? "▲ 閉じる" : "▼ 開く"}
@@ -359,11 +212,19 @@ export default function DiscussionPanel({
       {open && (
         <div style={{ padding: 14 }}>
           <div style={{ fontSize: 12.5, color: C.textSub, lineHeight: 1.7, marginBottom: 10 }}>
-            生成された出力について、AIに相談しながら改善方針を一緒に練れます。違和感を感じた点を自由に書いてください（例：「案2の『ベストセラー』はKDP規約的に大丈夫？」「案3のターゲットがぼやけている気がする」）。
+            出力を改善したい時は、ChatGPT や Claude.ai などの<strong>個人AI</strong>で深く議論できます。
+            下のプロンプトをコピーして外部AIに貼り付け、議論を進めてください。
+            最終的にAIが返す改訂版の出力を、上の出力データ欄にそのまま貼り付ければ反映できます。
           </div>
 
-          {/* STEP4専用: 案ごとのフォーカスモード（軽量版・改善要望への自動付加だけ） */}
-          {stepNum === 4 && onRegenerateWithRequest && (
+          {!hasOutput && (
+            <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginBottom: 12, fontSize: 13, color: C.red }}>
+              先に出力データを生成してから、外部AIで相談してください。
+            </div>
+          )}
+
+          {/* STEP4専用: 案ごとのフォーカスモード */}
+          {stepNum === 4 && onFocusedCaseChange && (
             <div style={{
               padding: "8px 12px",
               background: focusedCase ? C.goldPale : "#f8f8f8",
@@ -376,343 +237,137 @@ export default function DiscussionPanel({
               gap: 8,
               flexWrap: "wrap",
             }}>
-              <span style={{ fontWeight: 700, color: C.navy }}>🎯 ブラッシュアップ対象：</span>
+              <span style={{ fontWeight: 700, color: C.navy }}>🎯 出力欄の表示切替：</span>
               <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
                 <input type="radio" name={`focus-${stepNum}`} value="" checked={focusedCase === ""}
-                  onChange={() => setFocusedCase("")} disabled={regenerating} />
+                  onChange={() => onFocusedCaseChange("")} />
                 <span>全案</span>
               </label>
               <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
                 <input type="radio" name={`focus-${stepNum}`} value="1" checked={focusedCase === "1"}
-                  onChange={() => setFocusedCase("1")} disabled={regenerating} />
+                  onChange={() => onFocusedCaseChange("1")} />
                 <span>案1のみ</span>
               </label>
               <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
                 <input type="radio" name={`focus-${stepNum}`} value="2" checked={focusedCase === "2"}
-                  onChange={() => setFocusedCase("2")} disabled={regenerating} />
+                  onChange={() => onFocusedCaseChange("2")} />
                 <span>案2のみ</span>
               </label>
               <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
                 <input type="radio" name={`focus-${stepNum}`} value="3" checked={focusedCase === "3"}
-                  onChange={() => setFocusedCase("3")} disabled={regenerating} />
+                  onChange={() => onFocusedCaseChange("3")} />
                 <span>案3のみ</span>
               </label>
               {focusedCase && (
                 <span style={{ fontSize: 11, color: C.gold, marginLeft: "auto" }}>
-                  ✨再生成時は案{focusedCase}にだけ集中します（他案は維持）
+                  出力欄を案{focusedCase}だけに絞り込んで編集できます
                 </span>
               )}
             </div>
           )}
 
-          {/* ターン数表示（コスト管理のため上限付き） */}
-          <div style={{
-            fontSize: 12, color: turnLimitReached ? C.red : C.textLight,
-            background: turnLimitReached ? "#fef2f2" : "#f8f8f8",
-            border: `1px solid ${turnLimitReached ? "rgba(192,57,43,0.25)" : C.border}`,
-            borderRadius: 4, padding: "6px 10px", marginBottom: 10,
-            display: "flex", justifyContent: "space-between", alignItems: "center",
-          }}>
-            <span>
-              {turnLimitReached
-                ? `⚠ このスレッドは上限の${MAX_TURNS}往復に達しました。リセットして新しいスレッドを開始してください。`
-                : `📊 残り ${turnsLeft} / ${MAX_TURNS} 往復`}
-            </span>
-            <span style={{ fontSize: 11, color: C.textLight }}>
-              ※ コスト管理のため1スレッド{MAX_TURNS}往復までです
-            </span>
-          </div>
-
-          {/* 再生成中の進捗バナー（目立つように） */}
-          {regenerating && (
-            <div style={{
-              padding: "12px 14px",
-              background: "#fff8e7",
-              border: `1px solid ${C.gold}`,
-              borderRadius: 6,
-              marginBottom: 10,
-              fontSize: 13.5,
-              color: C.navy,
-              fontWeight: 600,
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-            }}>
-              <span style={{ fontSize: 18 }}>{regeneratePhase === "summarizing" ? "📝" : "🔄"}</span>
-              <span>
-                {regeneratePhase === "summarizing"
-                  ? "議論を要約しています...（数秒）"
-                  : "STEP本体を再生成しています...（30秒〜1分）"}
-              </span>
+          {/* プロンプト表示エリア */}
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: C.navy, marginBottom: 6 }}>
+              生成されたプロンプト（コピーして外部AIへ）：
             </div>
-          )}
-
-          {/* インライン確認パネル：要約完了後にここで「再生成する／キャンセル」を選ぶ */}
-          {pendingSummary && (
-            <div style={{
-              padding: 14,
-              background: "#fff8e7",
-              border: `2px solid ${C.gold}`,
-              borderRadius: 6,
-              marginBottom: 10,
-            }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: C.navy, marginBottom: 8 }}>
-                ✨ 以下の改善要望でSTEP{stepNum}「{stepName}」を再生成します
-              </div>
-              <div style={{
-                fontSize: 12.5,
-                color: C.text,
-                lineHeight: 1.7,
-                background: C.white,
-                padding: "10px 12px",
-                borderRadius: 4,
-                border: `1px solid ${C.border}`,
-                marginBottom: 10,
-                maxHeight: 180,
-                overflowY: "auto",
-                whiteSpace: "pre-wrap",
-              }}>
-                {pendingSummary}
-              </div>
-              <div style={{ fontSize: 11.5, color: C.textSub, marginBottom: 10, lineHeight: 1.6 }}>
-                ⚠ 既存の出力データは上書きされます。必要なら事前に「出力をコピー」しておいてください。
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  onClick={handleConfirmRegenerate}
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: C.white,
-                    background: C.navy,
-                    border: "none",
-                    borderRadius: 3,
-                    padding: "9px 22px",
-                    cursor: "pointer",
-                    boxShadow: "0 2px 4px rgba(36,61,92,0.25)",
-                  }}
-                >
-                  ✓ 再生成する
-                </button>
-                <button
-                  onClick={handleCancelRegenerate}
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: C.navy,
-                    background: C.white,
-                    border: `1px solid ${C.navy}`,
-                    borderRadius: 3,
-                    padding: "9px 18px",
-                    cursor: "pointer",
-                  }}
-                >
-                  キャンセル
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* 成功時の通知バナー（目立つように） */}
-          {!regenerating && applyMsg && applyMsg.includes("再生成が完了") && (
-            <div style={{
-              padding: "12px 14px",
-              background: "#e8f5e9",
-              border: `1px solid ${C.green}`,
-              borderRadius: 6,
-              marginBottom: 10,
-              fontSize: 13.5,
-              color: C.green,
-              fontWeight: 600,
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-            }}>
-              <span style={{ fontSize: 18 }}>✅</span>
-              <span>{applyMsg} ↑ 上の出力データ欄を確認してください</span>
-            </div>
-          )}
-
-          {!hasOutput && (
-            <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginBottom: 12, fontSize: 13, color: C.red }}>
-              先に出力データを生成・保存してから相談してください。
-            </div>
-          )}
-
-          <div style={{ border: `1px solid ${C.border}`, borderRadius: 6, overflow: "hidden", background: C.white }}>
-            {/* メッセージ表示エリア */}
-            <div
-              ref={chatAreaRef}
+            <textarea
+              value={generatedPrompt}
+              readOnly
+              rows={14}
               style={{
-                height: 320,
-                overflowY: "auto",
-                padding: "16px 14px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
+                width: "100%",
+                padding: "12px 14px",
+                fontSize: 12.5,
+                fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+                lineHeight: 1.6,
+                color: C.text,
                 background: C.navyLight,
+                border: `1px solid ${C.border}`,
+                borderRadius: 4,
+                outline: "none",
+                resize: "vertical",
+                boxSizing: "border-box",
+                whiteSpace: "pre",
+                overflowX: "auto",
               }}
-            >
-              {messages.length === 0 && (
-                <div style={{ fontSize: 13, color: C.textLight, textAlign: "center", marginTop: 60, lineHeight: 1.7 }}>
-                  気になる点を入力して送信してください
-                </div>
-              )}
-              {messages.map((msg, i) => (
-                <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: msg.role === "user" ? "flex-end" : "flex-start" }}>
-                  <div style={{ fontSize: 11, color: C.textLight, marginBottom: 3, paddingLeft: msg.role === "user" ? 0 : 4, paddingRight: msg.role === "user" ? 4 : 0 }}>
-                    {msg.role === "user" ? "あなた" : "AI"}
-                  </div>
-                  <div
-                    style={{
-                      maxWidth: "82%",
-                      padding: "10px 14px",
-                      borderRadius: msg.role === "user" ? "12px 12px 3px 12px" : "12px 12px 12px 3px",
-                      background: msg.role === "user" ? C.navy : C.white,
-                      color: msg.role === "user" ? C.white : C.text,
-                      fontSize: 13.5,
-                      lineHeight: 1.75,
-                      whiteSpace: "pre-wrap",
-                      wordBreak: "break-word",
-                      border: msg.role === "user" ? "none" : `1px solid ${C.border}`,
-                      boxShadow: "0 1px 3px rgba(0,0,0,0.07)",
-                    }}
-                  >
-                    {msg.content}
-                  </div>
-                </div>
-              ))}
-              {loading && (
-                <div style={{ display: "flex", alignItems: "flex-start" }}>
-                  <div style={{ padding: "10px 16px", borderRadius: "12px 12px 12px 3px", background: C.white, border: `1px solid ${C.border}`, fontSize: 13, color: C.textLight }}>
-                    考え中...
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* エラー表示 */}
-            {error && (
-              <div style={{ padding: "8px 14px", background: "#fef2f2", borderTop: `1px solid rgba(192,57,43,0.2)`, fontSize: 12.5, color: C.red }}>
-                {error}
-              </div>
-            )}
-
-            {/* 入力エリア */}
-            <div style={{ display: "flex", borderTop: `1px solid ${C.border}`, background: C.white }}>
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-                placeholder={turnLimitReached
-                  ? `上限の${MAX_TURNS}往復に達しました。リセットしてください`
-                  : "気になる点を入力（Enterで送信 / Shift+Enterで改行）"}
-                rows={3}
-                disabled={!hasOutput || turnLimitReached}
-                style={{
-                  flex: 1,
-                  padding: "12px 14px",
-                  fontSize: 13.5,
-                  border: "none",
-                  outline: "none",
-                  resize: "none",
-                  fontFamily: "inherit",
-                  lineHeight: 1.65,
-                  boxSizing: "border-box",
-                  background: (!hasOutput || turnLimitReached) ? "#f5f5f5" : C.white,
-                }}
-              />
-              <button
-                onClick={handleSend}
-                disabled={loading || !input.trim() || !hasOutput || turnLimitReached}
-                style={{
-                  width: 80,
-                  background: (loading || !input.trim() || !hasOutput || turnLimitReached) ? "#ccc" : C.navy,
-                  color: C.white,
-                  border: "none",
-                  fontWeight: 700,
-                  fontSize: 13,
-                  cursor: (loading || !input.trim() || !hasOutput || turnLimitReached) ? "default" : "pointer",
-                  flexShrink: 0,
-                }}
-              >
-                送信
-              </button>
-            </div>
+              onClick={(e) => e.target.select()}
+            />
           </div>
 
           {/* アクションボタン群 */}
-          <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              {/* Phase 2: メインアクション「✨ この方針で再生成」 */}
-              {/* onRegenerateWithRequest が供給されている場合のみ表示。STEP本体を改善要望付きで再実行する */}
-              {onRegenerateWithRequest && (
-                <button
-                  onClick={handleRegenerate}
-                  disabled={!hasAssistantMessage || regenerating}
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: (!hasAssistantMessage || regenerating) ? C.textLight : C.white,
-                    background: (!hasAssistantMessage || regenerating) ? "rgba(0,0,0,0.06)" : C.navy,
-                    border: "none",
-                    borderRadius: 3,
-                    padding: "9px 20px",
-                    cursor: (!hasAssistantMessage || regenerating) ? "default" : "pointer",
-                    boxShadow: (!hasAssistantMessage || regenerating) ? "none" : "0 2px 4px rgba(36,61,92,0.25)",
-                  }}
-                >
-                  {regenerating
-                    ? (regeneratePhase === "summarizing" ? "📝 議論を要約中..." : "🔄 再生成中...")
-                    : "✨ この方針で再生成"}
-                </button>
-              )}
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
+            <button
+              onClick={handleCopyPrompt}
+              disabled={!hasOutput}
+              style={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: hasOutput ? C.white : C.textLight,
+                background: hasOutput ? C.navy : "rgba(0,0,0,0.06)",
+                border: "none",
+                borderRadius: 3,
+                padding: "9px 22px",
+                cursor: hasOutput ? "pointer" : "default",
+                boxShadow: hasOutput ? "0 2px 4px rgba(36,61,92,0.25)" : "none",
+              }}
+            >
+              📋 プロンプトをコピー
+            </button>
+            <button
+              onClick={handleOpenClaude}
+              disabled={!hasOutput}
+              style={{
+                fontSize: 12.5,
+                fontWeight: 600,
+                color: hasOutput ? C.gold : C.textLight,
+                background: hasOutput ? C.white : "rgba(0,0,0,0.04)",
+                border: `1px solid ${hasOutput ? C.gold : C.border}`,
+                borderRadius: 3,
+                padding: "8px 16px",
+                cursor: hasOutput ? "pointer" : "default",
+              }}
+            >
+              🤖 コピーしてClaude.aiを開く
+            </button>
+            <button
+              onClick={handleOpenChatGPT}
+              disabled={!hasOutput}
+              style={{
+                fontSize: 12.5,
+                fontWeight: 600,
+                color: hasOutput ? C.navy : C.textLight,
+                background: hasOutput ? C.white : "rgba(0,0,0,0.04)",
+                border: `1px solid ${hasOutput ? C.navy : C.border}`,
+                borderRadius: 3,
+                padding: "8px 16px",
+                cursor: hasOutput ? "pointer" : "default",
+              }}
+            >
+              🤖 コピーしてChatGPTを開く
+            </button>
+            {copyMsg && <span style={{ fontSize: 12, color: copyMsg.startsWith("✓") ? C.green : C.red, fontWeight: 600 }}>{copyMsg}</span>}
+          </div>
 
-              {/* サブアクション：改善要望欄へ転記 or クリップボードコピー */}
-              <button
-                onClick={handleApply}
-                disabled={!hasAssistantMessage || regenerating}
-                style={{
-                  fontSize: 12.5,
-                  fontWeight: 600,
-                  color: (!hasAssistantMessage || regenerating) ? C.textLight : C.navy,
-                  background: (!hasAssistantMessage || regenerating) ? "rgba(0,0,0,0.04)" : C.white,
-                  border: `1px solid ${(!hasAssistantMessage || regenerating) ? C.border : C.navy}`,
-                  borderRadius: 3,
-                  padding: "7px 14px",
-                  cursor: (!hasAssistantMessage || regenerating) ? "default" : "pointer",
-                }}
-              >
-                {onApplyToImprovementRequest ? "↓ 改善要望欄へ転記" : "↓ コピー"}
-              </button>
-
-              {applyMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>{applyMsg}</span>}
-            </div>
-            <div>
-              <button
-                onClick={handleReset}
-                disabled={messages.length === 0}
-                style={{
-                  fontSize: 12,
-                  color: messages.length === 0 ? "#aaa" : C.textLight,
-                  background: "none",
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 3,
-                  padding: "4px 10px",
-                  cursor: messages.length === 0 ? "default" : "pointer",
-                }}
-              >
-                相談履歴をリセット
-              </button>
-              <span style={{ fontSize: 11.5, color: C.textLight, marginLeft: 8 }}>
-                別の方向性で相談したい時はリセットしてください
-              </span>
-            </div>
+          {/* 使い方ガイド */}
+          <div style={{
+            marginTop: 12,
+            padding: "10px 14px",
+            background: "#eef2f7",
+            border: "1px solid #c8d4e0",
+            borderRadius: 4,
+            fontSize: 12.5,
+            color: C.text,
+            lineHeight: 1.8,
+          }}>
+            <div style={{ fontWeight: 700, color: C.navy, marginBottom: 6 }}>使い方の流れ</div>
+            <ol style={{ margin: 0, paddingLeft: 20 }}>
+              <li>「📋 プロンプトをコピー」ボタンを押す</li>
+              <li>ChatGPT または Claude.ai を開いて、コピーしたプロンプトを貼り付けて送信</li>
+              <li>AIが「最初の発言を待っています」と応えるので、改善したい点を自由に書いて議論を進める</li>
+              <li>議論が終わって最終版が出たら、それを上の「出力データ」欄に貼り付け</li>
+              <li>「出力データを保存」ボタンで確定</li>
+            </ol>
           </div>
         </div>
       )}

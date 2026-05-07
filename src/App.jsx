@@ -1507,16 +1507,13 @@ const Step1Page = ({ savedAuthorProfile, savedWorkProfile, onSaveWorkProfile, on
         </div>
       </div>
 
-      {/* 出力相談パネル：STEP1（書籍プロファイル草案）の出力について議論できる */}
-      {/* 注: STEP1ではまだwork_profileが未確定なので、相談時のworkProfileには現在の出力(outputText)を渡す（自己参照ループにならないよう、AIには「相談対象出力」として認識させる） */}
+      {/* 外部AIで相談するためのプロンプト生成パネル */}
       <DiscussionPanel
         stepNum={1}
         stepName="書籍プロファイル草案"
         stepOutput={outputText}
         authorProfile={savedAuthorProfile || ""}
         workProfile=""
-        projectId={project?.id || ""}
-        onTransferToOutput={(text) => setOutputText(text)}
       />
     </div>
   );
@@ -1971,17 +1968,13 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
         </div>
       </div>
 
-      {/* 出力相談パネル：STEP2（市場検証→書籍プロファイル確定）の出力について議論できる */}
-      {/* 相談ニーズが最も高いSTEP（市場分析を見ながら「この切り口で勝てそうか」「読者軸を広げるべきか」等の議論が発生しやすい） */}
-      {/* workProfileには相談対象である現在の確定版（confirmedDraft）を渡す。AIには「これを相談している」と認識される */}
+      {/* 外部AIで相談するためのプロンプト生成パネル */}
       <DiscussionPanel
         stepNum={2}
         stepName="市場検証→書籍プロファイル確定"
         stepOutput={confirmedDraft}
         authorProfile={savedAuthorProfile || ""}
         workProfile={extractDiscussionContext(confirmedDraft || "")}
-        projectId={project?.id || ""}
-        onTransferToOutput={(text) => setConfirmedDraft(text)}
       />
 
       <div style={{ marginBottom: 24 }}>
@@ -2652,9 +2645,8 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         </div>
       </div>
 
-      {/* 出力相談パネル：全STEP共通。チャット型STEP（既にメインのチャット会話を持つ）でも、出力サマリの再検討用に有用なため表示 */}
-      {/* workProfile は軽量化版を渡す：STEP2の出力60KBから市場分析データを除き、相談に必要な核情報のみに圧縮（コスト削減） */}
-      {/* onRegenerateWithRequest: Phase 2の「✨ この方針で再生成」機能。STEP3〜9（workflow型）でのみ提供、STEP3はchat型なので対象外 */}
+      {/* 外部AIで相談するためのプロンプト生成パネル（全STEP共通） */}
+      {/* workProfile は軽量化版を渡す：STEP2の出力60KBから市場分析データを除き、相談に必要な核情報のみに圧縮 */}
       {/* focusedCase / onFocusedCaseChange: STEP4専用のフォーカスモード。outputTextは常にフル3案を保持し、表示時のみ抽出 */}
       <DiscussionPanel
         stepNum={step.num}
@@ -2662,11 +2654,8 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         stepOutput={outputText}
         authorProfile={getAutoInjectedProfiles().author_profile || ""}
         workProfile={extractDiscussionContext(getAutoInjectedProfiles().work_profile || "")}
-        projectId={project?.id || ""}
-        onRegenerateWithRequest={step.type !== "chat" ? handleRegenerateWithRequest : undefined}
         focusedCase={focusedCase}
         onFocusedCaseChange={(newFocus) => {
-          // フォーカス指定時、出力データから3案を抽出できることを確認
           if (newFocus && step.num === 4) {
             const parsed = parseStep4CaseStructure(outputText);
             if (!parsed) {
