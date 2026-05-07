@@ -114,15 +114,6 @@ workflow:
           variable: kw2
         - default: ''
           hint: ''
-          label: 読者・価値設計のアウトプット（必須）
-          max_length: 5000
-          options: []
-          placeholder: ''
-          required: true
-          type: paragraph
-          variable: theme_output
-        - default: ''
-          hint: ''
           label: エピソードインタビューのアウトプット（必須）
           max_length: 5000
           options: []
@@ -369,7 +360,7 @@ workflow:
 
             関連キーワード ({{#1772343147375.kw2#}})
 
-            内容・ストーリーライン ({{#1772343147375.theme_output#}})
+            内容・ストーリーライン（書籍プロファイルから読み取る：仮テーマ・想定読者・読了後の状態・狙い目の切り口）
 
             独自エピソード・差別化要素 ({{#1772343147375.diff_elements#}})
 
