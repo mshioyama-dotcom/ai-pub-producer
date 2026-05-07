@@ -17,9 +17,14 @@
 import { useState, useRef, useEffect } from "react";
 
 // 1スレッドあたりの最大往復数（コスト管理のため）
-// ユーザー往復1 + AI往復1 = 1ターン。MAX_TURNS=5なら 10メッセージで打ち切り。
-// サブスクのプランごとに動的に変えられるよう、将来は props で受け取る想定。
-const MAX_TURNS = 5;
+// ユーザー往復1 + AI往復1 = 1ターン。MAX_TURNS=10なら 20メッセージで打ち切り。
+//
+// 設計判断（履歴）:
+// - 当初 5往復 → Anthropic Prompt Caching 有効化により1往復コスト$0.10→$0.02に削減
+// - キャッシュ後は10往復でも$0.20程度なので、議論の質を優先して10に緩和
+// - サブスクのTier別に動的化する場合は props で受け取る形に変更予定
+//   （例: Lite=5, Standard=10, Pro=20）
+const MAX_TURNS = 10;
 
 // 色トークン（App.jsxと同期）
 const C = {
