@@ -150,7 +150,7 @@ const STEPS = [
     category: "執筆設計", type: "workflow",
     url: "https://udify.app/workflow/lRAWtZGuVL4bqHM9",
     inputs: [
-      { name: "detailed_plot_text", label: "詳細プロット作成のアウトプット（1章分）", desc: "STEP7の詳細プロットを貼り付け（「自動振り分け」で自動入力）", source: "STEP7", required: true, type: "textarea", autoFill: true, maxChars: 5000 },
+      { name: "detailed_plot_text", label: "詳細プロット作成のアウトプット（1章分）", desc: "STEP7の詳細プロットから1章分だけを選択してください。", source: "STEP7", required: true, type: "textarea", autoFill: false, maxChars: 5000 },
       { name: "target_section", label: "執筆対象の節（1節分）", desc: "今回書きたい節を1つ選びます。下の「STEP7から節を抽出」ボタンを押すと、節の候補が一覧表示されます。", source: "STEP7", required: true, type: "text", autoFill: false, maxChars: 256 },
       { name: "past_writing_text", label: "著者の過去の執筆データ（任意）", desc: "あなたの過去の記事や原稿があれば貼り付けてください。AIが文体を真似て書いてくれます。空欄でもOKです。", source: null, required: false, type: "textarea", maxChars: 4000 }
     ],
@@ -2778,6 +2778,69 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
             if (field.name === "keyword1") { if (parsed.keyword1) handleInputChange("keyword1", parsed.keyword1); else alert("「主題軸キーワード1」が見つかりませんでした。手動で入力してください。"); }
             if (field.name === "keyword2") { if (parsed.keyword2) handleInputChange("keyword2", parsed.keyword2); else alert("「主題軸キーワード2」が見つかりませんでした。手動で入力してください。"); }
           } : undefined;
+
+          // STEP8「詳細プロット（1章分）」専用UI:
+          // STEP7 の全章プロット（=== 第N章 === 区切り）から1章を選択して詳細プロットtextarea に転記する。
+          // STEP7 と同じ extractChapters + ChapterSelector を流用。
+          if (field.name === "detailed_plot_text") {
+            const hasErr = validationErrors.includes(field.name);
+            const currentLen = (inputs[field.name] || "").length;
+            const isOver = field.maxChars && currentLen > field.maxChars;
+            return (
+              <div key={field.name} style={{ marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
+                  <label style={{ fontSize: 13.5, fontWeight: 600, color: hasErr ? C.red : C.navy }}>{field.label}</label>
+                  {field.required && <RequiredMark />}
+                  <SourceLabel source={field.source} autoFill={false} onAutoFill={() => {}}
+                    onRef={() => { const s = allSteps?.[7]?.outputText; if (s) onRefPanel({ stepNum: 7, text: s, targetField: "detailed_plot_text" }); else alert("STEP7の出力データがまだ保存されていません。"); }} />
+                  {hasErr && <span style={{ fontSize: 12, color: C.red, fontWeight: 500 }}>← 章を選んでください</span>}
+                </div>
+                <div style={{ fontSize: 13, color: "#444444", marginBottom: 8 }}>{field.desc}</div>
+                <div style={{ marginBottom: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <button onClick={() => {
+                    const srcOutput = allSteps?.[7]?.outputText;
+                    if (!srcOutput) { alert("STEP7の出力データがまだ保存されていません。\n\nSTEP7を完了して「出力データを保存」ボタンを押してから、もう一度お試しください。"); return; }
+                    const extracted = extractChapters(srcOutput);
+                    if (extracted.length === 0) { alert("STEP7の出力から「第N章: xxx」「はじめに」「おわりに」形式の章を検出できませんでした。STEP7の出力をもう一度確認してください。"); return; }
+                    setChapterOptions(extracted); setSelectedChapter(null); handleInputChange("detailed_plot_text", "");
+                    // 章を変えたら節も選び直し
+                    setSectionOptions([]); setSelectedSection(null); handleInputChange("target_section", "");
+                  }} style={{ fontSize: 12.5, fontWeight: 600, color: C.white, background: C.gold, border: "none", borderRadius: 3, padding: "7px 14px", cursor: "pointer" }}>
+                    📋 STEP7から章を抽出
+                  </button>
+                  {chapterOptions.length > 0 && (
+                    <button onClick={() => { setChapterOptions([]); setSelectedChapter(null); handleInputChange("detailed_plot_text", ""); }}
+                      style={{ fontSize: 12, color: C.textLight, background: "none", border: `1px solid ${C.border}`, borderRadius: 3, padding: "6px 12px", cursor: "pointer" }}>
+                      抽出結果をクリア
+                    </button>
+                  )}
+                </div>
+                {chapterOptions.length > 0 && (
+                  <ChapterSelector chapters={chapterOptions} selected={selectedChapter}
+                    onSelect={(i, ch) => {
+                      setSelectedChapter(i);
+                      handleInputChange("detailed_plot_text", ch.body.trim());
+                      // 章を選んだら節も選び直し
+                      setSectionOptions([]); setSelectedSection(null); handleInputChange("target_section", "");
+                    }}
+                    onReselect={() => { setSelectedChapter(null); handleInputChange("detailed_plot_text", ""); setSectionOptions([]); setSelectedSection(null); handleInputChange("target_section", ""); }} />
+                )}
+                {/* 選択後の textarea（編集可） */}
+                {(selectedChapter !== null || (inputs[field.name] || "").trim()) && (
+                  <div style={{ marginTop: 12 }}>
+                    <textarea id={`field-${field.name}`} value={inputs[field.name] || ""} onChange={(e) => { setSelectedChapter(null); handleInputChange(field.name, e.target.value); }}
+                      placeholder="選択した章の詳細プロット（編集可能）"
+                      rows={8}
+                      style={{ width: "100%", padding: "10px 12px", fontSize: 14, border: hasErr ? `2px solid ${C.red}` : isOver ? `2px solid ${C.gold}` : `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: hasErr ? "#fef2f2" : C.white, lineHeight: 1.7 }} />
+                    <div style={{ fontSize: 11, color: isOver ? C.red : C.textLight, textAlign: "right", marginTop: 3 }}>
+                      {currentLen.toLocaleString()} / {field.maxChars.toLocaleString()}文字
+                      {isOver && " ← 上限を超過しています。1章分だけになるよう編集してください。"}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          }
 
           // STEP7「1章分のアウトライン」専用UI:
           // STEP6 から章を抽出してプレビュー表示し、「全章を順次生成」ボタン1つで一括処理する。
