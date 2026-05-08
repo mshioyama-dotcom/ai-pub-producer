@@ -2106,10 +2106,24 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
   );
 };
 
-// STEP4専用：3案の中から1案を選んで「タイトル・サブタイトルを確定する」UI。
+// STEP4専用：「タイトル・サブタイトルを確定する」UI。
+// 想定する2つのワークフロー：
+//   A. 3案出す → 外部AIで相談 → 1案に決める → 出力欄に貼り付け（1案構造）
+//      → 出力全体からタイトル/サブタイトルを直接抽出してプレフィル
+//   B. 3案出す → そのまま採用案を選ぶ（3案構造）
+//      → 案ボタンで選択
+// どちらのフォーマットでも対応。完全手動入力もできる。
 // 確定後はSTEP5以降の入力欄（title_text / subtitle_text）に自動転記される。
 const Step4ConfirmPanel = ({ outputText }) => {
+  // 3案構造としてパースを試みる（成功すれば案ボタン表示）
   const parsed = useMemo(() => parseStep4CaseStructure(outputText), [outputText]);
+  // 1案構造（AI議論後の結果）として直接抽出を試みる（パース失敗時のフォールバック）
+  const singleExtracted = useMemo(() => {
+    if (parsed) return null;
+    if (!outputText) return null;
+    const r = extractTitleSubtitleFromStep4Case(outputText);
+    return (r.title || r.subtitle) ? r : null;
+  }, [outputText, parsed]);
 
   // 既に確定済みの内容を初期表示
   const initialTitle = (typeof window !== "undefined") ? (localStorage.getItem(TITLE_CONFIRMED_KEY) || "") : "";
@@ -2119,6 +2133,18 @@ const Step4ConfirmPanel = ({ outputText }) => {
   const [titleInput, setTitleInput] = useState(initialTitle);
   const [subtitleInput, setSubtitleInput] = useState(initialSubtitle);
   const [savedMsg, setSavedMsg] = useState(false);
+  const [autoFilledFromSingle, setAutoFilledFromSingle] = useState(false);
+
+  // 1案構造でタイトル/サブタイトルが抽出できた場合、入力欄が空ならプレフィル。
+  // 既に手動入力された値は上書きしない。
+  useEffect(() => {
+    if (!singleExtracted) return;
+    let filled = false;
+    if (singleExtracted.title && !titleInput) { setTitleInput(singleExtracted.title); filled = true; }
+    if (singleExtracted.subtitle && !subtitleInput) { setSubtitleInput(singleExtracted.subtitle); filled = true; }
+    if (filled) setAutoFilledFromSingle(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [singleExtracted]);
 
   // 案ボタンを押したら、その案からタイトル/サブタイトルを抽出してプレフィル
   const handleSelectCase = (caseNum) => {
@@ -2160,26 +2186,40 @@ const Step4ConfirmPanel = ({ outputText }) => {
         3案から1つ選ぶか、自分で書いた内容を直接入力してください。
       </div>
 
-      {!parsed && outputText && (
-        <div style={{ padding: "8px 12px", background: "#fff", border: `1px solid ${C.border}`, borderRadius: 3, fontSize: 12.5, color: C.textSub, marginBottom: 10 }}>
-          ※ 出力フォーマットの自動解析に失敗しました。下のフォームに手動で入力してください。
+      {/* パターンB: 3案構造を検出 → 案ボタン表示 */}
+      {parsed && (
+        <>
+          <div style={{ fontSize: 12.5, color: C.textSub, marginBottom: 8 }}>
+            ✓ 3案構造を検出しました。下のボタンで採用する案を選んでください。
+          </div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+            {["1", "2", "3"].map((n) => (
+              <button key={n} onClick={() => handleSelectCase(n)}
+                style={{
+                  fontSize: 13, fontWeight: 600,
+                  color: selectedCase === n ? C.white : C.gold,
+                  background: selectedCase === n ? C.gold : C.white,
+                  border: `1.5px solid ${C.gold}`,
+                  borderRadius: 3, padding: "8px 16px", cursor: "pointer",
+                }}>
+                📋 案{n}を採用
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* パターンA: 1案構造（AI議論後の貼り付け）→ 自動抽出済みのお知らせ */}
+      {!parsed && autoFilledFromSingle && (
+        <div style={{ padding: "8px 12px", background: C.greenLight, border: `1px solid rgba(45,122,79,0.25)`, borderRadius: 3, fontSize: 12.5, color: C.green, marginBottom: 10, fontWeight: 600 }}>
+          ✓ 出力欄から「メインタイトル」「サブタイトル」を自動取得しました。内容を確認して、必要なら編集してから確定してください。
         </div>
       )}
 
-      {parsed && (
-        <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-          {["1", "2", "3"].map((n) => (
-            <button key={n} onClick={() => handleSelectCase(n)}
-              style={{
-                fontSize: 13, fontWeight: 600,
-                color: selectedCase === n ? C.white : C.gold,
-                background: selectedCase === n ? C.gold : C.white,
-                border: `1.5px solid ${C.gold}`,
-                borderRadius: 3, padding: "8px 16px", cursor: "pointer",
-              }}>
-              📋 案{n}を採用
-            </button>
-          ))}
+      {/* どちらでもない: 完全手動入力を促す */}
+      {!parsed && !autoFilledFromSingle && outputText && (
+        <div style={{ padding: "8px 12px", background: "#fff", border: `1px solid ${C.border}`, borderRadius: 3, fontSize: 12.5, color: C.textSub, marginBottom: 10 }}>
+          ※ 出力欄からタイトル・サブタイトルを自動取得できませんでした。下のフォームに手動で入力してください。
         </div>
       )}
 
