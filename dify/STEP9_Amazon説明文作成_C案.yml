@@ -210,12 +210,12 @@ workflow:
           variable_selector: []
         model:
           completion_params:
-            max_tokens: 1500
-            temperature: 0.2
-            top_p: 0.9
+            max_tokens: 8192
+            reasoning_effort: low
+            verbosity: medium
           mode: chat
-          name: claude-sonnet-4-6
-          provider: langgenius/anthropic/anthropic
+          name: gpt-5.2
+          provider: langgenius/openai/openai
         prompt_template:
         - id: 76b5efe0-4f0a-43eb-a1f6-109c4589c4cf
           role: system
@@ -398,10 +398,12 @@ workflow:
           variable_selector: []
         model:
           completion_params:
-            max_tokens: 2500
+            max_tokens: 8192
+            reasoning_effort: low
+            verbosity: medium
           mode: chat
-          name: claude-sonnet-4-6
-          provider: langgenius/anthropic/anthropic
+          name: gpt-5.2
+          provider: langgenius/openai/openai
         prompt_template:
         - id: 81a2d729-d492-4272-a03e-897c699f0227
           role: system

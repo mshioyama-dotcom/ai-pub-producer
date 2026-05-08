@@ -62,11 +62,13 @@ model_config:
       number_limits: 3
   model:
     completion_params:
-      max_tokens: 4000
+      max_tokens: 8192
+      reasoning_effort: low
+      verbosity: medium
       stop: []
     mode: chat
-    name: claude-sonnet-4-6
-    provider: langgenius/anthropic/anthropic
+    name: gpt-5.2
+    provider: langgenius/openai/openai
   more_like_this:
     enabled: false
   opening_statement: 'この出力について気になる点・修正したい点があれば自由にご相談ください。
