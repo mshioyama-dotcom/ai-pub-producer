@@ -395,17 +395,26 @@ function getAutoInjectedProfiles() {
 }
 
 // STEP4の単一案テキストから「メインタイトル」「サブタイトル」を抽出する。
-// STEP4 YMLの出力テンプレート（メインタイトル\n\n[値]\n\nサブタイトル\n\n[値]）に対応。
+// 以下の3パターンに対応：
+//   1. 「メインタイトル: xxx」「メインタイトル：xxx」（同行）
+//   2. 「メインタイトル\n\nxxx」（次の非空行）
+//   3. 「**メインタイトル**\n\nxxx」（装飾付き）
+// 外部AIからコピペされた多様なフォーマットでも抽出できるよう柔軟に。
 function extractTitleSubtitleFromStep4Case(caseText) {
   if (!caseText || typeof caseText !== "string") return { title: "", subtitle: "" };
-  // 「メインタイトル」見出しの直後（空行を挟んで）の最初の非空行を取る
-  const titleMatch = caseText.match(/メインタイトル\s*\n+\s*([^\n]+)/);
-  // 「サブタイトル」も同様
-  const subtitleMatch = caseText.match(/サブタイトル\s*\n+\s*([^\n]+)/);
-  const clean = (s) => (s || "").replace(/^[\s*【】「」"']+|[\s*【】「」"']+$/g, "").trim();
+  const tryExtract = (label) => {
+    // 同行記法: "メインタイトル: xxx" / "メインタイトル：xxx"
+    const inline = caseText.match(new RegExp(`${label}\\s*[:：]\\s*([^\\n]+)`));
+    if (inline && inline[1].trim()) return inline[1];
+    // 別行記法: "メインタイトル\n\nxxx"（**装飾**や行頭#も許容）
+    const block = caseText.match(new RegExp(`(?:^|\\n)\\s*[#*]*\\s*${label}\\s*[#*]*\\s*\\n+\\s*([^\\n]+)`));
+    if (block && block[1].trim()) return block[1];
+    return "";
+  };
+  const clean = (s) => (s || "").replace(/^[\s*【】「」"'：:]+|[\s*【】「」"']+$/g, "").trim();
   return {
-    title: clean(titleMatch ? titleMatch[1] : ""),
-    subtitle: clean(subtitleMatch ? subtitleMatch[1] : ""),
+    title: clean(tryExtract("メインタイトル")),
+    subtitle: clean(tryExtract("サブタイトル")),
   };
 }
 
@@ -458,15 +467,25 @@ function splitStep2Output(text) {
   };
 }
 
+// 行頭の「【案N】」「## 【案N】」「### 【案N】」「**【案N】**」など
+// 見出しレベルや装飾を問わずに位置を返す。見つからなければ -1。
+function findCaseHeaderIdx(text, label) {
+  const re = new RegExp(`(^|\\n)\\s*[#*]*\\s*${label}`);
+  const m = text.match(re);
+  if (!m) return -1;
+  return m.index + (m[1] ? m[1].length : 0);
+}
+
 // STEP4 タイトル・サブタイトル作成の出力（3案併記Markdown）をパースして、
 // ヘッダー / 案1 / 案2 / 案3 / 推し案フッター に分解する。
+// 見出しの装飾（## や ** など）の有無に依存しない。
 // パースに失敗（フォーマット崩れ等）した場合は null を返す。
 function parseStep4CaseStructure(text) {
   if (!text || typeof text !== "string") return null;
-  const case1Idx = text.indexOf("## 【案1】");
-  const case2Idx = text.indexOf("## 【案2】");
-  const case3Idx = text.indexOf("## 【案3】");
-  const oshiIdx = text.indexOf("## 【推し案】");
+  const case1Idx = findCaseHeaderIdx(text, "【案1】");
+  const case2Idx = findCaseHeaderIdx(text, "【案2】");
+  const case3Idx = findCaseHeaderIdx(text, "【案3】");
+  const oshiIdx = findCaseHeaderIdx(text, "【推し案】");
   // 3案すべて存在し、順序が正しいことを確認
   if (case1Idx === -1 || case2Idx === -1 || case3Idx === -1) return null;
   if (!(case1Idx < case2Idx && case2Idx < case3Idx)) return null;
