@@ -420,14 +420,21 @@ function extractTitleSubtitleFromStep4Case(caseText) {
 function parseStep1Suggestions(text) {
   if (!text) return [];
   const items = [];
-  const blockRegex = /###\s*([^\n]+)\s*\n([\s\S]*?)(?=\n###\s|$)/g;
+  // 装飾フリー: 「### xxx」「## xxx」「**xxx**」「### **xxx**」など、見出しレベルや装飾の有無に依存せず検出
+  const blockRegex = /(?:^|\n)\s*[#*]+\s*([^\n#*]+?)\s*[*]*\s*\n([\s\S]*?)(?=\n\s*[#*]+\s*\S|$)/g;
+  // ラベル行: 行頭の任意の箇条書き記号（-、・、*、+ など）に依存しない
+  const buildLabelRegex = (label) =>
+    new RegExp(`(?:^|\\n)\\s*[\\-・*+]?\\s*${label}\\s*[:：]\\s*([\\s\\S]*?)(?=\\n\\s*[\\-・*+]?\\s*(?:現状|提案|根拠)\\s*[:：]|$)`);
   let match;
   while ((match = blockRegex.exec(text)) !== null) {
     const title = match[1].trim();
     const body = match[2].trim();
-    const currentMatch = body.match(/[-・]\s*現状\s*[:：]\s*([\s\S]*?)(?=\n[-・]\s*(?:提案|根拠)\s*[:：]|$)/);
-    const proposalMatch = body.match(/[-・]\s*提案\s*[:：]\s*([\s\S]*?)(?=\n[-・]\s*根拠\s*[:：]|$)/);
-    const reasonMatch = body.match(/[-・]\s*根拠\s*[:：]\s*([\s\S]*?)$/);
+    if (!title || !body) continue;
+    const currentMatch = body.match(buildLabelRegex("現状"));
+    const proposalMatch = body.match(buildLabelRegex("提案"));
+    const reasonMatch = body.match(buildLabelRegex("根拠"));
+    // 現状・提案・根拠のいずれもなければ提案ブロックではないので除外
+    if (!currentMatch && !proposalMatch && !reasonMatch) continue;
     items.push({
       title,
       current: currentMatch ? currentMatch[1].trim() : "",
@@ -446,9 +453,12 @@ function isUnchanged(proposal) {
 
 function splitStep2Output(text) {
   if (!text) return { market: "", suggestions: "", confirmed: "", competitors: "", raw: text || "" };
+  // 見出しレベル（##/###）や装飾（**）の有無に依存せず、見出しテキストの一致で抽出する。
+  // 次の見出し行（行頭が #/* で始まる、または同レベル見出し）まで本文として取得。
   const extract = (heading) => {
     const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const re = new RegExp(`(?:^|\\n)##\\s*${escaped}\\s*\\n([\\s\\S]*?)(?=\\n##\\s|$)`);
+    // パターン: 行頭の任意の装飾(##, ###, **)+ 見出しテキスト + 改行 + 本文 ... + 次の装飾見出しまで
+    const re = new RegExp(`(?:^|\\n)\\s*[#*]+\\s*${escaped}\\s*[*]*\\s*\\n([\\s\\S]*?)(?=\\n\\s*[#*]+\\s*\\S|$)`);
     const m = text.match(re);
     return m ? m[1].trim() : "";
   };
@@ -543,17 +553,17 @@ function extractDiscussionContext(workProfile) {
   if (!workProfile) return "";
   const text = workProfile;
 
-  // STEP2の出力（確定版）かを判定：## 書籍プロファイル確定版 が含まれているか
-  const hasConfirmed = /(?:^|\n)##\s*書籍プロファイル確定版/.test(text);
+  // STEP2の出力（確定版）かを判定：装飾フリーで「書籍プロファイル確定版」見出しを検出
+  const hasConfirmed = /(?:^|\n)\s*[#*]+\s*書籍プロファイル確定版/.test(text);
   if (!hasConfirmed) {
     // STEP1草案の場合はサイズが小さいのでそのまま渡す
     return text;
   }
 
-  // STEP2出力から「核となる」セクションだけを抽出
+  // STEP2出力から「核となる」セクションだけを抽出（見出しレベル/装飾の有無に依存しない）
   const extractSection = (heading) => {
     const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const re = new RegExp(`(?:^|\\n)##\\s*${escaped}\\s*\\n([\\s\\S]*?)(?=\\n##\\s|$)`);
+    const re = new RegExp(`(?:^|\\n)\\s*[#*]+\\s*${escaped}\\s*[*]*\\s*\\n([\\s\\S]*?)(?=\\n\\s*[#*]+\\s*\\S|$)`);
     const m = text.match(re);
     return m ? m[1].trim() : "";
   };
@@ -574,8 +584,9 @@ function extractDiscussionContext(workProfile) {
 
 function extractMotivation(workProfileDraft) {
   if (!workProfileDraft) return "";
-  // ■ 動機 セクションを抽出（次の ■ または末尾まで）
-  const match = workProfileDraft.match(/[■]\s*動機[\s\S]*?\n([\s\S]*?)(?=\n\s*[■]|\n\s*##|$)/);
+  // 「動機」セクションを抽出（装飾記号 ■▲●◆□▼○◇ や **/##/### に依存しない）
+  // 次のセクション見出し（同種の記号 or # で始まる行）または末尾まで
+  const match = workProfileDraft.match(/(?:^|\n)\s*[■▲●◆□▼○◇#*]+\s*動機[\s*]*\s*\n([\s\S]*?)(?=\n\s*[■▲●◆□▼○◇#*]+\s*\S|$)/);
   return match ? match[1].trim() : "";
 }
 
@@ -588,9 +599,12 @@ function extractKeywords3Axes(workProfileDraft) {
     const cleaned = text.replace(/\*+/g, "").trim();
     return cleaned.split(/[、,]/)[0].trim();
   };
-  const themeMatch = workProfileDraft.match(/[-・]\s*主題軸\s*[:：]\s*(.+)/);
-  const readerMatch = workProfileDraft.match(/[-・]\s*読者軸\s*[:：]\s*(.+)/);
-  const diffMatch = workProfileDraft.match(/[-・]\s*差分軸\s*[:：]\s*(.+)/);
+  // 装飾フリー: 行頭の任意の箇条書き記号 (-/・/*/+/▶/▼/●/○/◆/◇/■/□) のあとに「軸名: xxx」
+  // 装飾なし「主題軸: xxx」も検出。コロンは半角/全角どちらでも可。
+  const buildAxisRegex = (axis) => new RegExp(`(?:^|\\n)\\s*[\\-・*+▶▼●○◆◇■□]?\\s*${axis}\\s*[:：]\\s*(.+)`);
+  const themeMatch = workProfileDraft.match(buildAxisRegex("主題軸"));
+  const readerMatch = workProfileDraft.match(buildAxisRegex("読者軸"));
+  const diffMatch = workProfileDraft.match(buildAxisRegex("差分軸"));
   return {
     theme: themeMatch ? pickFirst(themeMatch[1]) : "",
     reader: readerMatch ? pickFirst(readerMatch[1]) : "",
@@ -612,10 +626,10 @@ function parseWorkProfileKeywords(workProfile) {
 function parseStep2Output(text) {
   if (!text) return { keyword1: "", keyword2: "", intent: "", markets: [] };
 
-  // keyword1/keyword2：新C案では確定版の「■ 検索キーワード3軸 - 主題軸：A B」から、旧版ではタイトル行 `# 〇〇 × △△` から取得
+  // keyword1/keyword2：装飾フリーで「主題軸: A B」を検出。失敗時はタイトル行 `# 〇〇 × △△` をフォールバック
   let keyword1 = "";
   let keyword2 = "";
-  const themeAxisMatch = text.match(/[-・]\s*主題軸\s*[:：]\s*([^\n]+)/);
+  const themeAxisMatch = text.match(/(?:^|\n)\s*[\-・*+▶▼●○◆◇■□]?\s*主題軸\s*[:：]\s*([^\n]+)/);
   if (themeAxisMatch) {
     const parts = themeAxisMatch[1].replace(/\*+/g, "").trim().split(/[\s　]+/).filter(Boolean);
     keyword1 = parts[0] || "";
@@ -625,14 +639,12 @@ function parseStep2Output(text) {
     if (titleMatch) { keyword1 = titleMatch[1].trim(); keyword2 = titleMatch[2].trim(); }
   }
 
-  // 検索意図：新C案 `## 検索者の意図（仮説）` を最優先、旧C案 `### 🎯 検索者の意図（仮説）` をフォールバック
-  // 終端は次の `## 〇〇`（同レベル以上）または `---` または `### 🎯` 系。新フォーマットのみ次の `##` で確実に切る
-  const intentMatchNew = text.match(/(?:^|\n)##\s*検索者の意図[（(]仮説[）)]\s*\n([\s\S]*?)(?=\n##\s|\n---|$)/);
-  const intentMatchOld = text.match(/###\s*🎯\s*検索者の意図[（(]仮説[）)]\s*\n([\s\S]*?)(?=\n---|\n##|$)/);
-  const intent = (intentMatchNew?.[1] || intentMatchOld?.[1] || "").trim();
+  // 検索意図：装飾フリーで「検索者の意図（仮説）」見出しを検出（## / ### / ** / 絵文字あり/なし いずれもOK）
+  const intentMatch = text.match(/(?:^|\n)\s*[#*]+\s*[^\n]*検索者の意図[（(]仮説[）)][^\n]*\n([\s\S]*?)(?=\n\s*[#*]+\s*\S|\n---|$)/);
+  const intent = (intentMatch?.[1] || "").trim();
 
-  // 狙い目の切り口：新C案 `## 狙い目の切り口` を最優先、旧C案 `【狙い目の切り口】` をフォールバック
-  const marketMatchNew = text.match(/(?:^|\n)##\s*狙い目の切り口\s*\n([\s\S]*?)(?=\n##\s|\n---|$)/);
+  // 狙い目の切り口：装飾フリーで見出しを検出。旧フォーマットの `【狙い目の切り口】` もフォールバック
+  const marketMatchNew = text.match(/(?:^|\n)\s*[#*]+\s*[^\n]*狙い目の切り口[^\n]*\n([\s\S]*?)(?=\n\s*[#*]+\s*\S|\n---|$)/);
   const marketMatchOld = text.match(/【狙い目の切り口】\s*\n([\s\S]*?)(?=\n---|\n##|\n【|$)/);
   const marketSection = (marketMatchNew?.[1] || marketMatchOld?.[1] || "").trim();
   let markets = [];
@@ -703,16 +715,26 @@ function extractChapters(text) {
   return chapters;
 }
 
+// STEP7（詳細プロット）の出力から節 (1)(2)... と項①②③... を抽出する。
+// AI議論でフォーマットが揺れる前提で、装飾記号を除去してから判定。
+// サポートする節見出し: (1) / （1） / 1. / 1) / 1． / 1、 / **(1) xxx**
 function extractSections(text) {
   if (!text || typeof text !== "string") return [];
+
+  // 装飾を除去するヘルパー（行頭の #/*/> 等と途中の **）
+  const stripDecoration = (s) =>
+    String(s).replace(/^[\s　]*[#*>]+[\s　]*/, "").replace(/[*]+/g, "").trim();
+
   const sections = []; const lines = text.split("\n");
-  const sectionRegex = /^\([0-9]+\)[\s　]*.+$/;
+  // 節見出し: (1) / （1） / 1. / 1) / 1）/ 1． / 1、 など、装飾フリーで検出
+  const sectionRegex = /^[\(（]?\s*\d+\s*[\)）.．、]\s*.+$/;
   const itemRegex = /^[\u2460-\u2473][\s　]?.{2,100}$/;
   let currentSection = null;
   for (const rawLine of lines) {
-    const line = rawLine.trim();
+    const line = stripDecoration(rawLine);
     if (!line) continue;
-    if (sectionRegex.test(line)) {
+    // 節見出しは80文字以下（長文は本文の可能性）
+    if (line.length <= 80 && sectionRegex.test(line)) {
       if (currentSection) sections.push(currentSection);
       currentSection = { sectionTitle: line, items: [] };
     } else if (itemRegex.test(line)) {
