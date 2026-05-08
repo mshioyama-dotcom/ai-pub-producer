@@ -84,7 +84,100 @@ function withHeading(text, heading) {
   return `${heading}\n\n${t}`;
 }
 
-// 外部AIに渡すプロンプトを生成
+// 戦略レビュー用プロンプト：
+// 「3案改善」のような表層的なレビューではなく、編集者・出版コンサルタントの視点から
+// 「商業的に売れる本になるか」「読者像の一貫性」「コンセプトの一貫性」「商業誘導性のリスク」
+// 「差別化」「橋渡し設計」「致命的欠陥の有無」を率直にレビューしてもらうためのプロンプト。
+// ユーザーが現状のプロットや本文に対して、改善案より先に「そもそも商業的に成立するか」を問いたい時に使う。
+function generateStrategicReviewPrompt({ stepNum, stepName, authorProfile, workProfile, currentOutput }) {
+  return `あなたは出版コンサルタント兼ベテラン編集者です。
+建前抜きで、率直で厳しい意見を述べてください。
+褒めすぎるのは助けにならないので、致命的な問題があれば「致命的」と明言し、
+直せるなら具体的な修正方向を提示してください。
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【依頼】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+下記の **STEP${stepNum}「${stepName}」** の出力について、商業的に売れる本になるかを率直にレビューしてください。
+著者は「Life Book Navigator」というサブスクサービスへの誘導も視野に入れています。
+そのため、サービス誘導臭がリスクになる可能性も含めて評価してください。
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【特にチェックしてほしい観点】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. **読者像の一貫性**
+   - ターゲット読者は1人に絞れているか？
+   - 「Aの悩みを持つ人」と「Bに関心がある人」が混在していないか？
+   - 混在している場合、どこで読者が脱落するリスクがあるか？
+
+2. **コンセプトの一貫性**
+   - 本書の核メッセージは1つに絞れているか？
+   - 章構成や本文がコンセプトを一貫して支えているか？
+   - 途中でテーマが切り替わっていないか？
+
+3. **商業誘導性のリスク**
+   - 著者のサービス（Life Book Navigator）への誘導臭が出ていないか？
+   - 読者が「これは結局広告/勧誘」と感じる構造になっていないか？
+   - 誘導するなら、読者が「自分でもできる」と確信した後の構造になっているか？
+
+4. **差別化**
+   - 既存の類書（転職本・自己啓発本・出版ノウハウ本など）と何が違うか明確か？
+   - 独自性が表現できているか？タイトル・サブタイトルにも反映されているか？
+
+5. **橋渡しの設計**
+   - 「悩みの共感」から「解決策の説得」への移行が滑らかか？
+   - 読者が「自分にも当てはまる」と感じやすい設計か？
+   - 飛躍していないか？
+
+6. **致命的欠陥の有無**
+   - 上記観点で「致命的」と判断する問題はあるか？
+   - もしあれば、「修正可能」か「最初から作り直し」か？
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【参考情報】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+${withHeading(authorProfile, "【著者プロファイル】")}
+
+
+${withHeading(workProfile, "【書籍プロファイル】")}
+
+
+【現在の出力（レビュー対象：STEP${stepNum} ${stepName}）】
+
+${(currentOutput || "（未生成）").trim()}
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【返答の形式】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. **率直な判定**
+   売れる本になるか / なりにくいか / 致命的か。1〜2行で結論。
+
+2. **一番の問題（1つに絞る）**
+   観点を縦断して見たとき、最も致命的な問題は何か。
+
+3. **各観点での評価**
+   上記6観点について、それぞれ「✓ OK／△ 要改善／✗ 致命的」で評価し、簡潔にコメント。
+
+4. **修正の優先順位**
+   何から手を付けるべきか、具体的なアクションを優先度順に3つまで。
+
+5. **総評**
+   建設的なまとめ。「このまま進めるべきか」「一度立ち止まるべきか」の判断。
+
+
+率直に。建前抜きで。ただし建設的に。
+`;
+}
+
+// 外部AIに渡すプロンプトを生成（改善案モード）
 function generateExternalAIPrompt({ stepNum, stepName, authorProfile, workProfile, currentOutput }) {
   const hint = STEP_ROLE_HINTS[stepNum] || {
     role: "出版プロデューサーとして、ユーザーの本作りを一緒に伴走してください",
@@ -288,15 +381,25 @@ export default function DiscussionPanel({
 }) {
   const [open, setOpen] = useState(false);
   const [copyMsg, setCopyMsg] = useState("");
+  // モード: "improve"（改善案3つ）/ "review"（戦略レビュー）
+  const [mode, setMode] = useState("improve");
 
-  // 生成されるプロンプト（毎回計算でOK・軽い）
-  const generatedPrompt = generateExternalAIPrompt({
-    stepNum,
-    stepName,
-    authorProfile,
-    workProfile,
-    currentOutput: stepOutput,
-  });
+  // 生成されるプロンプト（モードに応じて切り替え）
+  const generatedPrompt = mode === "review"
+    ? generateStrategicReviewPrompt({
+        stepNum,
+        stepName,
+        authorProfile,
+        workProfile,
+        currentOutput: stepOutput,
+      })
+    : generateExternalAIPrompt({
+        stepNum,
+        stepName,
+        authorProfile,
+        workProfile,
+        currentOutput: stepOutput,
+      });
 
   const handleCopyPrompt = () => {
     if (!generatedPrompt) return;
@@ -338,7 +441,41 @@ export default function DiscussionPanel({
 
       {open && (
         <div style={{ padding: 14 }}>
-          <div style={{ fontSize: 12.5, color: C.textSub, lineHeight: 1.7, marginBottom: 10 }}>
+          {/* モード切り替えタブ */}
+          <div style={{ display: "flex", gap: 0, marginBottom: 12, borderBottom: `1px solid ${C.border}` }}>
+            <button onClick={() => setMode("improve")}
+              style={{
+                fontSize: 12.5, fontWeight: 600,
+                color: mode === "improve" ? C.navy : C.textLight,
+                background: "transparent",
+                border: "none",
+                borderBottom: mode === "improve" ? `2px solid ${C.navy}` : "2px solid transparent",
+                padding: "8px 14px", cursor: "pointer",
+                marginBottom: -1,
+              }}>
+              💡 改善案を依頼
+            </button>
+            <button onClick={() => setMode("review")}
+              style={{
+                fontSize: 12.5, fontWeight: 600,
+                color: mode === "review" ? C.navy : C.textLight,
+                background: "transparent",
+                border: "none",
+                borderBottom: mode === "review" ? `2px solid ${C.navy}` : "2px solid transparent",
+                padding: "8px 14px", cursor: "pointer",
+                marginBottom: -1,
+              }}>
+              🎯 戦略レビューを依頼（売れる本になるか）
+            </button>
+          </div>
+          {mode === "review" && (
+            <div style={{ fontSize: 12.5, color: C.textSub, lineHeight: 1.7, marginBottom: 10, padding: "8px 12px", background: "#fff7e6", border: "1px solid #ffd591", borderRadius: 4 }}>
+              出版コンサルタント・編集者として<strong>率直で厳しい意見</strong>を返してもらうプロンプトです。
+              読者像の一貫性／コンセプトの一貫性／商業誘導性／差別化／橋渡し設計／致命的欠陥の有無 を評価してくれます。
+              改善案より先に「そもそも商業的に成立するか」を確認したい時に使ってください。
+            </div>
+          )}
+          <div style={{ fontSize: 12.5, color: C.textSub, lineHeight: 1.7, marginBottom: 10, display: mode === "review" ? "none" : "block" }}>
             出力を改善したい時は、ChatGPT や Claude.ai などの<strong>個人AI</strong>に
             このプロンプトを貼り付けてください。AIが現在の出力を読み込んで、
             <strong>気づいた改善方向性で3つの改善案を即提示</strong>します。
