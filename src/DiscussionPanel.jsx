@@ -605,10 +605,31 @@ export default function DiscussionPanel({
               <li>「📋 プロンプトをコピー」ボタンを押す</li>
               <li>ChatGPT または Claude.ai を開いて、コピーしたプロンプトを貼り付けて送信</li>
               <li>AIが現在の出力を読み込んで <strong>3つの改善案を即提示</strong> してくれる（こちらから方向性を伝える必要なし）</li>
-              <li>気に入った案があれば「N案目で確定」と伝えて確定版を取得 → 上の「出力データ」欄に貼り付け</li>
-              <li>違う方向性で見たい時は「もっと刺さるタイトルに」「N案目をベースに〜」など一言伝えれば、また3案返ってくる</li>
-              <li>「出力データを保存」ボタンで確定</li>
+              <li>気に入った案があれば「N案目で確定」と伝えて<strong>確定版テキスト</strong>を取得</li>
+              <li>
+                <strong style={{ color: C.gold }}>↑ 確定版を「出力データ」欄に貼り付け</strong>：
+                このページを上にスクロールして「<strong>③ 出力データ</strong>」セクションの textarea を全選択→削除→貼り付け
+              </li>
+              <li>「<strong>出力データを保存</strong>」ボタンで確定</li>
+              <li>違う方向性で見たい時は外部AIに「もっと刺さるタイトルに」「N案目をベースに〜」など一言伝えれば、また3案返ってくる</li>
             </ol>
+            <div style={{ marginTop: 10, padding: "8px 10px", background: C.white, border: `1px dashed ${C.gold}`, borderRadius: 3, fontSize: 11.5, color: C.textSub, lineHeight: 1.6 }}>
+              ⬆ <strong style={{ color: C.gold }}>このパネルの上に「③ 出力データ」セクションがあります</strong>。
+              そこの textarea に確定版を貼り付け、「出力データを保存」ボタンを押すと、次のSTEPに進めます。
+            </div>
+            <div style={{ marginTop: 10, textAlign: "center" }}>
+              <button onClick={() => {
+                const el = document.getElementById("output-section");
+                if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+                style={{
+                  fontSize: 13, fontWeight: 700, color: C.white, background: C.gold,
+                  border: "none", borderRadius: 3, padding: "10px 22px", cursor: "pointer",
+                  letterSpacing: "0.04em",
+                }}>
+                ⬆ 「出力データ」欄にスクロール
+              </button>
+            </div>
           </div>
         </div>
       )}

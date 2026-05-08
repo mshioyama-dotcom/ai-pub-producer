@@ -3170,7 +3170,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         </Card>
       </div>
 
-      <div style={{ marginBottom: 28 }}>
+      <div id="output-section" style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
           <StepBadge num="③" />
           <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>出力データ</h2>
@@ -3179,6 +3179,18 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           {step.type === "chat" ? <>チャットの会話から得た結果をコピーして、下の欄に貼り付けてください。{nextStep && ` この出力は次のステップ（STEP${nextStep.num}）の入力になります。`}</> : <>AIの実行結果が自動で表示されます。内容を確認してから保存してください。{nextStep && ` この出力は次のステップ（STEP${nextStep.num}）の入力になります。`}</>}
           <br />出力はそのまま使っても、自分で修正したり、AIチャットで整えてから使うこともできます。
         </div>
+        {/* 外部AIで相談したユーザー向けの導線案内（初めての人にも分かりやすく） */}
+        {(outputText || "").trim() && step.num >= 1 && (
+          <div style={{ padding: "10px 14px", background: C.goldPale, border: `1px solid ${C.goldLight}`, borderRadius: 4, marginBottom: 10, fontSize: 12.5, color: C.text, lineHeight: 1.8 }}>
+            💡 <strong style={{ color: C.gold }}>外部AI（ChatGPT/Claude.ai）で相談した結果を反映するには：</strong>
+            <ol style={{ margin: "4px 0 0 0", paddingLeft: 22 }}>
+              <li>外部AIから受け取った<strong>確定版テキスト</strong>を全文コピー</li>
+              <li>下の出力データ欄を全選択して削除</li>
+              <li>コピーした確定版を貼り付け</li>
+              <li>「<strong>出力データを保存</strong>」ボタンを押す</li>
+            </ol>
+          </div>
+        )}
         <textarea value={outputText} onChange={(e) => setOutputText(e.target.value)}
           placeholder={step.type === "chat" ? "チャットで得た結果をここに貼り付けてください" : "実行するボタンを押すと結果が自動で表示されます"} rows={10}
           style={{ width: "100%", padding: "12px 14px", fontSize: 14, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.7, minHeight: 220 }} />
