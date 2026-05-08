@@ -151,8 +151,7 @@ const STEPS = [
     url: "https://udify.app/workflow/lRAWtZGuVL4bqHM9",
     inputs: [
       { name: "detailed_plot_text", label: "詳細プロット作成のアウトプット（1章分）", desc: "STEP7の詳細プロットから1章分だけを選択してください。", source: "STEP7", required: true, type: "textarea", autoFill: false, maxChars: 5000 },
-      { name: "target_section", label: "執筆対象の節（1節分）", desc: "今回書きたい節を1つ選びます。下の「STEP7から節を抽出」ボタンを押すと、節の候補が一覧表示されます。", source: "STEP7", required: true, type: "text", autoFill: false, maxChars: 256 },
-      { name: "past_writing_text", label: "著者の過去の執筆データ（任意）", desc: "あなたの過去の記事や原稿があれば貼り付けてください。AIが文体を真似て書いてくれます。空欄でもOKです。", source: null, required: false, type: "textarea", maxChars: 4000 }
+      { name: "target_section", label: "執筆対象の節（1節分）", desc: "今回書きたい節を1つ選びます。下の「STEP7から節を抽出」ボタンを押すと、節の候補が一覧表示されます。", source: "STEP7", required: true, type: "text", autoFill: false, maxChars: 256 }
     ],
     outputTitle: "生成された本文",
     help: [
@@ -2491,7 +2490,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         for (let i = 0; i < total; i++) {
           const currentItem = items[i];
           setSectionProgress({ total, current: i + 1, currentItemName: currentItem });
-          const response = await fetch("/api/dify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stepNum: 8, inputs: { ...getAutoInjectedProfiles(), detailed_plot_text: inputs.detailed_plot_text || "", target_heading: currentItem, past_writing_text: inputs.past_writing_text || "" } }) });
+          const response = await fetch("/api/dify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stepNum: 8, inputs: { ...getAutoInjectedProfiles(), detailed_plot_text: inputs.detailed_plot_text || "", target_heading: currentItem } }) });
           const data = await response.json();
           if (!response.ok) {
             setRunError(`節の生成中にエラーが発生しました。\n\n${total}項目中、${i + 1}項目目（${currentItem}）の生成で失敗しました。途中までの生成結果は破棄されます。\n\n少し時間をおいてから、もう一度「実行する」を押してください。\n\n（エラー詳細：${data.error || "不明なエラー"}）`);
@@ -2501,7 +2500,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         }
         const cleaned = results.map((out, idx) => stripChapterSection(out, idx === 0));
         setOutputText(cleaned.join("\n\n"));
-        await onSaveInput(step.num, { detailed_plot_text: inputs.detailed_plot_text || "", target_section: sectionToRun.sectionTitle, past_writing_text: inputs.past_writing_text || "" });
+        await onSaveInput(step.num, { detailed_plot_text: inputs.detailed_plot_text || "", target_section: sectionToRun.sectionTitle });
         setSectionProgress(null);
       } catch (e) {
         setRunError(`通信エラーが発生しました。途中までの生成結果は破棄されました。\n\nインターネット接続を確認して、少し時間をおいてからもう一度「実行する」を押してください。\n\n（エラー詳細：${e.message}）`);
@@ -2586,7 +2585,6 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                 ...getAutoInjectedProfiles(),
                 detailed_plot_text: inputs.detailed_plot_text || "",
                 target_heading: currentItem,
-                past_writing_text: inputs.past_writing_text || "",
                 previous_output: baseOutput,
                 improvement_request: improvementRequest,
               },
