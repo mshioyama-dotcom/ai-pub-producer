@@ -1225,6 +1225,14 @@ const HomePage = ({ project, stepStatuses, allSteps, onNavigate }) => {
       <div style={{ marginBottom: 28 }}>
         <h2 style={{ fontSize: 14, fontWeight: 700, color: C.navy, marginBottom: 12, letterSpacing: "0.03em" }}>進行中のステップ</h2>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {/* STEP0（著者プロファイル）— 専用ページ。STEPS配列には含まれないので個別レンダリング */}
+          <div key="step_0" onClick={() => onNavigate("step_0")}
+            style={{ display: "flex", alignItems: "center", padding: "12px 16px", background: C.white, borderRadius: 4, border: `1px solid ${C.border}`, cursor: "pointer", transition: "box-shadow 0.12s" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 4, fontSize: 12, fontWeight: 700, background: stepStatuses[0] === "completed" ? C.greenLight : "rgba(0,0,0,0.04)", color: stepStatuses[0] === "completed" ? C.green : C.textLight, marginRight: 14, flexShrink: 0 }}>0</span>
+            <span style={{ flex: 1, fontSize: 13.5, fontWeight: 500, color: C.text }}>著者プロファイル</span>
+            <Badge status={stepStatuses[0]} />
+            <span style={{ marginLeft: 12, fontSize: 12, color: C.gold, fontWeight: 600 }}>開く →</span>
+          </div>
           {STEPS.map((s) => (
             <div key={s.id} onClick={() => onNavigate(`step_${s.num}`)}
               style={{ display: "flex", alignItems: "center", padding: "12px 16px", background: C.white, borderRadius: 4, border: `1px solid ${C.border}`, cursor: "pointer", transition: "box-shadow 0.12s" }}>
@@ -3317,6 +3325,11 @@ export default function App() {
 
   const stepStatuses = {};
   for (let i = 1; i <= 10; i++) stepStatuses[i] = allSteps[i]?.status || "not_started";
+  // STEP0 は専用ページ（Step0Page）で著者プロファイルを localStorage に保存する設計のため、
+  // ステータスは aipub:author_profile の有無で判定する。
+  stepStatuses[0] = (typeof window !== "undefined" && (localStorage.getItem(AUTHOR_PROFILE_KEY) || "").trim())
+    ? "completed"
+    : "not_started";
 
   const [pendingInputs, setPendingInputs] = useState({});
   const [refPanel, setRefPanel] = useState(null);
