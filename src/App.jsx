@@ -658,20 +658,43 @@ function parseStep2Output(text) {
 }
 
 // STEP6（章構成作成）の出力テキストから、章単位の配列を抽出する。
-// 「はじめに」「第N章: xxx」「おわりに」を見出しとして検出し、
-// 装飾（**、##など）の有無に関わらずマッチさせる。
+// AIや外部AIとのやり取り次第で章見出しのフォーマットが揺れる前提で、
+// 装飾記号（[]・**・##・【】・番号付きリスト・スペース等）を一旦除去してから
+// 「はじめに」「第N章...」「おわりに」のキーワード一致で判定する。
+//
+// サポートする例:
+//   [はじめに] / **はじめに** / ## はじめに / はじめに
+//   [第1章：xxx] / 第1章：xxx / ## 第1章: xxx / **第3章 xxx** / 1. 第1章 xxx
+//   [おわりに] / **おわりに** / おわりに
 function extractChapters(text) {
   if (!text || typeof text !== "string") return [];
-  const headingRegex = /^\s*[#*]*\s*(?:はじめに|第\s*\d+\s*章\s*[:：].*?|おわりに)\s*[#*]*\s*$/;
+
+  // 章タイトルかどうか判定するヘルパー：装飾記号を全部除去した文字列でキーワード判定する
+  const stripDecoration = (s) =>
+    String(s).replace(/^[\s　]*[\d０-９]+[.．、]?[\s　]*/, "") // 行頭の番号付きリスト記号 (1. 2. 等)
+             .replace(/[*#\[\]【】「」（）()"'`>～~・\s　]/g, ""); // 装飾記号と空白を全部除去
+  const isChapterHeading = (line) => {
+    if (!line) return false;
+    const s = stripDecoration(line);
+    if (!s) return false;
+    if (s.length > 80) return false; // 章タイトルは80文字以内
+    if (/^はじめに/.test(s)) return true;
+    if (/^おわりに/.test(s)) return true;
+    if (/^第[\d０-９]+章/.test(s)) return true;
+    return false;
+  };
+
   const lines = text.split("\n");
   const chapters = [];
   let current = null;
   for (const rawLine of lines) {
     const trimmed = rawLine.trim();
-    if (headingRegex.test(trimmed)) {
+    if (isChapterHeading(trimmed)) {
       if (current && current.body.trim()) chapters.push(current);
-      // 表示用に装飾記号を取り除いたタイトル
-      const cleanTitle = trimmed.replace(/[#*]/g, "").trim();
+      // 表示用に装飾記号を取り除いたタイトル（コロン・全角文字は残す）
+      const cleanTitle = trimmed.replace(/^[\s　]*[\d０-９]+[.．、]?[\s　]*/, "")
+                                .replace(/[*#\[\]【】]/g, "")
+                                .trim();
       current = { chapterTitle: cleanTitle, body: rawLine + "\n" };
     } else if (current) {
       current.body += rawLine + "\n";
