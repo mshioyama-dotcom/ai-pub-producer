@@ -167,8 +167,7 @@ const STEPS = [
     url: "https://udify.app/workflow/6yWZfOGGU76ciJBI",
     inputs: [
       { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "STEP3のインタビュー要約を貼り付け（「自動振り分け」で自動入力）", source: "STEP3", required: true, type: "textarea", autoFill: true, maxChars: 5000 },
-      { name: "outline_text", label: "章構成作成のアウトプット", desc: "STEP6の章構成を貼り付け（「自動振り分け」で自動入力）", source: "STEP6", required: true, type: "textarea", autoFill: true, maxChars: 20000 },
-      { name: "author_profile_text", label: "著者プロフィール（任意）", desc: "著者の経歴や実績があれば書いてください。空欄でもOKです。", source: null, required: false, type: "textarea", maxChars: 2000 }
+      { name: "outline_text", label: "章構成作成のアウトプット", desc: "STEP6の章構成を貼り付け（「自動振り分け」で自動入力）", source: "STEP6", required: true, type: "textarea", autoFill: true, maxChars: 20000 }
     ],
     outputTitle: "Amazon説明文",
     help: [

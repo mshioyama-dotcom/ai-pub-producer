@@ -72,7 +72,7 @@ function mapInputs(stepNum, inputs) {
     // title / subtitle は getAutoInjectedProfiles から自動注入（STEP4で確定された値）
     if (m.interview_text !== undefined)      { m.author_episode = m.interview_text; delete m.interview_text; }
     if (m.outline_text !== undefined)        { m.toc_text = m.outline_text; delete m.outline_text; }
-    if (m.author_profile_text !== undefined) { m.author_profile = m.author_profile_text; delete m.author_profile_text; }
+    // author_profile は getAutoInjectedProfiles で自動注入されるので変換不要
   }
 
   return m;
