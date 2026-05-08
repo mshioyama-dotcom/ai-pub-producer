@@ -248,23 +248,24 @@ workflow:
           text\", toc_text)\n    except:\n        content = toc_text\n\n    if content\
           \ is None:\n        content = \"\"\n\n    # コードブロック記号などを掃除\n    content\
           \ = str(content).replace(\"```markdown\", \"\").replace(\"```\", \"\").strip()\n\
-          \n    # --- 2. 章ごとに分割 ---\n    # 太字見出し **はじめに** / **第1章：...** / **おわりに**\
-          \ に対応\n    heading_pattern = r'(?=^\\*\\*(?:はじめに|第\\s*\\d+\\s*章[:：].*?|おわりに)\\\
-          *\\*$)'\n    parts = re.split(heading_pattern, content, flags=re.MULTILINE)\n\
+          \n    # --- 2. 章ごとに分割 ---\n    # 「はじめに / 第N章：xxx / おわりに」を見出しとして検出。\n\
+          \    # 太字記法（**...**）の有無、見出しレベル（##/###）の有無に依存しないよう柔軟にマッチさせる。\n\
+          \    heading_pattern = r'(?=^\\s*[#*]*\\s*(?:はじめに|第\\s*\\d+\\s*章[:：].*?|おわりに)\\s*[#*]*\\s*$)'\n\
+          \    parts = re.split(heading_pattern, content, flags=re.MULTILINE)\n\n\
+          \    is_heading = re.compile(r'^\\s*[#*]*\\s*(?:はじめに|第\\s*\\d+\\s*章[:：].*?|おわりに)\\s*[#*]*\\s*$')\n\
           \n    all_chapters = []\n    for p in parts:\n        p = p.strip()\n  \
           \      if not p:\n            continue\n        first_line = p.split('\\\
-          n')[0].strip()\n        if re.match(r'^\\*\\*(?:はじめに|第\\s*\\d+\\s*章[:：].*?|おわりに)\\\
-          *\\*$', first_line):\n            all_chapters.append(p)\n\n    # --- 3.\
-          \ フィルタリング判定 ---\n    query = str(target_chapter or \"\").strip()\n\n   \
-          \ if not query:\n        return {\"chapters_list\": all_chapters}\n\n  \
-          \  filtered = []\n    for chapter in all_chapters:\n        first_line =\
-          \ chapter.split('\\n')[0].strip()\n\n        # 例: \"3\" -> 第3章\n       \
-          \ if query in first_line:\n            filtered.append(chapter)\n      \
-          \      continue\n\n        # \"第3章\" でも拾えるようにする\n        if re.search(rf'第\\\
+          n')[0].strip()\n        if is_heading.match(first_line):\n            all_chapters.append(p)\n\
+          \n    # --- 3. フィルタリング判定 ---\n    query = str(target_chapter or \"\").strip()\n\n\
+          \    if not query:\n        return {\"chapters_list\": all_chapters}\n\n\
+          \    filtered = []\n    for chapter in all_chapters:\n        first_line\
+          \ = chapter.split('\\n')[0].strip()\n        # 比較時は装飾記号を除いて正規化\n        \
+          normalized_first_line = re.sub(r'[#*\\s]', '', first_line)\n        normalized_query\
+          \ = re.sub(r'[#*\\s]', '', query)\n\n        # 例: \"3\" -> 第3章\n       \
+          \ if normalized_query in normalized_first_line:\n            filtered.append(chapter)\n\
+          \            continue\n\n        # \"第3章\" でも拾えるようにする\n        if re.search(rf'第\\\
           s*{re.escape(query)}\\s*章', first_line):\n            filtered.append(chapter)\n\
-          \            continue\n\n        # はじめに / おわりに も拾えるようにする\n        normalized_query\
-          \ = query.replace(\"**\", \"\").strip()\n        normalized_first_line =\
-          \ first_line.replace(\"**\", \"\").strip()\n        if normalized_query\
+          \            continue\n\n        # はじめに / おわりに の完全一致\n        if normalized_query\
           \ == normalized_first_line:\n            filtered.append(chapter)\n\n  \
           \  return {\n        \"chapters_list\": filtered if filtered else all_chapters\n\
           \    }"
