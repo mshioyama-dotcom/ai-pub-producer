@@ -2383,6 +2383,16 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     setExpandedFields({});
   }, [step.num]);
 
+  // STEP7 専用: ページを開いた瞬間にSTEP6の出力から章を自動抽出してプレビュー表示する。
+  useEffect(() => {
+    if (step.num !== 7) return;
+    const srcOutput = allSteps?.[6]?.outputText;
+    if (!srcOutput) { setChapterOptions([]); return; }
+    const extracted = extractChapters(srcOutput);
+    setChapterOptions(extracted);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step.num, allSteps]);
+
   // 自動投入: autoFill: true で source 定義のあるフィールドが空欄なら、前STEPの outputText で自動補完。
   // 既に値があれば上書きしない（ユーザーの手動編集を尊重）。
   // 「自動振り分け」ボタンを押す手間を省くための自動化。
@@ -2754,31 +2764,29 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                   STEP6 の章構成から章を自動で抽出し、全章分の詳細プロットを一括生成します。
                   本文（STEP8）に進む前に全章揃えるのが標準の運用です。
                 </div>
-                <div style={{ marginBottom: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                  <button onClick={() => {
-                    const srcOutput = allSteps?.[6]?.outputText;
-                    if (!srcOutput) { alert("STEP6の出力データがまだ保存されていません。\n\nSTEP6を完了して「出力データを保存」ボタンを押してから、もう一度お試しください。"); return; }
-                    const extracted = extractChapters(srcOutput);
-                    if (extracted.length === 0) { alert("STEP6の出力から「第N章: xxx」「はじめに」「おわりに」形式の章を検出できませんでした。STEP6の出力をもう一度確認してください。"); return; }
-                    setChapterOptions(extracted); setSelectedChapter(null); handleInputChange("chapter_outline_text", "");
-                  }} style={{ fontSize: 12.5, fontWeight: 600, color: C.white, background: C.gold, border: "none", borderRadius: 3, padding: "7px 14px", cursor: "pointer" }}>
-                    📋 STEP6から章を抽出
-                  </button>
-                  {chapterOptions.length > 0 && (
-                    <>
-                      <button onClick={handleRunAllChaptersForStep7}
-                        disabled={isRunning}
-                        title="抽出された全ての章を順番にDifyに投げて、全章分の詳細プロットを一気に生成します。"
-                        style={{ fontSize: 12.5, fontWeight: 700, color: C.white, background: isRunning ? "#93c5fd" : C.navy, border: "none", borderRadius: 3, padding: "7px 14px", cursor: isRunning ? "default" : "pointer" }}>
-                        🚀 全章を順次生成（{chapterOptions.length}章）
-                      </button>
-                      <button onClick={() => { setChapterOptions([]); setSelectedChapter(null); handleInputChange("chapter_outline_text", ""); }}
-                        style={{ fontSize: 12, color: C.textLight, background: "none", border: `1px solid ${C.border}`, borderRadius: 3, padding: "6px 12px", cursor: "pointer" }}>
-                        抽出結果をクリア
-                      </button>
-                    </>
-                  )}
-                </div>
+                {/* STEP6 出力が未保存 → 案内表示 */}
+                {!allSteps?.[6]?.outputText && (
+                  <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginBottom: 10, fontSize: 13, color: C.red }}>
+                    ⚠ STEP6 の出力データがまだ保存されていません。STEP6 で「出力データを保存」を押してから戻ってきてください。
+                  </div>
+                )}
+                {/* 章が0件検出（フォーマット崩れ等） */}
+                {allSteps?.[6]?.outputText && chapterOptions.length === 0 && (
+                  <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginBottom: 10, fontSize: 13, color: C.red, lineHeight: 1.7 }}>
+                    ⚠ STEP6 の出力から章を検出できませんでした。「はじめに」「第N章: xxx」「おわりに」のような章見出しが含まれているか、STEP6 の出力を確認してください。
+                  </div>
+                )}
+                {/* 章が検出できた場合のみ「全章を順次生成」ボタンを表示 */}
+                {chapterOptions.length > 0 && (
+                  <div style={{ marginBottom: 10 }}>
+                    <button onClick={handleRunAllChaptersForStep7}
+                      disabled={isRunning}
+                      title="検出された全ての章を順番にDifyに投げて、全章分の詳細プロットを一気に生成します。"
+                      style={{ fontSize: 13, fontWeight: 700, color: C.white, background: isRunning ? "#93c5fd" : C.navy, border: "none", borderRadius: 3, padding: "10px 22px", cursor: isRunning ? "default" : "pointer", letterSpacing: "0.04em" }}>
+                      🚀 全章を順次生成（{chapterOptions.length}章）
+                    </button>
+                  </div>
+                )}
                 {chapterStockProgress && (
                   <div style={{ marginBottom: 12, padding: "12px 14px", background: C.navyLight, border: `1px solid rgba(42,68,104,0.2)`, borderRadius: 4 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, fontSize: 12.5, color: C.navyMid, fontWeight: 600 }}>
