@@ -1459,7 +1459,7 @@ const Step0Page = ({ savedProfile, onSaveProfile, onNavigate }) => {
         </Card>
       </div>
 
-      <div style={{ marginBottom: 28 }}>
+      <div id="output-section" style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
           <StepBadge num="③" />
           <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>生成された著者プロファイル</h2>
@@ -1686,7 +1686,7 @@ const Step1Page = ({ savedAuthorProfile, savedWorkProfile, onSaveWorkProfile, on
         </Card>
       </div>
 
-      <div style={{ marginBottom: 28 }}>
+      <div id="output-section" style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
           <StepBadge num="③" />
           <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>生成された書籍プロファイル草案</h2>
@@ -2144,7 +2144,7 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
         </Card>
       </div>
 
-      <div style={{ marginBottom: 28 }}>
+      <div id="output-section" style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
           <StepBadge num="③" />
           <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>出力：書籍プロファイル確定版（保存対象・編集可能）</h2>
