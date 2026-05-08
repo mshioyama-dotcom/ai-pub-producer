@@ -2365,6 +2365,8 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   // STEP7（詳細プロット作成）の章選択用
   const [chapterOptions, setChapterOptions] = useState([]);
   const [selectedChapter, setSelectedChapter] = useState(null);
+  // STEP7 全章一括生成の進捗
+  const [chapterStockProgress, setChapterStockProgress] = useState(null);
   // 自動投入済みフィールドの展開状態（デフォルト：折りたたみ）
   const [expandedFields, setExpandedFields] = useState({});
   // フォーカスモード（案ごと表示切替）は、外部AIプロンプト生成方式への移行に伴い廃止しました。
@@ -2376,7 +2378,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     setHelpOpen(false); setValidationErrors([]); setCharErrors({}); setRunError("");
     setMarketOptions([]); setSelectedMarket(null);
     setSectionOptions([]); setSelectedSection(null); setSectionProgress(null);
-    setChapterOptions([]); setSelectedChapter(null);
+    setChapterOptions([]); setSelectedChapter(null); setChapterStockProgress(null);
     setChatMessages([]); setChatInput(""); setChatLoading(false);
     setChatConversationId(""); setChatError(""); setChatCopyMsg(false); setChatTransferMsg(false); setChatSelectOptions([]); setChatSelectMsg(false);
     setExpandedFields({});
@@ -2601,6 +2603,63 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     await onSaveInput(step.num, inputsForSave);
   };
 
+  // STEP7 専用: 抽出された全章を順次 Dify に投げて、結果を outputText に蓄積する。
+  // 章間に短いウェイトを入れてレートリミット対策（Anthropic 30K input tokens/min）。
+  const handleRunAllChaptersForStep7 = async () => {
+    if (step.num !== 7) return;
+    if (!chapterOptions || chapterOptions.length === 0) {
+      alert("先に「📋 STEP6から章を抽出」を押して章を抽出してください。");
+      return;
+    }
+    // 既存の出力があれば上書き確認
+    if ((outputText || "").trim()) {
+      const ok = window.confirm("現在の出力データは上書きされます。続行しますか？");
+      if (!ok) return;
+    }
+    setIsRunning(true);
+    setRunError("");
+    setChapterStockProgress({ total: chapterOptions.length, current: 0, currentItemName: "" });
+    const results = [];
+    try {
+      for (let i = 0; i < chapterOptions.length; i++) {
+        const ch = chapterOptions[i];
+        setChapterStockProgress({ total: chapterOptions.length, current: i + 1, currentItemName: ch.chapterTitle });
+        const execInputs = {
+          ...getAutoInjectedProfiles(),
+          chapter_outline_text: ch.body.trim(),
+          added_episode_text: inputs.added_episode_text || "",
+        };
+        const response = await fetch("/api/dify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ stepNum: 7, inputs: execInputs }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(`第${i + 1}章「${ch.chapterTitle}」の生成で失敗：${data.error || "不明なエラー"}`);
+        }
+        const out = (data.output || "").trim();
+        if (!out || out.length < 50) {
+          throw new Error(`第${i + 1}章「${ch.chapterTitle}」で有効な出力が返りませんでした（${out.length}文字）`);
+        }
+        results.push({ title: ch.chapterTitle, content: out });
+        // レート制御: 最後の章以外は3秒ウェイト
+        if (i < chapterOptions.length - 1) {
+          await new Promise((r) => setTimeout(r, 3000));
+        }
+      }
+      // 全章を結合（章ごとに区切り目を挿入）
+      const combined = results.map((r) => `=== ${r.title} ===\n\n${r.content}`).join("\n\n---\n\n");
+      setOutputText(combined);
+      setChapterStockProgress(null);
+    } catch (e) {
+      setRunError(e.message + "\n\n途中までの結果は破棄されます。少し時間をおいてから「全章を順次生成」をもう一度お試しください。");
+      setChapterStockProgress(null);
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
@@ -2695,7 +2754,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                   {hasChapterErr && <span style={{ fontSize: 12, color: C.red, fontWeight: 500 }}>← 章を選んでください</span>}
                 </div>
                 <div style={{ fontSize: 13, color: "#444444", marginBottom: 8 }}>{field.desc}</div>
-                <div style={{ marginBottom: 10 }}>
+                <div style={{ marginBottom: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                   <button onClick={() => {
                     const srcOutput = allSteps?.[6]?.outputText;
                     if (!srcOutput) { alert("STEP6の出力データがまだ保存されていません。\n\nSTEP6を完了して「出力データを保存」ボタンを押してから、もう一度お試しください。"); return; }
@@ -2706,12 +2765,32 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                     📋 STEP6から章を抽出
                   </button>
                   {chapterOptions.length > 0 && (
-                    <button onClick={() => { setChapterOptions([]); setSelectedChapter(null); handleInputChange("chapter_outline_text", ""); }}
-                      style={{ fontSize: 12, color: C.textLight, background: "none", border: `1px solid ${C.border}`, borderRadius: 3, padding: "6px 12px", cursor: "pointer", marginLeft: 8 }}>
-                      抽出結果をクリア
-                    </button>
+                    <>
+                      <button onClick={handleRunAllChaptersForStep7}
+                        disabled={isRunning}
+                        title="抽出された全ての章を順番にDifyに投げて、全章分の詳細プロットを一気に生成します。"
+                        style={{ fontSize: 12.5, fontWeight: 700, color: C.white, background: isRunning ? "#93c5fd" : C.navy, border: "none", borderRadius: 3, padding: "7px 14px", cursor: isRunning ? "default" : "pointer" }}>
+                        🚀 全章を順次生成（{chapterOptions.length}章）
+                      </button>
+                      <button onClick={() => { setChapterOptions([]); setSelectedChapter(null); handleInputChange("chapter_outline_text", ""); }}
+                        style={{ fontSize: 12, color: C.textLight, background: "none", border: `1px solid ${C.border}`, borderRadius: 3, padding: "6px 12px", cursor: "pointer" }}>
+                        抽出結果をクリア
+                      </button>
+                    </>
                   )}
                 </div>
+                {chapterStockProgress && (
+                  <div style={{ marginBottom: 12, padding: "12px 14px", background: C.navyLight, border: `1px solid rgba(42,68,104,0.2)`, borderRadius: 4 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, fontSize: 12.5, color: C.navyMid, fontWeight: 600 }}>
+                      <span>章の一括生成中：{chapterStockProgress.current} / {chapterStockProgress.total} 章</span>
+                      <span>{Math.round((chapterStockProgress.current / chapterStockProgress.total) * 100)}%</span>
+                    </div>
+                    <div style={{ height: 8, background: "rgba(0,0,0,0.08)", borderRadius: 4, overflow: "hidden" }}>
+                      <div style={{ width: `${(chapterStockProgress.current / chapterStockProgress.total) * 100}%`, height: "100%", background: C.navy, transition: "width 0.3s ease" }} />
+                    </div>
+                    <div style={{ marginTop: 8, fontSize: 12, color: C.textSub, lineHeight: 1.6 }}>⏳ 生成中：<span style={{ color: C.text, fontWeight: 600 }}>{chapterStockProgress.currentItemName}</span></div>
+                  </div>
+                )}
                 {chapterOptions.length > 0 && (
                   <ChapterSelector chapters={chapterOptions} selected={selectedChapter}
                     onSelect={(i, ch) => { setSelectedChapter(i); handleInputChange("chapter_outline_text", ch.body.trim()); }}
