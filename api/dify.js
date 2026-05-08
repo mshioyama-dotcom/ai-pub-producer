@@ -43,30 +43,33 @@ function mapInputs(stepNum, inputs) {
 
   if (stepNum === 5) {
     // 旧STEP6 目次作成。blueprint 入力は廃止
+    // title / subtitle は getAutoInjectedProfiles から自動注入（STEP4で確定された値）
     if (m.interview_text !== undefined) { m.interview_notes = m.interview_text; delete m.interview_text; }
   }
 
   if (stepNum === 6) {
     // 旧STEP7 章構成作成。blueprint 入力は廃止
+    // title / subtitle は getAutoInjectedProfiles から自動注入（STEP4で確定された値）
     if (m.toc_text !== undefined)       { m.refined_toc = m.toc_text; delete m.toc_text; }
-    if (m.interview_text !== undefined) { m.nterview_notes = m.interview_text; delete m.interview_text; }
+    if (m.interview_text !== undefined) { m.interview_notes = m.interview_text; delete m.interview_text; }
   }
 
   if (stepNum === 7) {
     // 旧STEP8 詳細プロット作成
+    // title / subtitle は getAutoInjectedProfiles から自動注入（STEP4で確定された値）
     if (m.chapter_outline_text !== undefined) { m.plot_instruction = m.chapter_outline_text; delete m.chapter_outline_text; }
     if (m.added_episode_text !== undefined)   { m.added_episodes = m.added_episode_text; delete m.added_episode_text; }
   }
 
   if (stepNum === 8) {
     // 旧STEP9 本文作成
+    // title / subtitle は getAutoInjectedProfiles から自動注入（STEP4で確定された値）
     if (m.past_writing_text !== undefined) { m.past_writing_data = m.past_writing_text; delete m.past_writing_text; }
   }
 
   if (stepNum === 9) {
     // 旧STEP10 Amazon説明文作成。reader_value_design 入力は廃止
-    if (m.title_text !== undefined)          { m.title = m.title_text; delete m.title_text; }
-    if (m.subtitle_text !== undefined)       { m.subtitle = m.subtitle_text; delete m.subtitle_text; }
+    // title / subtitle は getAutoInjectedProfiles から自動注入（STEP4で確定された値）
     if (m.interview_text !== undefined)      { m.author_episode = m.interview_text; delete m.interview_text; }
     if (m.outline_text !== undefined)        { m.toc_text = m.outline_text; delete m.outline_text; }
     if (m.author_profile_text !== undefined) { m.author_profile = m.author_profile_text; delete m.author_profile_text; }

@@ -168,8 +168,6 @@ const STEPS = [
     category: "販売準備", type: "workflow",
     url: "https://udify.app/workflow/6yWZfOGGU76ciJBI",
     inputs: [
-      { name: "title_text", label: "タイトル", desc: "STEP4で確定したメインタイトル", source: "STEP4", required: true, type: "text", autoFill: false, maxChars: 128 },
-      { name: "subtitle_text", label: "サブタイトル", desc: "STEP4で確定したサブタイトル", source: "STEP4", required: true, type: "text", autoFill: false, maxChars: 256 },
       { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "STEP3のインタビュー要約を貼り付け（「自動振り分け」で自動入力）", source: "STEP3", required: true, type: "textarea", autoFill: true, maxChars: 5000 },
       { name: "outline_text", label: "章構成作成のアウトプット", desc: "STEP6の章構成を貼り付け（「自動振り分け」で自動入力）", source: "STEP6", required: true, type: "textarea", autoFill: true, maxChars: 20000 },
       { name: "author_profile_text", label: "著者プロフィール（任意）", desc: "著者の経歴や実績があれば書いてください。空欄でもOKです。", source: null, required: false, type: "textarea", maxChars: 2000 }
@@ -204,6 +202,8 @@ const WORK_PROFILE_STEP2_FULL_KEY = "aipub:work_profile_step2_full";
 const STEP1_PENDING_KEY = "aipub:step1_pending_inputs";
 const STEP1_INPUTS_KEY = "aipub:step1_inputs";
 const STEP2_INPUTS_KEY = "aipub:step2_inputs";
+const TITLE_CONFIRMED_KEY = "aipub:title_confirmed";
+const SUBTITLE_CONFIRMED_KEY = "aipub:subtitle_confirmed";
 
 const defaultProject = () => ({
   projectName: "新しい企画",
@@ -380,13 +380,33 @@ function getAutoInjectedProfiles() {
     const workProfile = localStorage.getItem(WORK_PROFILE_CONFIRMED_KEY)
       || localStorage.getItem(WORK_PROFILE_KEY)
       || "";
+    const titleConfirmed = localStorage.getItem(TITLE_CONFIRMED_KEY) || "";
+    const subtitleConfirmed = localStorage.getItem(SUBTITLE_CONFIRMED_KEY) || "";
     const out = {};
     if (authorProfile) out.author_profile = authorProfile;
     if (workProfile) out.work_profile = workProfile;
+    // STEP4で確定したタイトル・サブタイトルはSTEP5以降の全STEPで参照される
+    if (titleConfirmed) out.title = titleConfirmed;
+    if (subtitleConfirmed) out.subtitle = subtitleConfirmed;
     return out;
   } catch {
     return {};
   }
+}
+
+// STEP4の単一案テキストから「メインタイトル」「サブタイトル」を抽出する。
+// STEP4 YMLの出力テンプレート（メインタイトル\n\n[値]\n\nサブタイトル\n\n[値]）に対応。
+function extractTitleSubtitleFromStep4Case(caseText) {
+  if (!caseText || typeof caseText !== "string") return { title: "", subtitle: "" };
+  // 「メインタイトル」見出しの直後（空行を挟んで）の最初の非空行を取る
+  const titleMatch = caseText.match(/メインタイトル\s*\n+\s*([^\n]+)/);
+  // 「サブタイトル」も同様
+  const subtitleMatch = caseText.match(/サブタイトル\s*\n+\s*([^\n]+)/);
+  const clean = (s) => (s || "").replace(/^[\s*【】「」"']+|[\s*【】「」"']+$/g, "").trim();
+  return {
+    title: clean(titleMatch ? titleMatch[1] : ""),
+    subtitle: clean(subtitleMatch ? subtitleMatch[1] : ""),
+  };
 }
 
 function parseStep1Suggestions(text) {
@@ -730,14 +750,20 @@ const SectionSelector = ({ sections, selected, onSelect, onReselect }) => {
   );
 };
 
-const SourceLabel = ({ source, autoFill, onAutoFill, onRef, onAutoFillParsed }) =>
+// SourceLabel - フィールドの「データ源」と操作ボタンを表示。
+// autoFill === true は「ページ表示時に自動投入される」フィールド。ボタンは「再転記」（最新の出力で上書き）。
+// onAutoFillParsed はSTEP4キーワード等の特殊抽出ボタン。
+const SourceLabel = ({ source, autoFill, onAutoFill, onRef, onAutoFillParsed, isAutoFilled }) =>
   source ? (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
       <span style={{ fontSize: 12, color: C.navyMid, background: C.blueLight, padding: "2px 7px", borderRadius: 3 }}>← {source}の出力</span>
+      {autoFill === true && isAutoFilled && (
+        <span style={{ fontSize: 11, color: C.green, background: C.greenLight, padding: "2px 7px", borderRadius: 3, fontWeight: 600 }}>✓ 自動投入済み</span>
+      )}
       {onAutoFillParsed ? (
         <button onClick={onAutoFillParsed} style={{ fontSize: 11, color: C.white, background: C.gold, border: "none", borderRadius: 3, padding: "2px 8px", cursor: "pointer", fontWeight: 600 }}>自動振り分け</button>
       ) : autoFill === true ? (
-        <button onClick={onAutoFill} style={{ fontSize: 11, color: C.white, background: C.navyMid, border: "none", borderRadius: 3, padding: "2px 8px", cursor: "pointer", fontWeight: 600 }}>自動転記</button>
+        <button onClick={onAutoFill} title={`${source}の最新出力で再投入`} style={{ fontSize: 11, color: C.navyMid, background: "transparent", border: `1px solid ${C.border}`, borderRadius: 3, padding: "2px 8px", cursor: "pointer", fontWeight: 500 }}>↻ 再転記</button>
       ) : (
         <button onClick={onRef} style={{ fontSize: 11, color: C.navyMid, background: C.blueLight, border: `1px solid rgba(42,68,104,0.2)`, borderRadius: 3, padding: "2px 8px", cursor: "pointer", fontWeight: 600 }}>参照</button>
       )}
@@ -770,11 +796,14 @@ const StepBadge = ({ num }) => (
 
 // STEP3+ で AI に自動転記される「著者プロファイル」「書籍プロファイル確定版」を可視化するパネル
 // デフォルトは折りたたみ。展開時は全文を表示
-const AutoInjectedProfilesPanel = ({ onNavigate }) => {
+// stepNum を渡すと、STEP5+ で「タイトル・サブタイトル未確定」の警告を出す
+const AutoInjectedProfilesPanel = ({ onNavigate, stepNum }) => {
   const [expanded, setExpanded] = useState(false);
   const [authorProfile, setAuthorProfile] = useState("");
   const [workProfile, setWorkProfile] = useState("");
   const [workProfileSource, setWorkProfileSource] = useState(""); // "confirmed" | "draft" | ""
+  const [titleConfirmed, setTitleConfirmed] = useState("");
+  const [subtitleConfirmed, setSubtitleConfirmed] = useState("");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -785,10 +814,15 @@ const AutoInjectedProfilesPanel = ({ onNavigate }) => {
     if (wpConfirmed) { setWorkProfile(wpConfirmed); setWorkProfileSource("confirmed"); }
     else if (wpDraft) { setWorkProfile(wpDraft); setWorkProfileSource("draft"); }
     else { setWorkProfile(""); setWorkProfileSource(""); }
+    setTitleConfirmed(localStorage.getItem(TITLE_CONFIRMED_KEY) || "");
+    setSubtitleConfirmed(localStorage.getItem(SUBTITLE_CONFIRMED_KEY) || "");
   }, [expanded]);
 
   const hasAuthor = !!authorProfile.trim();
   const hasWork = !!workProfile.trim();
+  const hasTitle = !!(titleConfirmed && subtitleConfirmed);
+  // STEP5以降ではタイトル・サブタイトル確定が必要
+  const needsTitle = stepNum && stepNum >= 5;
 
   return (
     <div style={{ marginBottom: 16, border: `1px solid ${C.border}`, borderRadius: 4, background: C.bg }}>
@@ -800,6 +834,7 @@ const AutoInjectedProfilesPanel = ({ onNavigate }) => {
           📎 自動転記される参照情報（AIに渡されます）
           <span style={{ marginLeft: 8, fontSize: 11.5, color: C.textLight, fontWeight: 400 }}>
             著者プロファイル: {hasAuthor ? "✓" : "未設定"} ／ 書籍プロファイル: {hasWork ? (workProfileSource === "confirmed" ? "✓ 確定版" : "△ 草案のみ") : "未設定"}
+            {needsTitle && <> ／ タイトル: <span style={{ color: hasTitle ? C.green : C.red, fontWeight: 600 }}>{hasTitle ? "✓ 確定済み" : "⚠ 未確定"}</span></>}
           </span>
         </span>
         <span style={{ fontSize: 13, color: C.textLight }}>{expanded ? "▲ 閉じる" : "▼ 展開"}</span>
@@ -858,6 +893,31 @@ const AutoInjectedProfilesPanel = ({ onNavigate }) => {
               </div>
             )}
           </div>
+
+          {/* タイトル・サブタイトル（STEP4で確定）。STEP5以降は必須 */}
+          {(stepNum && stepNum >= 4) && (
+            <div style={{ marginTop: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: C.navy }}>
+                  【タイトル・サブタイトル（STEP4で確定）】
+                </span>
+                <button onClick={() => onNavigate?.("step_4")}
+                  style={{ fontSize: 11.5, color: C.navyMid, background: "transparent", border: `1px solid ${C.border}`, borderRadius: 3, padding: "4px 10px", cursor: "pointer" }}>
+                  STEP4 で確定 ›
+                </button>
+              </div>
+              {hasTitle ? (
+                <pre style={{ fontSize: 12, color: C.textSub, background: C.white, border: `1px solid ${C.border}`, borderRadius: 3, padding: "10px 12px", margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word", fontFamily: "inherit", lineHeight: 1.7 }}>
+{`メインタイトル: ${titleConfirmed}
+サブタイトル: ${subtitleConfirmed}`}
+                </pre>
+              ) : (
+                <div style={{ fontSize: 12.5, color: needsTitle ? C.red : C.textLight, padding: "10px 12px", background: needsTitle ? "#fef2f2" : "#f5f5f5", border: `1px solid ${needsTitle ? "rgba(192,57,43,0.2)" : C.border}`, borderRadius: 3 }}>
+                  {needsTitle ? "⚠ 未確定。STEP4 で 1案を採用→確定してください。タイトルが渡らないと目次や本文が散漫になります。" : "（任意）STEP4 で 1案を確定すると、ここに表示されます。"}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -1288,6 +1348,15 @@ const Step0Page = ({ savedProfile, onSaveProfile, onNavigate }) => {
           {saveMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました（STEP1〜9で利用できます）</span>}
         </div>
       </div>
+
+      {/* 外部AIで相談するためのプロンプト生成パネル（STEP0用） */}
+      <DiscussionPanel
+        stepNum={0}
+        stepName="著者プロファイル"
+        stepOutput={outputText}
+        authorProfile={outputText}
+        workProfile=""
+      />
     </div>
   );
 };
@@ -2018,6 +2087,117 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
   );
 };
 
+// STEP4専用：3案の中から1案を選んで「タイトル・サブタイトルを確定する」UI。
+// 確定後はSTEP5以降の入力欄（title_text / subtitle_text）に自動転記される。
+const Step4ConfirmPanel = ({ outputText }) => {
+  const parsed = useMemo(() => parseStep4CaseStructure(outputText), [outputText]);
+
+  // 既に確定済みの内容を初期表示
+  const initialTitle = (typeof window !== "undefined") ? (localStorage.getItem(TITLE_CONFIRMED_KEY) || "") : "";
+  const initialSubtitle = (typeof window !== "undefined") ? (localStorage.getItem(SUBTITLE_CONFIRMED_KEY) || "") : "";
+
+  const [selectedCase, setSelectedCase] = useState(null); // "1" | "2" | "3" | null
+  const [titleInput, setTitleInput] = useState(initialTitle);
+  const [subtitleInput, setSubtitleInput] = useState(initialSubtitle);
+  const [savedMsg, setSavedMsg] = useState(false);
+
+  // 案ボタンを押したら、その案からタイトル/サブタイトルを抽出してプレフィル
+  const handleSelectCase = (caseNum) => {
+    setSelectedCase(caseNum);
+    if (parsed && parsed.cases[caseNum]) {
+      const { title, subtitle } = extractTitleSubtitleFromStep4Case(parsed.cases[caseNum]);
+      if (title) setTitleInput(title);
+      if (subtitle) setSubtitleInput(subtitle);
+    }
+  };
+
+  const handleConfirm = () => {
+    if (!titleInput.trim() || !subtitleInput.trim()) {
+      alert("タイトルとサブタイトルの両方を入力してください。");
+      return;
+    }
+    try {
+      localStorage.setItem(TITLE_CONFIRMED_KEY, titleInput.trim());
+      localStorage.setItem(SUBTITLE_CONFIRMED_KEY, subtitleInput.trim());
+      setSavedMsg(true);
+      setTimeout(() => setSavedMsg(false), 2500);
+    } catch {
+      alert("確定の保存に失敗しました。ブラウザのストレージ容量を確認してください。");
+    }
+  };
+
+  const isConfirmed = !!(initialTitle && initialSubtitle);
+  const totalLen = (titleInput || "").length + (subtitleInput || "").length;
+  const isOverLimit = totalLen > 200;
+
+  return (
+    <div style={{ marginTop: 24, marginBottom: 16, padding: 16, border: `2px solid ${C.gold}`, borderRadius: 6, background: C.goldPale }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 14, fontWeight: 700, color: C.gold }}>⭐ 採用する案を確定する</span>
+        {isConfirmed && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 確定済み（STEP5以降に自動転記されます）</span>}
+      </div>
+      <div style={{ fontSize: 13, color: C.textSub, marginBottom: 12, lineHeight: 1.7 }}>
+        STEP5（目次）以降では、ここで確定したタイトル・サブタイトルが本の核となります。
+        3案から1つ選ぶか、自分で書いた内容を直接入力してください。
+      </div>
+
+      {!parsed && outputText && (
+        <div style={{ padding: "8px 12px", background: "#fff", border: `1px solid ${C.border}`, borderRadius: 3, fontSize: 12.5, color: C.textSub, marginBottom: 10 }}>
+          ※ 出力フォーマットの自動解析に失敗しました。下のフォームに手動で入力してください。
+        </div>
+      )}
+
+      {parsed && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+          {["1", "2", "3"].map((n) => (
+            <button key={n} onClick={() => handleSelectCase(n)}
+              style={{
+                fontSize: 13, fontWeight: 600,
+                color: selectedCase === n ? C.white : C.gold,
+                background: selectedCase === n ? C.gold : C.white,
+                border: `1.5px solid ${C.gold}`,
+                borderRadius: 3, padding: "8px 16px", cursor: "pointer",
+              }}>
+              📋 案{n}を採用
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div style={{ marginBottom: 10 }}>
+        <label style={{ fontSize: 12.5, fontWeight: 600, color: C.navy, display: "block", marginBottom: 4 }}>メインタイトル</label>
+        <input type="text" value={titleInput} onChange={(e) => setTitleInput(e.target.value)}
+          placeholder="案ボタンで自動入力、または手動で入力"
+          style={{ width: "100%", padding: "9px 12px", fontSize: 14, border: `1px solid ${C.border}`, borderRadius: 3, outline: "none", boxSizing: "border-box", background: C.white }} />
+      </div>
+      <div style={{ marginBottom: 10 }}>
+        <label style={{ fontSize: 12.5, fontWeight: 600, color: C.navy, display: "block", marginBottom: 4 }}>サブタイトル</label>
+        <input type="text" value={subtitleInput} onChange={(e) => setSubtitleInput(e.target.value)}
+          placeholder="案ボタンで自動入力、または手動で入力"
+          style={{ width: "100%", padding: "9px 12px", fontSize: 14, border: `1px solid ${C.border}`, borderRadius: 3, outline: "none", boxSizing: "border-box", background: C.white }} />
+      </div>
+
+      <div style={{ fontSize: 12, color: isOverLimit ? C.red : C.textLight, marginBottom: 10 }}>
+        合計文字数: {totalLen} / 200（Amazon KDP制限）{isOverLimit && " ← 超過しています"}
+      </div>
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <button onClick={handleConfirm}
+          disabled={!titleInput.trim() || !subtitleInput.trim()}
+          style={{
+            fontSize: 13, fontWeight: 700, color: C.white,
+            background: (titleInput.trim() && subtitleInput.trim()) ? C.gold : "rgba(0,0,0,0.15)",
+            border: "none", borderRadius: 3, padding: "10px 22px",
+            cursor: (titleInput.trim() && subtitleInput.trim()) ? "pointer" : "default",
+          }}>
+          ⭐ タイトル・サブタイトルを確定する
+        </button>
+        {savedMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 確定しました（STEP5以降で利用できます）</span>}
+      </div>
+    </div>
+  );
+};
+
 const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutput, onUpdateProject, onInputChange, allSteps, onRefPanel }) => {
   const [inputs, setInputs] = useState(stepData.inputData || {});
   const [outputText, setOutputText] = useState(stepData.outputText || "");
@@ -2056,6 +2236,30 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     setChatMessages([]); setChatInput(""); setChatLoading(false);
     setChatConversationId(""); setChatError(""); setChatCopyMsg(false); setChatTransferMsg(false); setChatSelectOptions([]); setChatSelectMsg(false);
   }, [step.num]);
+
+  // 自動投入: autoFill: true で source 定義のあるフィールドが空欄なら、前STEPの outputText で自動補完。
+  // 既に値があれば上書きしない（ユーザーの手動編集を尊重）。
+  // 「自動振り分け」ボタンを押す手間を省くための自動化。
+  useEffect(() => {
+    if (!step.inputs || !allSteps) return;
+    const updates = {};
+    step.inputs.forEach((field) => {
+      if (field.autoFill !== true || !field.source) return;
+      if ((inputs[field.name] || "").trim()) return; // 既に値があればスキップ
+      const srcMatch = field.source.match(/^STEP(\d+)$/);
+      if (!srcMatch) return;
+      const srcNum = parseInt(srcMatch[1], 10);
+      const srcOutput = allSteps?.[srcNum]?.outputText;
+      if (srcOutput) updates[field.name] = srcOutput;
+    });
+    if (Object.keys(updates).length === 0) return;
+    setInputs((prev) => {
+      const merged = { ...prev, ...updates };
+      onInputChange?.(step.num, merged);
+      return merged;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step.num, allSteps]);
 
   const prevStep = step.num > 1 ? STEPS[step.num - 2] : null;
   const nextStep = step.num < 9 ? STEPS[step.num] : null;
@@ -2296,7 +2500,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           <StepBadge num="①" />
           <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>入力データ</h2>
         </div>
-        {step.num >= 3 && <AutoInjectedProfilesPanel onNavigate={onNavigate} />}
+        {step.num >= 3 && <AutoInjectedProfilesPanel onNavigate={onNavigate} stepNum={step.num} />}
         {validationErrors.length > 0 && (
           <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginBottom: 12, fontSize: 13, color: C.red, fontWeight: 500 }}>必須の項目がまだ空欄です。赤くなっている欄を入力してから、もう一度お試しください。</div>
         )}
@@ -2371,12 +2575,22 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
             );
           }
 
+          // 自動投入済みかどうか（現在のフィールド値が前STEP outputText と一致するか）
+          const isFieldAutoFilled = (() => {
+            if (field.autoFill !== true || !field.source) return false;
+            const m = field.source.match(/^STEP(\d+)$/);
+            if (!m) return false;
+            const srcOutput = allSteps?.[parseInt(m[1], 10)]?.outputText;
+            return !!(srcOutput && inputs[field.name] === srcOutput);
+          })();
+
           return (
             <div key={field.name} style={{ marginBottom: 16 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
                 <label style={{ fontSize: 13.5, fontWeight: 600, color: hasError ? C.red : C.navy }}>{field.label}</label>
                 {field.required && <RequiredMark />}
                 <SourceLabel source={field.source} autoFill={field.autoFill}
+                  isAutoFilled={isFieldAutoFilled}
                   onAutoFill={() => {
                     const srcNum = parseInt(field.source.replace("STEP", ""), 10);
                     const srcOutput = allSteps?.[srcNum]?.outputText;
@@ -2554,6 +2768,9 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           {!nextStep && <BtnSecondary onClick={() => onNavigate("saved")} style={{ background: C.greenLight, color: C.green, border: `1px solid rgba(45,122,79,0.25)` }}>完了 → 保存データを見る</BtnSecondary>}
         </div>
       </div>
+
+      {/* STEP4 専用：採用案を確定する UI */}
+      {step.num === 4 && <Step4ConfirmPanel outputText={outputText} />}
 
       {/* 外部AIで相談するためのプロンプト生成パネル（全STEP共通） */}
       {/* workProfile は軽量化版を渡す：STEP2の出力60KBから市場分析データを除き、相談に必要な核情報のみに圧縮 */}

@@ -95,6 +95,24 @@ workflow:
         type: start
         variables:
         - default: ''
+          hint: 'STEP4で確定したメインタイトル（自動転記）'
+          label: タイトル
+          max_length: 128
+          options: []
+          placeholder: ''
+          required: false
+          type: text-input
+          variable: title
+        - default: ''
+          hint: 'STEP4で確定したサブタイトル（自動転記）'
+          label: サブタイトル
+          max_length: 256
+          options: []
+          placeholder: ''
+          required: false
+          type: text-input
+          variable: subtitle
+        - default: ''
           hint: ''
           label: エピソードインタビューのアウトプット（必須）
           max_length: 5000
@@ -165,7 +183,13 @@ workflow:
         prompt_template:
         - id: 8495f65c-5811-4317-afe4-00ca0da78f3b
           role: system
-          text: '■ 著者プロファイル（参考情報・自動転記／空欄の場合は無視）
+          text: '■ 確定タイトル・サブタイトル（STEP4で確定済み・本書の核）
+
+            メインタイトル: {{#1772856018370.title#}}
+
+            サブタイトル: {{#1772856018370.subtitle#}}
+
+            ■ 著者プロファイル（参考情報・自動転記／空欄の場合は無視）
 
             {{#1772856018370.author_profile#}}
 
@@ -178,6 +202,8 @@ workflow:
             ■ プロファイルの扱い
 
             著者プロファイル・書籍プロファイルが提供されています。これらから読者像・読了後の状態・著者の角度・狙い目の切り口を読み取り、章構造の土台として使ってください。
+
+            タイトル・サブタイトルは本書の「核となる約束」です。章構造はこの約束を満たす流れになるよう設計してください。タイトル・サブタイトルが空欄の場合は無視してください。
 
             プロファイルが空欄の場合は、interview_notes のみを根拠にしてください。
 

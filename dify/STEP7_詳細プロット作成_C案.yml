@@ -108,6 +108,24 @@ workflow:
         type: start
         variables:
         - default: ''
+          hint: 'STEP4で確定したメインタイトル（自動転記）'
+          label: タイトル
+          max_length: 128
+          options: []
+          placeholder: ''
+          required: false
+          type: text-input
+          variable: title
+        - default: ''
+          hint: 'STEP4で確定したサブタイトル（自動転記）'
+          label: サブタイトル
+          max_length: 256
+          options: []
+          placeholder: ''
+          required: false
+          type: text-input
+          variable: subtitle
+        - default: ''
           hint: ''
           label: 1章分のアウトライン作成のアウトプット（必須）
           max_length: 2048
@@ -188,7 +206,14 @@ workflow:
         prompt_template:
         - id: 392a08df-b5de-4bbb-a09a-f3a0139c98ee
           role: system
-          text: '■ 著者プロファイル（参考情報・自動転記／空欄の場合は無視）
+          text: '■ 確定タイトル・サブタイトル（STEP4で確定済み・本書の核）
+
+            メインタイトル: {{#1773057012167.title#}}
+
+            サブタイトル: {{#1773057012167.subtitle#}}
+
+
+            ■ 著者プロファイル（参考情報・自動転記／空欄の場合は無視）
 
             {{#1773057012167.author_profile#}}
 
@@ -201,6 +226,8 @@ workflow:
             ■ プロファイルの扱い
 
             著者プロファイル・書籍プロファイルが提供されている場合は、著者の角度・読者像・差分を踏まえて項見出し・要約を設計してください。
+
+            タイトル・サブタイトルは本書の核となる約束です。各項の内容はこの約束を満たす形で設計してください（タイトル・サブタイトルが空欄の場合は無視）。
 
             プロファイルが空欄の場合は、他の入力のみを根拠にしてください。
 
