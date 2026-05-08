@@ -2283,6 +2283,8 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   const [sectionOptions, setSectionOptions] = useState([]);
   const [selectedSection, setSelectedSection] = useState(null);
   const [sectionProgress, setSectionProgress] = useState(null);
+  // 自動投入済みフィールドの展開状態（デフォルト：折りたたみ）
+  const [expandedFields, setExpandedFields] = useState({});
   // フォーカスモード（案ごと表示切替）は、外部AIプロンプト生成方式への移行に伴い廃止しました。
   // 関連していた parseStep4CaseStructure / mergeStep4Case / extractStep4Case ユーティリティ関数は
   // 将来用途のためコード上は維持していますが、ここでは未使用です。
@@ -2294,6 +2296,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     setSectionOptions([]); setSelectedSection(null); setSectionProgress(null);
     setChatMessages([]); setChatInput(""); setChatLoading(false);
     setChatConversationId(""); setChatError(""); setChatCopyMsg(false); setChatTransferMsg(false); setChatSelectOptions([]); setChatSelectMsg(false);
+    setExpandedFields({});
   }, [step.num]);
 
   // 自動投入: autoFill: true で source 定義のあるフィールドが空欄なら、前STEPの outputText で自動補完。
@@ -2643,6 +2646,29 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
             return !!(srcOutput && inputs[field.name] === srcOutput);
           })();
 
+          // 自動投入済み & 未展開 → 折りたたみバナーだけ表示（編集する時だけ展開）
+          const isCollapsed = isFieldAutoFilled && !expandedFields[field.name];
+          if (isCollapsed) {
+            const srcNum = parseInt(field.source.replace("STEP", ""), 10);
+            const valueLength = (inputs[field.name] || "").length;
+            return (
+              <div key={field.name} style={{ marginBottom: 12 }}>
+                <button
+                  onClick={() => setExpandedFields((prev) => ({ ...prev, [field.name]: true }))}
+                  style={{
+                    width: "100%", textAlign: "left", padding: "10px 14px",
+                    background: C.greenLight, border: `1px solid rgba(45,122,79,0.25)`,
+                    borderRadius: 4, cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+                  }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: C.green }}>✓ {field.label}</span>
+                  <span style={{ fontSize: 12, color: C.textSub }}>STEP{srcNum}から自動投入済み（{valueLength.toLocaleString()}文字）</span>
+                  <span style={{ marginLeft: "auto", fontSize: 12, color: C.textLight }}>▼ 内容を確認・編集</span>
+                </button>
+              </div>
+            );
+          }
+
           return (
             <div key={field.name} style={{ marginBottom: 16 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
@@ -2664,6 +2690,12 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                     else alert(`STEP${srcNum}の出力データがまだ保存されていません。`);
                   }}
                   onAutoFillParsed={handleAutoFillParsed} />
+                {isFieldAutoFilled && expandedFields[field.name] && (
+                  <button onClick={() => setExpandedFields((prev) => ({ ...prev, [field.name]: false }))}
+                    style={{ fontSize: 11, color: C.textSub, background: "transparent", border: `1px solid ${C.border}`, borderRadius: 3, padding: "2px 8px", cursor: "pointer" }}>
+                    ▲ 折りたたむ
+                  </button>
+                )}
                 {hasError && <span style={{ fontSize: 12, color: C.red, fontWeight: 500 }}>← 入力してください</span>}
               </div>
               <div style={{ fontSize: 13, color: "#444444", marginBottom: 6 }}>{field.desc}</div>
