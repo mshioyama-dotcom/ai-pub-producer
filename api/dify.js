@@ -133,8 +133,11 @@ export default async function handler(req, res) {
     console.log(`[DIFY_DEBUG] STEP${stepNum} status=${workflowStatus} keys=[${outputKeys}] outputLen=${outputLen} rawTextLen=${rawTextLen} tail="${rawTextTail}" error="${workflowError}"`);
     // --- END DEBUG ---
 
-    // 出力が異常に短い（≤10文字）場合は診断情報をクライアントに返す
-    if (outputLen <= 10) {
+    // 出力が空の場合は診断情報をクライアントに返す。
+    // Dify が `{ text: "" }` のように空文字のみを返すケースも検出（rawText未定義 or trim後0文字）。
+    const rawTextTrimmedLen = (rawText || "").trim().length;
+    const isEffectivelyEmpty = rawTextTrimmedLen === 0 || outputLen <= 10;
+    if (isEffectivelyEmpty) {
       return res.status(200).json({
         output,
         diagnostic: {
@@ -142,7 +145,8 @@ export default async function handler(req, res) {
           workflowError,
           outputKeys,
           outputsRaw: outputs,
-          message: `Dify が空または短い出力を返しました（${outputLen}文字）。Dify ワークフローのノードでエラーが起きているか、出力ノードに正しい変数が接続されていない可能性があります。`,
+          rawTextTrimmedLen,
+          message: `Dify が空または短い出力を返しました（rawText: ${rawTextTrimmedLen}文字 / output: ${outputLen}文字）。考えられる原因: (1) Dify Cloud の YML 再import 後、プロンプト内の変数参照（{{#XXX.title#}}等）が新しい NodeID とマッチしていない、(2) 出力ノード（end/output）の text 接続が外れている、(3) LLM ノードでエラーが起きている。Dify Cloud でこのアプリの「実行履歴」を開き、最新実行の各ノードの input/output を確認してください。`,
         },
       });
     }
