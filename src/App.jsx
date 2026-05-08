@@ -657,6 +657,30 @@ function parseStep2Output(text) {
   return { keyword1, keyword2, intent, markets };
 }
 
+// STEP6（章構成作成）の出力テキストから、章単位の配列を抽出する。
+// 「はじめに」「第N章: xxx」「おわりに」を見出しとして検出し、
+// 装飾（**、##など）の有無に関わらずマッチさせる。
+function extractChapters(text) {
+  if (!text || typeof text !== "string") return [];
+  const headingRegex = /^\s*[#*]*\s*(?:はじめに|第\s*\d+\s*章\s*[:：].*?|おわりに)\s*[#*]*\s*$/;
+  const lines = text.split("\n");
+  const chapters = [];
+  let current = null;
+  for (const rawLine of lines) {
+    const trimmed = rawLine.trim();
+    if (headingRegex.test(trimmed)) {
+      if (current && current.body.trim()) chapters.push(current);
+      // 表示用に装飾記号を取り除いたタイトル
+      const cleanTitle = trimmed.replace(/[#*]/g, "").trim();
+      current = { chapterTitle: cleanTitle, body: rawLine + "\n" };
+    } else if (current) {
+      current.body += rawLine + "\n";
+    }
+  }
+  if (current && current.body.trim()) chapters.push(current);
+  return chapters;
+}
+
 function extractSections(text) {
   if (!text || typeof text !== "string") return [];
   const sections = []; const lines = text.split("\n");
@@ -762,6 +786,38 @@ const SectionSelector = ({ sections, selected, onSelect, onReselect }) => {
             style={{ padding: "10px 14px", borderRadius: 4, border: `1px solid ${C.border}`, background: C.white, cursor: "pointer" }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: C.navy, marginBottom: 4, lineHeight: 1.5 }}>{sec.sectionTitle}</div>
             <div style={{ fontSize: 11, color: C.textLight }}>{sec.items.length}項を一括生成 ／ 実行時間の目安：{Math.ceil(sec.items.length * 0.7)}〜{sec.items.length}分程度</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ChapterSelector - STEP6の章構成出力から1章を選んで textarea にセットするUI。
+// 「STEP6から章を抽出」ボタン押下後、章タイトル一覧を表示し、選択すると章本文がプレフィルされる。
+const ChapterSelector = ({ chapters, selected, onSelect, onReselect }) => {
+  if (!chapters || chapters.length === 0) return null;
+  if (selected !== null && chapters[selected]) {
+    const ch = chapters[selected];
+    return (
+      <div style={{ marginTop: 8, padding: "12px 14px", background: C.greenLight, borderRadius: 4, border: `1px solid rgba(30,107,58,0.25)` }}>
+        <div style={{ fontSize: 12, color: C.green, marginBottom: 6, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{ fontWeight: 600 }}>✓ 選択中の章（下のテキストエリアに転記済み・必要なら編集してください）</span>
+          <button onClick={onReselect} style={{ fontSize: 11, color: C.gold, background: "none", border: "none", cursor: "pointer", fontWeight: 600, padding: 0, textDecoration: "underline" }}>選び直す</button>
+        </div>
+        <div style={{ fontSize: 13.5, color: C.text, fontWeight: 700, lineHeight: 1.6 }}>{ch.chapterTitle}</div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ fontSize: 12, color: C.gold, fontWeight: 600, marginBottom: 8 }}>分解する章を1つ選んでください（{chapters.length}章を検出）</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 360, overflowY: "auto", padding: 2 }}>
+        {chapters.map((ch, i) => (
+          <div key={i} onClick={() => onSelect(i, ch)}
+            style={{ padding: "10px 14px", borderRadius: 4, border: `1px solid ${C.border}`, background: C.white, cursor: "pointer" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.navy, marginBottom: 4, lineHeight: 1.5 }}>{ch.chapterTitle}</div>
+            <div style={{ fontSize: 11, color: C.textLight }}>{ch.body.trim().length.toLocaleString()}文字</div>
           </div>
         ))}
       </div>
@@ -2283,6 +2339,9 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   const [sectionOptions, setSectionOptions] = useState([]);
   const [selectedSection, setSelectedSection] = useState(null);
   const [sectionProgress, setSectionProgress] = useState(null);
+  // STEP7（詳細プロット作成）の章選択用
+  const [chapterOptions, setChapterOptions] = useState([]);
+  const [selectedChapter, setSelectedChapter] = useState(null);
   // 自動投入済みフィールドの展開状態（デフォルト：折りたたみ）
   const [expandedFields, setExpandedFields] = useState({});
   // フォーカスモード（案ごと表示切替）は、外部AIプロンプト生成方式への移行に伴い廃止しました。
@@ -2294,6 +2353,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     setHelpOpen(false); setValidationErrors([]); setCharErrors({}); setRunError("");
     setMarketOptions([]); setSelectedMarket(null);
     setSectionOptions([]); setSelectedSection(null); setSectionProgress(null);
+    setChapterOptions([]); setSelectedChapter(null);
     setChatMessages([]); setChatInput(""); setChatLoading(false);
     setChatConversationId(""); setChatError(""); setChatCopyMsg(false); setChatTransferMsg(false); setChatSelectOptions([]); setChatSelectMsg(false);
     setExpandedFields({});
@@ -2598,6 +2658,59 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
             if (field.name === "keyword1") { if (parsed.keyword1) handleInputChange("keyword1", parsed.keyword1); else alert("「主題軸キーワード1」が見つかりませんでした。手動で入力してください。"); }
             if (field.name === "keyword2") { if (parsed.keyword2) handleInputChange("keyword2", parsed.keyword2); else alert("「主題軸キーワード2」が見つかりませんでした。手動で入力してください。"); }
           } : undefined;
+
+          // STEP7「1章分のアウトライン」専用UI: STEP6の出力から章を抽出してリスト選択
+          if (field.name === "chapter_outline_text") {
+            const hasChapterErr = validationErrors.includes(field.name);
+            return (
+              <div key={field.name} style={{ marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
+                  <label style={{ fontSize: 13.5, fontWeight: 600, color: hasChapterErr ? C.red : C.navy }}>{field.label}</label>
+                  {field.required && <RequiredMark />}
+                  <SourceLabel source={field.source} autoFill={false} onAutoFill={() => {}}
+                    onRef={() => { const s = allSteps?.[6]?.outputText; if (s) onRefPanel({ stepNum: 6, text: s, targetField: "chapter_outline_text" }); else alert("STEP6の出力データがまだ保存されていません。"); }} />
+                  {hasChapterErr && <span style={{ fontSize: 12, color: C.red, fontWeight: 500 }}>← 章を選んでください</span>}
+                </div>
+                <div style={{ fontSize: 13, color: "#444444", marginBottom: 8 }}>{field.desc}</div>
+                <div style={{ marginBottom: 10 }}>
+                  <button onClick={() => {
+                    const srcOutput = allSteps?.[6]?.outputText;
+                    if (!srcOutput) { alert("STEP6の出力データがまだ保存されていません。\n\nSTEP6を完了して「出力データを保存」ボタンを押してから、もう一度お試しください。"); return; }
+                    const extracted = extractChapters(srcOutput);
+                    if (extracted.length === 0) { alert("STEP6の出力から「第N章: xxx」「はじめに」「おわりに」形式の章を検出できませんでした。STEP6の出力をもう一度確認してください。"); return; }
+                    setChapterOptions(extracted); setSelectedChapter(null); handleInputChange("chapter_outline_text", "");
+                  }} style={{ fontSize: 12.5, fontWeight: 600, color: C.white, background: C.gold, border: "none", borderRadius: 3, padding: "7px 14px", cursor: "pointer" }}>
+                    📋 STEP6から章を抽出
+                  </button>
+                  {chapterOptions.length > 0 && (
+                    <button onClick={() => { setChapterOptions([]); setSelectedChapter(null); handleInputChange("chapter_outline_text", ""); }}
+                      style={{ fontSize: 12, color: C.textLight, background: "none", border: `1px solid ${C.border}`, borderRadius: 3, padding: "6px 12px", cursor: "pointer", marginLeft: 8 }}>
+                      抽出結果をクリア
+                    </button>
+                  )}
+                </div>
+                {chapterOptions.length > 0 && (
+                  <ChapterSelector chapters={chapterOptions} selected={selectedChapter}
+                    onSelect={(i, ch) => { setSelectedChapter(i); handleInputChange("chapter_outline_text", ch.body.trim()); }}
+                    onReselect={() => { setSelectedChapter(null); handleInputChange("chapter_outline_text", ""); }} />
+                )}
+                {/* 選択後または手動入力用の textarea */}
+                {(selectedChapter !== null || (inputs[field.name] || "").trim()) && (
+                  <div style={{ marginTop: 12 }}>
+                    <textarea id={`field-${field.name}`} value={inputs[field.name] || ""} onChange={(e) => { setSelectedChapter(null); handleInputChange(field.name, e.target.value); }}
+                      placeholder="選択した章の内容（編集可能）"
+                      rows={8}
+                      style={{ width: "100%", padding: "10px 12px", fontSize: 14, border: hasChapterErr ? `2px solid ${C.red}` : `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: hasChapterErr ? "#fef2f2" : C.white, lineHeight: 1.7 }} />
+                    {field.maxChars && (
+                      <div style={{ fontSize: 11, color: ((inputs[field.name] || "").length > field.maxChars) ? C.red : C.textLight, textAlign: "right", marginTop: 3 }}>
+                        {(inputs[field.name] || "").length.toLocaleString()} / {field.maxChars.toLocaleString()}文字
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          }
 
           if (field.name === "target_section") {
             const hasSectionErr = validationErrors.includes(field.name);
