@@ -135,8 +135,7 @@ const STEPS = [
     category: "執筆設計", type: "workflow",
     url: "https://udify.app/workflow/Ka9gpeDvAnkPV9hW",
     inputs: [
-      { name: "chapter_outline_text", label: "1章分のアウトライン", desc: "STEP6の出力から、今回分解したい1章分だけをコピーして貼り付けてください。", source: "STEP6", required: true, type: "textarea", autoFill: false, maxChars: 2048 },
-      { name: "added_episode_text", label: "著者が入れたいエピソード（任意）", desc: "この章でとくに入れたい体験談やエピソードがあれば書いてください。空欄でもOKです。", source: null, required: false, type: "textarea", maxChars: 1024 }
+      { name: "chapter_outline_text", label: "1章分のアウトライン", desc: "STEP6の出力から、今回分解したい1章分だけをコピーして貼り付けてください。", source: "STEP6", required: true, type: "textarea", autoFill: false, maxChars: 2048 }
     ],
     outputTitle: "詳細プロット",
     help: [
@@ -2627,7 +2626,6 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         const execInputs = {
           ...getAutoInjectedProfiles(),
           chapter_outline_text: ch.body.trim(),
-          added_episode_text: inputs.added_episode_text || "",
         };
         const response = await fetch("/api/dify", {
           method: "POST",
