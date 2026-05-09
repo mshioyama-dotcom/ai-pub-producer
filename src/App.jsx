@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { extractTextFromFile, buildSourceText, ACCEPTED_EXTENSIONS } from "./utils/extractText";
+import { extractBookEssence, formatEssenceAsText } from "./utils/extractEssence";
 import DiscussionPanel from "./DiscussionPanel";
 
 // ============================================================
@@ -1272,13 +1273,34 @@ const HomePage = ({ project, stepStatuses, allSteps, onNavigate }) => {
   );
 };
 
-const BookSlotInput = ({ slot, idx, onChange, onClear }) => {
+const BookSlotInput = ({ slot, idx, onChange, onClear, onEditEssence }) => {
   const inputId = `book-slot-${idx}`;
+  const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draftText, setDraftText] = useState("");
+
+  const handleEditOpen = () => {
+    setDraftText(slot?.essenceText || "");
+    setEditing(true);
+    setExpanded(true);
+  };
+  const handleEditSave = () => {
+    onEditEssence?.(idx, draftText);
+    setEditing(false);
+  };
+  const handleEditCancel = () => {
+    setDraftText("");
+    setEditing(false);
+  };
+
+  const stats = slot?.essence?.stats;
+  const ratioPct = stats ? Math.round(stats.ratio * 100) : null;
+
   return (
     <div style={{ marginBottom: 8, padding: "10px 14px", border: `1px solid ${C.border}`, borderRadius: 4, background: C.white }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <span style={{ fontSize: 13, fontWeight: 700, color: C.navy, minWidth: 60 }}>📎 書籍{idx + 1}</span>
-        {(!slot || slot.status !== "extracting") && (
+        {(!slot || (slot.status !== "extracting" && slot.status !== "essence_extracting")) && (
           <label htmlFor={inputId} style={{ fontSize: 12.5, padding: "6px 14px", background: C.navyLight, color: C.navyMid, border: `1px solid rgba(42,68,104,0.2)`, borderRadius: 3, cursor: "pointer", fontWeight: 600 }}>
             {slot ? "別のファイルを選択" : "ファイルを選択"}
           </label>
@@ -1293,8 +1315,13 @@ const BookSlotInput = ({ slot, idx, onChange, onClear }) => {
         {slot && (
           <>
             <span style={{ fontSize: 12.5, color: C.text, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{slot.filename}</span>
-            {slot.status === "extracting" && <span style={{ fontSize: 11, color: C.gold, fontWeight: 600 }}>抽出中...</span>}
-            {slot.status === "done" && <span style={{ fontSize: 11, color: C.green, fontWeight: 600 }}>✓ 抽出完了</span>}
+            {slot.status === "extracting" && <span style={{ fontSize: 11, color: C.gold, fontWeight: 600 }}>テキスト抽出中...</span>}
+            {slot.status === "essence_extracting" && <span style={{ fontSize: 11, color: C.gold, fontWeight: 600 }}>要素抽出中...</span>}
+            {slot.status === "done" && stats && (
+              <span style={{ fontSize: 11, color: C.green, fontWeight: 600 }}>
+                ✓ {stats.originalChars.toLocaleString()}字 → {stats.extractedChars.toLocaleString()}字 ({ratioPct}%)
+              </span>
+            )}
             {slot.status === "error" && <span style={{ fontSize: 11, color: C.red, fontWeight: 600 }}>⚠ 失敗</span>}
             <button onClick={() => onClear(idx)} style={{ fontSize: 11, color: C.textLight, background: "none", border: `1px solid ${C.border}`, borderRadius: 3, padding: "3px 8px", cursor: "pointer" }}>削除</button>
           </>
@@ -1302,6 +1329,53 @@ const BookSlotInput = ({ slot, idx, onChange, onClear }) => {
       </div>
       {slot && slot.status === "error" && (
         <div style={{ marginTop: 6, fontSize: 12, color: C.red, lineHeight: 1.6 }}>{slot.error}</div>
+      )}
+
+      {/* 抽出結果プレビュー（done状態のみ） */}
+      {slot && slot.status === "done" && slot.essence && (
+        <div style={{ marginTop: 10, padding: "10px 12px", background: C.greenLight, border: `1px solid rgba(45,122,79,0.25)`, borderRadius: 4 }}>
+          <div style={{ fontSize: 12, color: C.green, fontWeight: 600, marginBottom: 6 }}>
+            抽出された要素：
+            {slot.essence.intro && " ✓ はじめに/序章 "}
+            {slot.essence.toc && slot.essence.toc.length > 0 && ` ✓ 目次(${slot.essence.toc.length}項目) `}
+            {slot.essence.chapterEnds && slot.essence.chapterEnds.length > 0 && ` ✓ 章末まとめ × ${slot.essence.chapterEnds.length} `}
+            {slot.essence.ending && " ✓ おわりに/終章"}
+          </div>
+          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+            <button onClick={() => setExpanded(!expanded)}
+              style={{ fontSize: 11, color: C.navyMid, background: C.white, border: `1px solid ${C.border}`, borderRadius: 3, padding: "4px 10px", cursor: "pointer", fontWeight: 600 }}>
+              {expanded ? "▲ 内容を閉じる" : "▼ 内容を確認"}
+            </button>
+            {!editing && (
+              <button onClick={handleEditOpen}
+                style={{ fontSize: 11, color: C.navyMid, background: C.white, border: `1px solid ${C.border}`, borderRadius: 3, padding: "4px 10px", cursor: "pointer", fontWeight: 600 }}>
+                ✎ 抽出結果を編集
+              </button>
+            )}
+          </div>
+          {expanded && !editing && (
+            <pre style={{ marginTop: 8, padding: "10px 12px", background: C.white, border: `1px solid ${C.border}`, borderRadius: 3, fontSize: 11.5, color: C.text, maxHeight: 320, overflowY: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word", fontFamily: "inherit", lineHeight: 1.7 }}>
+              {slot.essenceText || "(抽出結果なし)"}
+            </pre>
+          )}
+          {editing && (
+            <div style={{ marginTop: 8 }}>
+              <textarea value={draftText} onChange={(e) => setDraftText(e.target.value)}
+                rows={14}
+                style={{ width: "100%", padding: "8px 10px", fontSize: 12, border: `1px solid ${C.border}`, borderRadius: 3, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.7 }} />
+              <div style={{ marginTop: 6, display: "flex", gap: 8 }}>
+                <button onClick={handleEditSave}
+                  style={{ fontSize: 12, fontWeight: 700, color: C.white, background: C.navy, border: "none", borderRadius: 3, padding: "6px 14px", cursor: "pointer" }}>
+                  保存
+                </button>
+                <button onClick={handleEditCancel}
+                  style={{ fontSize: 12, color: C.textLight, background: "none", border: `1px solid ${C.border}`, borderRadius: 3, padding: "6px 14px", cursor: "pointer" }}>
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -1344,6 +1418,7 @@ const Step0Page = ({ savedProfile, onSaveProfile, onNavigate }) => {
   };
 
   const handleFileChange = async (slotIdx, file) => {
+    // フェーズ1: ファイルからテキスト抽出
     setBookSlots((slots) => {
       const next = [...slots];
       next[slotIdx] = { filename: file.name, text: "", status: "extracting", error: "" };
@@ -1351,9 +1426,26 @@ const Step0Page = ({ savedProfile, onSaveProfile, onNavigate }) => {
     });
     try {
       const text = await extractTextFromFile(file);
+      // フェーズ2: 著者プロファイル素材としての要素抽出（はじめに／おわりに／章末まとめ／目次）
       setBookSlots((slots) => {
         const next = [...slots];
-        next[slotIdx] = { filename: file.name, text, status: "done", error: "" };
+        next[slotIdx] = { filename: file.name, text, status: "essence_extracting", error: "" };
+        return next;
+      });
+      // 同期処理だが UI 更新を確実にするため次のtickへ
+      await new Promise((r) => setTimeout(r, 0));
+      const essence = extractBookEssence(text);
+      const essenceText = formatEssenceAsText(essence);
+      setBookSlots((slots) => {
+        const next = [...slots];
+        next[slotIdx] = {
+          filename: file.name,
+          text,
+          essence,
+          essenceText,
+          status: "done",
+          error: "",
+        };
         return next;
       });
     } catch (e) {
@@ -1363,6 +1455,17 @@ const Step0Page = ({ savedProfile, onSaveProfile, onNavigate }) => {
         return next;
       });
     }
+  };
+
+  // ユーザーが抽出結果プレビューを編集した時に呼ばれる
+  const handleEditEssence = (slotIdx, newText) => {
+    setBookSlots((slots) => {
+      const next = [...slots];
+      if (next[slotIdx]) {
+        next[slotIdx] = { ...next[slotIdx], essenceText: newText };
+      }
+      return next;
+    });
   };
 
   const handleClearSlot = (slotIdx) => {
@@ -1375,7 +1478,11 @@ const Step0Page = ({ savedProfile, onSaveProfile, onNavigate }) => {
 
   const handleGenerate = async () => {
     setRunError("");
-    const books = bookSlots.filter((b) => b && b.status === "done").map((b) => ({ filename: b.filename, text: b.text }));
+    // 各書籍は要素抽出済みテキスト（はじめに／おわりに／章末まとめ／目次のみ）を使う。
+    // ユーザーが編集していればその編集後テキストが essenceText に入っている。
+    const books = bookSlots
+      .filter((b) => b && b.status === "done" && (b.essenceText || "").trim())
+      .map((b) => ({ filename: b.filename, essenceText: b.essenceText }));
     const sourceText = buildSourceText({ books, posts: postsText, profile: profileText });
     if (!sourceText.trim() && !existingProfile.trim()) {
       setRunError("素材が何も入力されていません。書籍ファイル・Note/X投稿・プロフィールのいずれかを入力してください。");
@@ -1440,9 +1547,15 @@ const Step0Page = ({ savedProfile, onSaveProfile, onNavigate }) => {
 
         <div style={{ marginBottom: 20 }}>
           <label style={{ fontSize: 13.5, fontWeight: 600, color: C.navy }}>書籍ファイル（最大3冊・任意）</label>
-          <div style={{ fontSize: 13, color: "#444444", marginBottom: 8 }}>過去に出版した書籍があれば添付してください。対応形式：.txt .md .pdf .docx</div>
+          <div style={{ fontSize: 13, color: "#444444", marginBottom: 8, lineHeight: 1.7 }}>
+            過去に出版した書籍があれば添付してください。対応形式：.txt .md .pdf .docx
+            <br />
+            <span style={{ fontSize: 12, color: C.textLight }}>
+              ※ アップロード後、AI が著者プロファイル生成に有用な要素（<strong>はじめに／おわりに／章末まとめ／目次</strong>）を自動抽出します。書籍全文ではなく抽出済み素材だけがAIに渡されます。
+            </span>
+          </div>
           {bookSlots.map((slot, idx) => (
-            <BookSlotInput key={idx} slot={slot} idx={idx} onChange={handleFileChange} onClear={handleClearSlot} />
+            <BookSlotInput key={idx} slot={slot} idx={idx} onChange={handleFileChange} onClear={handleClearSlot} onEditEssence={handleEditEssence} />
           ))}
         </div>
 

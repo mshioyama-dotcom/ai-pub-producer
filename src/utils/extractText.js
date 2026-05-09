@@ -82,15 +82,18 @@ export async function extractTextFromFile(file) {
 }
 
 // 複数の入力ソースを受け取り、Dify送信用に1つのテキストに連結する。
-// books: [{ filename, text }]   （抽出失敗したファイルは text を空にして渡さない）
+// books: [{ filename, essenceText }]
+//   - essenceText: extractBookEssence + formatEssenceAsText で圧縮済みのテキスト
+//     （書籍の生テキストではなく、はじめに／おわりに／章末まとめ／目次に絞った要素抽出版）
+//   - ユーザーがプレビューで編集している場合はその編集後テキスト
 // posts: string  （Note/X投稿の貼付テキスト）
 // profile: string  （プロフィール・著者ページの貼付テキスト）
 export function buildSourceText({ books = [], posts = "", profile = "" }) {
   const blocks = [];
   books.forEach((b, idx) => {
-    if (!b || !b.text || !b.text.trim()) return;
-    const label = `=== 書籍${idx + 1}: ${b.filename || "(名称不明)"} から抽出 ===`;
-    blocks.push(`${label}\n\n${b.text.trim()}`);
+    if (!b || !b.essenceText || !b.essenceText.trim()) return;
+    const label = `=== 書籍${idx + 1}: ${b.filename || "(名称不明)"} から抽出した要素 ===`;
+    blocks.push(`${label}\n\n${b.essenceText.trim()}`);
   });
   if (posts && posts.trim()) {
     blocks.push(`=== Note/X投稿 ===\n\n${posts.trim()}`);
