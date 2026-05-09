@@ -131,7 +131,25 @@ workflow:
           required: true
           type: paragraph
           variable: author_profile
-      height: 200
+        - default: ''
+          hint: 改善要望機構用。前回の出力をそのまま渡す（Phase 2機能）
+          label: 前回出力（改善要望がある場合のみ）
+          max_length: 16000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: previous_output
+        - default: ''
+          hint: 改善要望機構用。相談機能で固めた方針を1段落で渡す（Phase 2機能）
+          label: 改善要望
+          max_length: 4000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: improvement_request
+      height: 280
       id: '1900000000001'
       position:
         x: 80
@@ -386,6 +404,31 @@ workflow:
             Step B で問題が見つかった箇所を修正した最終版を「Output Format」の形式で出力する。
             すべての観点が通過した場合はドラフトをそのまま出力してよい。
             繰り返し：レビュープロセスの出力は禁止。最終出力のみ返すこと。
+
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+            【改善要望機構（Phase 2）：previous_output と improvement_request の扱い】
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+            previous_output（前回出力）と improvement_request（改善要望）の両方が空でない場合、ユーザーは戦略レビュー（外部AI）で評価された結果を踏まえて、本書籍プロファイル草案を**根本的に直してほしい**と要望しています。
+
+            手順：
+            1. previous_output（前回の書籍プロファイル草案）を読み込む
+            2. improvement_request（改善要望文：根本原因と修正方針が書かれている）を読み込む
+            3. 改善要望の指示に従って、構造的に修正した新しい書籍プロファイル草案を生成する
+              - 表面の言い回しを変えるだけでなく、構造（読者像／コンセプト／核メッセージ）を組み直す
+              - 改善要望で「✓ OK」と評価された部分は変更しない（前回出力からそのままコピー）
+              - 「△ 要改善」「✗ 致命的」と指摘された部分を**根本原因に基づいて修正**する
+            4. 上記の Self-Refine プロセス（内部 Step A〜C）を新しい草案に対しても適用し、修正版を最終出力する
+
+            両方が空欄の場合：通常通り新規生成（既存の入力情報のみで草案を作る）。
+
+            improvement_request のみで previous_output が空の場合：新規生成として improvement_request の方針を反映してください。
+
+            previous_output: {{#1900000000001.previous_output#}}
+            improvement_request: {{#1900000000001.improvement_request#}}
         - id: a1b2c3d4-1900-4001-9000-000000000002
           role: user
           text: 上記の入力情報（仮テーマ・動機・想定読者の仮説・著者プロファイル）に基づき、【書籍プロファイル草案】を生成してください。

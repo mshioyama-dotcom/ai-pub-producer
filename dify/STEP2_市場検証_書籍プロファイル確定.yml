@@ -303,7 +303,25 @@ workflow:
           required: false
           type: paragraph
           variable: html_diff
-      height: 160
+        - default: ''
+          hint: 改善要望機構用。前回の出力をそのまま渡す（Phase 2機能）
+          label: 前回出力（改善要望がある場合のみ）
+          max_length: 60000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: previous_output
+        - default: ''
+          hint: 改善要望機構用。相談機能で固めた方針を1段落で渡す（Phase 2機能）
+          label: 改善要望
+          max_length: 4000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: improvement_request
+      height: 220
       id: '1771119975121'
       position:
         x: 483.2361090106334
@@ -1103,6 +1121,32 @@ workflow:
             Step B で問題が見つかった箇所を修正した最終版を、Output Format の形式で出力する。
             すべての観点が通過した場合はドラフトをそのまま出力してよい。
             繰り返し：レビュープロセス・各観点の指摘・差分の出力は禁止。最終レポートのみ返すこと。
+
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+            【改善要望機構（Phase 2）：previous_output と improvement_request の扱い】
+
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+            previous_output（前回出力）と improvement_request（改善要望）の両方が空でない場合、ユーザーは戦略レビュー（外部AI）で評価された結果を踏まえて、市場検証レポート＋確定版を**根本的に直してほしい**と要望しています。
+
+            手順：
+            1. previous_output（前回の市場検証レポート＋確定版）を読み込む
+            2. improvement_request（改善要望文：根本原因と修正方針が書かれている）を読み込む
+            3. 改善要望の指示に従って、構造的に修正した新しい市場検証レポート＋確定版を生成する
+              - 客観分析（市場像・需要診断・勝率診断）の数値・分析結論は、追加の Keepa/HTML データがない限り変更しない（中立性を保つ）
+              - 確定版テキスト本文（読者像・コンセプト・読了後の状態・狙い目の切り口）を改善要望に従って構造的に修正する
+              - 「✓ OK」と評価された部分は変更しない（前回出力からそのままコピー）
+              - 「△ 要改善」「✗ 致命的」と指摘された部分を**根本原因に基づいて修正**する
+            4. 上記の Self-Refine プロセス（内部 Step A〜C）を新しいドラフトに対しても適用し、修正版を最終出力する
+
+            両方が空欄の場合：通常通り新規生成（既存の入力情報のみで市場検証レポート＋確定版を作る）。
+
+            improvement_request のみで previous_output が空の場合：新規生成として improvement_request の方針を反映してください。
+
+            previous_output: {{#1771119975121.previous_output#}}
+            improvement_request: {{#1771119975121.improvement_request#}}
 '
         - id: b1b2c3d4-2000-4001-9000-000000000002
           role: user

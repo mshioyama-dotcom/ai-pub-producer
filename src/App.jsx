@@ -1669,6 +1669,10 @@ const Step1Page = ({ savedAuthorProfile, savedWorkProfile, onSaveWorkProfile, on
   const [outputText, setOutputText] = useState(savedWorkProfile || "");
   const [saveMsg, setSaveMsg] = useState(false);
   const [profilePreviewOpen, setProfilePreviewOpen] = useState(false);
+  // 改善要望機構（Phase 2 / 戦略レビュー結果を反映してDify再生成する仕組み）
+  const [improvementRequest, setImprovementRequest] = useState("");
+  const [regenerating, setRegenerating] = useState(false);
+  const [regenError, setRegenError] = useState("");
   const [pendingAppliedFields, setPendingAppliedFields] = useState(() => {
     const applied = [];
     if (pending.theme) applied.push("仮テーマ");
@@ -1678,6 +1682,49 @@ const Step1Page = ({ savedAuthorProfile, savedWorkProfile, onSaveWorkProfile, on
   });
 
   const hasAuthorProfile = !!(savedAuthorProfile || "").trim();
+
+  // 改善要望で Dify 再生成（Phase 2機構）
+  const handleRegenerateWithRequest = async () => {
+    if (!improvementRequest.trim()) return;
+    if (!outputText.trim()) {
+      setRegenError("再生成には前回の出力が必要です。");
+      return;
+    }
+    setRegenError("");
+    setRegenerating(true);
+    try {
+      const response = await fetch("/api/dify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stepNum: 1,
+          inputs: {
+            theme: theme.trim(),
+            motivation: motivation.trim(),
+            reader_hypothesis: readerHypothesis.trim(),
+            author_profile: savedAuthorProfile || "",
+            previous_output: outputText,
+            improvement_request: improvementRequest,
+          },
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setRegenError(data.error || "再生成中にエラーが発生しました。");
+      } else {
+        const newOutput = data.output || "";
+        if (!newOutput || newOutput.length < 50) {
+          setRegenError(`Difyから有効な出力が返りませんでした（${newOutput.length}文字）`);
+        } else {
+          setOutputText(newOutput);
+        }
+      }
+    } catch (e) {
+      setRegenError(`通信エラー：${e.message}`);
+    } finally {
+      setRegenerating(false);
+    }
+  };
 
   const handleGenerate = async () => {
     setRunError("");
@@ -1856,6 +1903,47 @@ const Step1Page = ({ savedAuthorProfile, savedWorkProfile, onSaveWorkProfile, on
         authorProfile={savedAuthorProfile || ""}
         workProfile=""
       />
+
+      {/* 改善要望で Dify 再生成 */}
+      {(outputText || "").trim() && (
+        <div style={{ marginTop: 24, marginBottom: 16, border: `2px solid ${C.gold}`, borderRadius: 6, background: C.goldPale }}>
+          <div style={{ padding: 14 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: C.gold, marginBottom: 6 }}>
+              ✨ 改善要望で Dify 再生成
+            </div>
+            <div style={{ fontSize: 12.5, color: C.text, marginBottom: 10, lineHeight: 1.7 }}>
+              外部AIの戦略レビューで得た「改善要望」を貼り付けると、Dify が <strong>現在の出力＋改善要望</strong> を踏まえて構造的に修正版を生成します。
+              <br />
+              <span style={{ color: C.textSub, fontSize: 11.5 }}>
+                ※ Dify ワークフロー内の Self-Refine（生成→自己批評→修正版）で根本修正を保証。
+              </span>
+            </div>
+            <textarea value={improvementRequest} onChange={(e) => setImprovementRequest(e.target.value)}
+              rows={6}
+              placeholder="例：『読者像が3層に分裂しているので、40〜50代会社員1層に絞り込み、サブターゲットは削除してください。コンセプトも書く→自己発見の1軸に統一してください。』"
+              style={{ width: "100%", padding: "10px 12px", fontSize: 13, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.7 }} />
+            <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <button onClick={handleRegenerateWithRequest}
+                disabled={regenerating || !improvementRequest.trim() || !(outputText || "").trim()}
+                style={{
+                  fontSize: 13, fontWeight: 700,
+                  color: C.white,
+                  background: regenerating ? "#93c5fd" : (improvementRequest.trim() && (outputText || "").trim() ? C.gold : "rgba(0,0,0,0.15)"),
+                  border: "none", borderRadius: 3, padding: "10px 22px",
+                  cursor: (regenerating || !improvementRequest.trim() || !(outputText || "").trim()) ? "default" : "pointer",
+                  letterSpacing: "0.04em",
+                }}>
+                {regenerating ? "再生成中..." : "✨ 改善要望で再生成"}
+              </button>
+              {regenerating && <span style={{ fontSize: 12, color: C.navyMid }}>Dify が改善要望を反映して修正版を生成中（30秒〜1分）...</span>}
+              {regenError && <div style={{ width: "100%", marginTop: 8, padding: "8px 12px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 3, fontSize: 12, color: C.red }}>{regenError}</div>}
+            </div>
+            <div style={{ marginTop: 8, fontSize: 11.5, color: C.textLight, lineHeight: 1.7 }}>
+              💡 完了後、上の「③ 生成された書籍プロファイル草案」欄が新しい修正版に置き換わります。内容を確認して「書籍プロファイル草案を保存」を押してください。
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -1975,6 +2063,10 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
   const [confirmedDraft, setConfirmedDraft] = useState(savedWorkProfileConfirmed || "");
   const [saveMsg, setSaveMsg] = useState(false);
   const [authorPreviewOpen, setAuthorPreviewOpen] = useState(false);
+  // 改善要望機構
+  const [improvementRequest, setImprovementRequest] = useState("");
+  const [regenerating, setRegenerating] = useState(false);
+  const [regenError, setRegenError] = useState("");
   const [draftPreviewOpen, setDraftPreviewOpen] = useState(false);
   const [procedureOpen, setProcedureOpen] = useState(false);
   const [competitorsOpen, setCompetitorsOpen] = useState(false);
@@ -2119,6 +2211,64 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
     await onSaveWorkProfileConfirmed(confirmedDraft);
     setSaveMsg(true);
     setTimeout(() => setSaveMsg(false), 2500);
+  };
+
+  // 改善要望で Dify 再生成（Phase 2機構）
+  const handleRegenerateWithRequest = async () => {
+    if (!improvementRequest.trim()) return;
+    if (!outputText.trim()) {
+      setRegenError("再生成には前回の出力が必要です。");
+      return;
+    }
+    setRegenError("");
+    setRegenerating(true);
+    try {
+      // HTML を最小限にクリーンアップ
+      const cleanedTheme = htmlTheme ? cleanHtmlMinimal(htmlTheme) || htmlTheme : "";
+      const cleanedReader = htmlReader ? cleanHtmlMinimal(htmlReader) || htmlReader : "";
+      const cleanedDiff = htmlDiff ? cleanHtmlMinimal(htmlDiff) || htmlDiff : "";
+      const response = await fetch("/api/dify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stepNum: 2,
+          inputs: {
+            keyword1: keywordTheme.split(/[\s　]+/)[0] || "",
+            keyword2: keywordTheme.split(/[\s　]+/)[1] || "",
+            HTML: cleanedTheme,
+            author_profile: savedAuthorProfile || "",
+            work_profile_draft: savedWorkProfileDraft || "",
+            motivation: motivation || "",
+            keyword_reader: keywordReader.trim(),
+            html_reader: cleanedReader,
+            keyword_diff: keywordDiff.trim(),
+            html_diff: cleanedDiff,
+            previous_output: outputText,
+            improvement_request: improvementRequest,
+          },
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setRegenError(data.error || "再生成中にエラーが発生しました。");
+      } else {
+        const newOutput = data.output || "";
+        if (!newOutput || newOutput.length < 50) {
+          setRegenError(`Difyから有効な出力が返りませんでした（${newOutput.length}文字）`);
+        } else {
+          setOutputText(newOutput);
+          // 確定版部分を再抽出
+          try {
+            const parsed = splitStep2Output(newOutput);
+            if (parsed.confirmed) setConfirmedDraft(parsed.confirmed);
+          } catch {}
+        }
+      }
+    } catch (e) {
+      setRegenError(`通信エラー：${e.message}`);
+    } finally {
+      setRegenerating(false);
+    }
   };
 
   const renderAxisSection = (axisLabel, icon, isRequired, keyword, setKeyword, html, setHtml, expanded, setExpanded) => {
@@ -2317,6 +2467,47 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
         authorProfile={savedAuthorProfile || ""}
         workProfile={extractDiscussionContext(confirmedDraft || "")}
       />
+
+      {/* 改善要望で Dify 再生成 */}
+      {(outputText || "").trim() && (
+        <div style={{ marginTop: 24, marginBottom: 16, border: `2px solid ${C.gold}`, borderRadius: 6, background: C.goldPale }}>
+          <div style={{ padding: 14 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: C.gold, marginBottom: 6 }}>
+              ✨ 改善要望で Dify 再生成
+            </div>
+            <div style={{ fontSize: 12.5, color: C.text, marginBottom: 10, lineHeight: 1.7 }}>
+              外部AIの戦略レビューで得た「改善要望」を貼り付けると、Dify が <strong>市場検証レポート＋確定版を構造的に修正</strong>します。
+              <br />
+              <span style={{ color: C.textSub, fontSize: 11.5 }}>
+                ※ 客観分析（市場像・需要診断・勝率診断）の数値は中立性のため変更されず、確定版テキスト本文のみが改善要望に従って修正されます。
+              </span>
+            </div>
+            <textarea value={improvementRequest} onChange={(e) => setImprovementRequest(e.target.value)}
+              rows={6}
+              placeholder="例：『確定版の読者像を1人に絞り込み、コンセプトを「書く→自己発見」の1軸に統一してください。』"
+              style={{ width: "100%", padding: "10px 12px", fontSize: 13, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.7 }} />
+            <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <button onClick={handleRegenerateWithRequest}
+                disabled={regenerating || !improvementRequest.trim() || !(outputText || "").trim()}
+                style={{
+                  fontSize: 13, fontWeight: 700,
+                  color: C.white,
+                  background: regenerating ? "#93c5fd" : (improvementRequest.trim() && (outputText || "").trim() ? C.gold : "rgba(0,0,0,0.15)"),
+                  border: "none", borderRadius: 3, padding: "10px 22px",
+                  cursor: (regenerating || !improvementRequest.trim() || !(outputText || "").trim()) ? "default" : "pointer",
+                  letterSpacing: "0.04em",
+                }}>
+                {regenerating ? "再生成中..." : "✨ 改善要望で再生成"}
+              </button>
+              {regenerating && <span style={{ fontSize: 12, color: C.navyMid }}>Dify が改善要望を反映して市場検証レポート＋確定版を再生成中（30秒〜1分）...</span>}
+              {regenError && <div style={{ width: "100%", marginTop: 8, padding: "8px 12px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 3, fontSize: 12, color: C.red }}>{regenError}</div>}
+            </div>
+            <div style={{ marginTop: 8, fontSize: 11.5, color: C.textLight, lineHeight: 1.7 }}>
+              💡 完了後、市場検証結果と確定版が新しい修正版に置き換わります。確定版の内容を確認して保存してください。
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
