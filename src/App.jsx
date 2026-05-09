@@ -196,6 +196,7 @@ const AUTHOR_PROFILE_KEY = "aipub:author_profile";
 const WORK_PROFILE_KEY = "aipub:work_profile_draft";
 const WORK_PROFILE_CONFIRMED_KEY = "aipub:work_profile_confirmed";
 const WORK_PROFILE_STEP2_FULL_KEY = "aipub:work_profile_step2_full";
+const STEP0_INPUTS_KEY = "aipub:step0_inputs";
 const STEP1_PENDING_KEY = "aipub:step1_pending_inputs";
 const STEP1_INPUTS_KEY = "aipub:step1_inputs";
 const STEP2_INPUTS_KEY = "aipub:step2_inputs";
@@ -1307,14 +1308,40 @@ const BookSlotInput = ({ slot, idx, onChange, onClear }) => {
 };
 
 const Step0Page = ({ savedProfile, onSaveProfile, onNavigate }) => {
+  // localStorage から保存済みの入力テキストを復元
+  // 注意：書籍ファイル（File オブジェクト）は保存できないので、テキスト入力のみ復元する
+  const savedInputs = (() => {
+    try {
+      const raw = (typeof window !== "undefined") ? localStorage.getItem(STEP0_INPUTS_KEY) : null;
+      return raw ? (JSON.parse(raw) || {}) : {};
+    } catch { return {}; }
+  })();
+
   const [bookSlots, setBookSlots] = useState([null, null, null]);
-  const [postsText, setPostsText] = useState("");
-  const [profileText, setProfileText] = useState("");
-  const [existingProfile, setExistingProfile] = useState("");
+  const [postsText, setPostsText] = useState(savedInputs.postsText || "");
+  const [profileText, setProfileText] = useState(savedInputs.profileText || "");
+  const [existingProfile, setExistingProfile] = useState(savedInputs.existingProfile || "");
   const [isRunning, setIsRunning] = useState(false);
   const [runError, setRunError] = useState("");
   const [outputText, setOutputText] = useState(savedProfile || "");
   const [saveMsg, setSaveMsg] = useState(false);
+  const [saveInputMsg, setSaveInputMsg] = useState(false);
+
+  const handleSaveInputs = () => {
+    try {
+      const data = {
+        postsText,
+        profileText,
+        existingProfile,
+      };
+      localStorage.setItem(STEP0_INPUTS_KEY, JSON.stringify(data));
+      setSaveInputMsg(true);
+      setTimeout(() => setSaveInputMsg(false), 2500);
+    } catch (e) {
+      console.warn("STEP0 inputs save failed:", e);
+      alert("入力データの保存に失敗しました。ブラウザのストレージ容量を確認してください。");
+    }
+  };
 
   const handleFileChange = async (slotIdx, file) => {
     setBookSlots((slots) => {
@@ -1444,6 +1471,13 @@ const Step0Page = ({ savedProfile, onSaveProfile, onNavigate }) => {
             placeholder="【著者プロファイル】... を貼り付け"
             rows={4}
             style={{ width: "100%", padding: "10px 12px", fontSize: 14, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.7 }} />
+        </div>
+
+        {/* 入力データ保存ボタン */}
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 8 }}>
+          <BtnPrimary onClick={handleSaveInputs}>入力データを保存</BtnPrimary>
+          {saveInputMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました（次回ページを開いた時に復元されます）</span>}
+          <span style={{ fontSize: 11.5, color: C.textLight, marginLeft: 4 }}>※書籍ファイルは再アップロードが必要です（テキスト入力のみ保存）</span>
         </div>
       </div>
 
