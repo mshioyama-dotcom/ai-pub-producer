@@ -2539,6 +2539,10 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   // STEP7（詳細プロット作成）の章選択用
   const [chapterOptions, setChapterOptions] = useState([]);
   const [selectedChapter, setSelectedChapter] = useState(null);
+  // 改善要望（外部AIレビュー結果を反映してDify再生成する仕組み）
+  const [improvementRequest, setImprovementRequest] = useState("");
+  const [regenerating, setRegenerating] = useState(false);
+  const [regenError, setRegenError] = useState("");
   // STEP7 全章一括生成の進捗
   const [chapterStockProgress, setChapterStockProgress] = useState(null);
   // 自動投入済みフィールドの展開状態（デフォルト：折りたたみ）
@@ -3363,6 +3367,60 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         authorProfile={getAutoInjectedProfiles().author_profile || ""}
         workProfile={extractDiscussionContext(getAutoInjectedProfiles().work_profile || "")}
       />
+
+      {/* 改善要望で Dify 再生成（外部AIで戦略レビューした結果を Dify に反映する仕組み）
+          - STEP YML の【6】改善要望機構 + Self-Refine が表面修正でなく構造的修正を保証
+          - 外部AIの「改善要望文」をここに貼って「✨ 改善要望で再生成」を押すと、
+            Dify が前回の出力と改善要望を踏まえて新しい修正版を生成する */}
+      {(outputText || "").trim() && step.num !== 0 && step.type !== "chat" && (
+        <div style={{ marginTop: 24, marginBottom: 16, border: `2px solid ${C.gold}`, borderRadius: 6, background: C.goldPale }}>
+          <div style={{ padding: 14 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: C.gold, marginBottom: 6 }}>
+              ✨ 改善要望で Dify 再生成
+            </div>
+            <div style={{ fontSize: 12.5, color: C.text, marginBottom: 10, lineHeight: 1.7 }}>
+              外部AIの戦略レビューで得た「改善要望」を貼り付けると、Dify が <strong>現在の出力＋改善要望</strong> を踏まえて構造的に修正版を生成します。
+              <br />
+              <span style={{ color: C.textSub, fontSize: 11.5 }}>
+                ※ 表面的書き換えではなく、Dify ワークフロー内の Self-Refine（生成→自己批評→修正版）で根本修正を保証。
+              </span>
+            </div>
+            <textarea value={improvementRequest} onChange={(e) => setImprovementRequest(e.target.value)}
+              rows={6}
+              placeholder="例：『読者像が3層に分裂しているので、40〜50代会社員1層に絞り込み、サブターゲットは削除してください。コンセプトも書く→自己発見の1軸に統一してください。』"
+              style={{ width: "100%", padding: "10px 12px", fontSize: 13, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.7 }} />
+            <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <button onClick={async () => {
+                setRegenError("");
+                setRegenerating(true);
+                try {
+                  await handleRegenerateWithRequest(improvementRequest);
+                } catch (e) {
+                  setRegenError(e.message || "再生成に失敗しました");
+                } finally {
+                  setRegenerating(false);
+                }
+              }}
+                disabled={regenerating || !improvementRequest.trim() || !(outputText || "").trim()}
+                style={{
+                  fontSize: 13, fontWeight: 700,
+                  color: C.white,
+                  background: regenerating ? "#93c5fd" : (improvementRequest.trim() && (outputText || "").trim() ? C.gold : "rgba(0,0,0,0.15)"),
+                  border: "none", borderRadius: 3, padding: "10px 22px",
+                  cursor: (regenerating || !improvementRequest.trim() || !(outputText || "").trim()) ? "default" : "pointer",
+                  letterSpacing: "0.04em",
+                }}>
+                {regenerating ? "再生成中..." : "✨ 改善要望で再生成"}
+              </button>
+              {regenerating && <span style={{ fontSize: 12, color: C.navyMid }}>Dify が改善要望を反映して修正版を生成中（30秒〜1分）...</span>}
+              {regenError && <div style={{ width: "100%", marginTop: 8, padding: "8px 12px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 3, fontSize: 12, color: C.red }}>{regenError}</div>}
+            </div>
+            <div style={{ marginTop: 8, fontSize: 11.5, color: C.textLight, lineHeight: 1.7 }}>
+              💡 完了後、上の「③ 出力データ」欄が新しい修正版に置き換わります。内容を確認して「出力データを保存」を押してください。
+            </div>
+          </div>
+        </div>
+      )}
 
       {step.help && step.help.length > 0 && (
         <div style={{ marginBottom: 16 }}>
