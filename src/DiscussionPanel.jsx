@@ -371,29 +371,12 @@ export default function DiscussionPanel({
 
       {open && (
         <div style={{ padding: 14 }}>
+          {/* 使い方を1ボックスに集約（最小限） */}
           <div style={{ fontSize: 12.5, color: C.textSub, lineHeight: 1.7, marginBottom: 10, padding: "8px 12px", background: "#fff7e6", border: "1px solid #ffd591", borderRadius: 4 }}>
-            <strong>このSTEP（STEP{stepNum}）専用の核観点（3つ）</strong>で、出版コンサルタント・編集者として<strong>率直な評価＋修正版</strong>を返してもらうプロンプトです。
-            返答の流れ：
-            <ol style={{ margin: "4px 0 0 0", paddingLeft: 20 }}>
-              <li><strong style={{ color: C.green }}>合格判定</strong>（致命的0個＋△1個以下なら「✅ 合格」で終了）</li>
-              <li>合格しない場合のみ：判定／観点評価／総評／<strong>修正版</strong>（事実確認必要なら先に質問）</li>
-            </ol>
-            <strong style={{ color: C.gold }}>使い方：</strong>
-            <ul style={{ margin: "4px 0 0 0", paddingLeft: 20, fontSize: 11.5 }}>
-              <li>返答の「修正版」を「③ 出力データ」欄に貼り付け → 保存</li>
-              <li>方向性が合わない場合は「もっと刺さる方向で」「3案で比較したい」等を続けて伝えると、追加で別案を出してくれます</li>
-            </ul>
-          </div>
-
-          {/* 無限ループ警告：レビュー過剰使用への注意喚起 */}
-          <div style={{ fontSize: 12, color: "#7c2d12", lineHeight: 1.7, marginBottom: 10, padding: "8px 12px", background: "#fef3c7", border: "1px solid #f59e0b", borderRadius: 4 }}>
-            ⚠️ <strong>レビューは1〜2回までが原則です</strong>。
-            AIは「指摘ゼロ＝仕事してない」と判定する構造的バイアスがあり、
-            修正のたびに別の角度から新しい指摘を生成し続けます。
-            合格判定（致命的0個＋△1個以下）を満たしたら、それ以上回さないでください。
+            <strong>STEP{stepNum}専用の3観点</strong>で評価 → <strong style={{ color: C.green }}>合格なら「✅ 合格」で終了</strong>／不合格なら<strong>修正版1案</strong>を出力。
+            修正版が出たら「③ 出力データ」欄に貼り付けて保存。
             <br />
-            「修正の修正」を3回以上重ねている場合、AIは本質的でない揺れを拾っているだけの可能性が高く、
-            <strong>「もう十分」と判断するのは著者の役割</strong>です。
+            <span style={{ color: "#7c2d12" }}>⚠️ レビュー3回以上は過剰。「もう十分」は著者判断で。</span>
           </div>
 
           {!hasOutput && (
@@ -405,7 +388,7 @@ export default function DiscussionPanel({
           {/* プロンプト表示エリア */}
           <div style={{ marginBottom: 10 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: C.navy, marginBottom: 6 }}>
-              生成されたプロンプト（コピーして外部AIへ）：
+              生成されたプロンプト（コピーして ChatGPT / Claude.ai に貼り付け）：
             </div>
             <textarea
               value={generatedPrompt}
@@ -432,7 +415,7 @@ export default function DiscussionPanel({
           </div>
 
           {/* アクションボタン群 */}
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <button
               onClick={handleCopyPrompt}
               disabled={!hasOutput}
@@ -450,64 +433,17 @@ export default function DiscussionPanel({
             >
               📋 プロンプトをコピー
             </button>
+            <button onClick={() => {
+              const el = document.getElementById("output-section");
+              if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+              style={{
+                fontSize: 13, fontWeight: 700, color: C.white, background: C.gold,
+                border: "none", borderRadius: 3, padding: "9px 22px", cursor: "pointer",
+              }}>
+              ⬆ 「出力データ」欄へ
+            </button>
             {copyMsg && <span style={{ fontSize: 12, color: copyMsg.startsWith("✓") ? C.green : C.red, fontWeight: 600 }}>{copyMsg}</span>}
-          </div>
-
-          {/* 使い方ガイド */}
-          <div style={{
-            marginTop: 12,
-            padding: "10px 14px",
-            background: "#eef2f7",
-            border: "1px solid #c8d4e0",
-            borderRadius: 4,
-            fontSize: 12.5,
-            color: C.text,
-            lineHeight: 1.8,
-          }}>
-            <div style={{ fontWeight: 700, color: C.navy, marginBottom: 6 }}>使い方の流れ</div>
-            <ol style={{ margin: 0, paddingLeft: 20 }}>
-              <li>「📋 プロンプトをコピー」ボタンを押す</li>
-              <li>ChatGPT または Claude.ai を開いて、コピーしたプロンプトを貼り付けて送信</li>
-              <li>
-                AIが <strong>合格判定</strong>（致命的0個＋△1個以下）をまず行い、
-                <ul style={{ margin: "2px 0 0 0", paddingLeft: 18, fontSize: 12 }}>
-                  <li><strong style={{ color: C.green }}>合格なら</strong>：「✅ 合格：このまま次STEPへ進んでOK」で終了 → そのままSTEPを進める</li>
-                  <li><strong style={{ color: C.gold }}>不合格なら</strong>：評価＋<strong>修正版1案</strong>を出力（事実確認が必要なら先に質問あり）</li>
-                </ul>
-              </li>
-              <li>修正版が出た場合は、
-                <strong style={{ color: C.gold }}>「出力データ」欄に貼り付け</strong>：
-                このページを上にスクロールして「<strong>③ 出力データ</strong>」セクションの textarea を全選択→削除→貼り付け
-              </li>
-              <li>「<strong>出力データを保存</strong>」ボタンで確定</li>
-              <li>
-                方向性が合わない場合のみ、外部AIに続けて
-                「<strong>もっと刺さる方向で</strong>」「<strong>3案で比較したい</strong>」「<strong>違う切り口で</strong>」等と伝えると、
-                追加で別方向の案を出してくれる
-              </li>
-              <li>
-                ⚠️ <strong style={{ color: "#7c2d12" }}>レビューは1〜2回まで</strong>。
-                修正版を貼り付けて再度レビュー →「また問題が見つかった」を3回以上繰り返している場合、
-                AIが本質的でない揺れを拾っている可能性が高いので、著者として「もう十分」と判断して次へ進む
-              </li>
-            </ol>
-            <div style={{ marginTop: 10, padding: "8px 10px", background: C.white, border: `1px dashed ${C.gold}`, borderRadius: 3, fontSize: 11.5, color: C.textSub, lineHeight: 1.6 }}>
-              ⬆ <strong style={{ color: C.gold }}>このパネルの上に「③ 出力データ」セクションがあります</strong>。
-              そこの textarea に確定版を貼り付け、「出力データを保存」ボタンを押すと、次のSTEPに進めます。
-            </div>
-            <div style={{ marginTop: 10, textAlign: "center" }}>
-              <button onClick={() => {
-                const el = document.getElementById("output-section");
-                if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-              }}
-                style={{
-                  fontSize: 13, fontWeight: 700, color: C.white, background: C.gold,
-                  border: "none", borderRadius: 3, padding: "10px 22px", cursor: "pointer",
-                  letterSpacing: "0.04em",
-                }}>
-                ⬆ 「出力データ」欄にスクロール
-              </button>
-            </div>
           </div>
         </div>
       )}
