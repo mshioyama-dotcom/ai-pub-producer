@@ -332,6 +332,9 @@ workflow:
 
             両方が空欄の場合は通常通り新規生成してください。improvement_requestのみで previous_output が空の場合も、新規生成として improvement_request の方針を反映してください。
 
+            previous_output: {{#1772856018370.previous_output#}}
+            improvement_request: {{#1772856018370.improvement_request#}}
+
             Output Format
 
             コードブロックは使わず、プレーンテキストで出力してください。
