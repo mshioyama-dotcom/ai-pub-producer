@@ -468,14 +468,28 @@ export default function DiscussionPanel({
             <ol style={{ margin: 0, paddingLeft: 20 }}>
               <li>「📋 プロンプトをコピー」ボタンを押す</li>
               <li>ChatGPT または Claude.ai を開いて、コピーしたプロンプトを貼り付けて送信</li>
-              <li>AIが現在の出力を読み込んで <strong>3つの改善案を即提示</strong> してくれる（こちらから方向性を伝える必要なし）</li>
-              <li>気に入った案があれば「N案目で確定」と伝えて<strong>確定版テキスト</strong>を取得</li>
               <li>
-                <strong style={{ color: C.gold }}>↑ 確定版を「出力データ」欄に貼り付け</strong>：
+                AIが <strong>合格判定</strong>（致命的0個＋△1個以下）をまず行い、
+                <ul style={{ margin: "2px 0 0 0", paddingLeft: 18, fontSize: 12 }}>
+                  <li><strong style={{ color: C.green }}>合格なら</strong>：「✅ 合格：このまま次STEPへ進んでOK」で終了 → そのままSTEPを進める</li>
+                  <li><strong style={{ color: C.gold }}>不合格なら</strong>：評価＋<strong>修正版1案</strong>を出力（事実確認が必要なら先に質問あり）</li>
+                </ul>
+              </li>
+              <li>修正版が出た場合は、
+                <strong style={{ color: C.gold }}>「出力データ」欄に貼り付け</strong>：
                 このページを上にスクロールして「<strong>③ 出力データ</strong>」セクションの textarea を全選択→削除→貼り付け
               </li>
               <li>「<strong>出力データを保存</strong>」ボタンで確定</li>
-              <li>違う方向性で見たい時は外部AIに「もっと刺さるタイトルに」「N案目をベースに〜」など一言伝えれば、また3案返ってくる</li>
+              <li>
+                方向性が合わない場合のみ、外部AIに続けて
+                「<strong>もっと刺さる方向で</strong>」「<strong>3案で比較したい</strong>」「<strong>違う切り口で</strong>」等と伝えると、
+                追加で別方向の案を出してくれる
+              </li>
+              <li>
+                ⚠️ <strong style={{ color: "#7c2d12" }}>レビューは1〜2回まで</strong>。
+                修正版を貼り付けて再度レビュー →「また問題が見つかった」を3回以上繰り返している場合、
+                AIが本質的でない揺れを拾っている可能性が高いので、著者として「もう十分」と判断して次へ進む
+              </li>
             </ol>
             <div style={{ marginTop: 10, padding: "8px 10px", background: C.white, border: `1px dashed ${C.gold}`, borderRadius: 3, fontSize: 11.5, color: C.textSub, lineHeight: 1.6 }}>
               ⬆ <strong style={{ color: C.gold }}>このパネルの上に「③ 出力データ」セクションがあります</strong>。
