@@ -294,6 +294,18 @@ function sendDebugLog(label, data) {
   } catch (e) {}
 }
 
+// 出力データの会話的ノイズ（前置き・相槌・受け止め要約）を取り除く。
+// 1) <<<出力データ>>> ... <<<出力データここまで>>> マーカーがあれば中身のみ抽出
+// 2) なければ単純に trim（既存挙動を壊さない）
+function cleanOutputText(text) {
+  if (typeof text !== "string") return text;
+  let cleaned = text.replace(/\r\n/g, "\n").trim();
+  const markerRe = /<<<\s*出力データ\s*>>>\s*([\s\S]*?)\s*<<<\s*出力データここまで\s*>>>/;
+  const m = cleaned.match(markerRe);
+  if (m) cleaned = m[1].trim();
+  return cleaned;
+}
+
 async function saveStepData(num, data) {
   try {
     const serialized = JSON.stringify(data);
@@ -1512,8 +1524,10 @@ const Step0Page = ({ savedProfile, onSaveProfile, onNavigate }) => {
   };
 
   const handleSaveProfile = async () => {
-    if (!outputText.trim()) return;
-    await onSaveProfile(outputText);
+    const cleaned = cleanOutputText(outputText);
+    if (!cleaned.trim()) return;
+    if (cleaned !== outputText) setOutputText(cleaned);
+    await onSaveProfile(cleaned);
     setSaveMsg(true);
     setTimeout(() => setSaveMsg(false), 2500);
   };
@@ -1722,8 +1736,10 @@ const Step1Page = ({ savedAuthorProfile, savedWorkProfile, onSaveWorkProfile, on
   };
 
   const handleSave = async () => {
-    if (!outputText.trim()) return;
-    await onSaveWorkProfile(outputText);
+    const cleaned = cleanOutputText(outputText);
+    if (!cleaned.trim()) return;
+    if (cleaned !== outputText) setOutputText(cleaned);
+    await onSaveWorkProfile(cleaned);
     setSaveMsg(true);
     setTimeout(() => setSaveMsg(false), 2500);
   };
@@ -2115,8 +2131,10 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
   };
 
   const handleSave = async () => {
-    if (!confirmedDraft.trim()) return;
-    await onSaveWorkProfileConfirmed(confirmedDraft);
+    const cleaned = cleanOutputText(confirmedDraft);
+    if (!cleaned.trim()) return;
+    if (cleaned !== confirmedDraft) setConfirmedDraft(cleaned);
+    await onSaveWorkProfileConfirmed(cleaned);
     setSaveMsg(true);
     setTimeout(() => setSaveMsg(false), 2500);
   };
@@ -2618,7 +2636,9 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   };
 
   const handleSaveOutput = async () => {
-    await onSaveOutput(step.num, outputText);
+    const cleaned = cleanOutputText(outputText);
+    if (cleaned !== outputText) setOutputText(cleaned);
+    await onSaveOutput(step.num, cleaned);
     setSaveOutputMsg("saved"); setTimeout(() => setSaveOutputMsg(false), 2000);
   };
 
@@ -3147,10 +3167,11 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                   <button onClick={() => {
                     const lastAI = [...chatMessages].reverse().find((m) => m.role === "assistant");
                     if (!lastAI) return;
-                    const lines = lastAI.content.split("\n").map((l) => l.trim()).filter(Boolean);
+                    const cleaned = cleanOutputText(lastAI.content);
+                    const lines = cleaned.split("\n").map((l) => l.trim()).filter(Boolean);
                     const candidates = lines.filter((l) => l.includes("×") || l.includes("x") || l.includes("X"));
                     if (candidates.length > 1) { setChatSelectOptions(candidates); }
-                    else { setOutputText(lastAI.content); setChatCopyMsg(true); setTimeout(() => setChatCopyMsg(false), 2000); }
+                    else { setOutputText(cleaned); setChatCopyMsg(true); setTimeout(() => setChatCopyMsg(false), 2000); }
                   }} disabled={!chatMessages.some((m) => m.role === "assistant")}
                     style={{ fontSize: 13, fontWeight: 700, color: chatMessages.some((m) => m.role === "assistant") ? C.white : C.textLight, background: chatMessages.some((m) => m.role === "assistant") ? C.gold : "rgba(0,0,0,0.06)", border: "none", borderRadius: 3, padding: "8px 18px", cursor: chatMessages.some((m) => m.role === "assistant") ? "pointer" : "default" }}>
                     ↓ 最後の回答を出力データへ転記
@@ -3514,8 +3535,9 @@ export default function App() {
   }, [allSteps]);
 
   const handleSaveOutput = useCallback(async (num, outputText) => {
+    const cleaned = cleanOutputText(outputText);
     const existing = allSteps[num] || defaultStepData(num);
-    const updated = { ...existing, outputText, status: "completed", isSaved: true, updatedAt: new Date().toISOString() };
+    const updated = { ...existing, outputText: cleaned, status: "completed", isSaved: true, updatedAt: new Date().toISOString() };
     await saveStepData(num, updated);
     setAllSteps((prev) => ({ ...prev, [num]: updated }));
     setProject((prev) => {
