@@ -2609,14 +2609,16 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   }, [step.num, allSteps]);
 
   // 自動投入: autoFill: true で source 定義のあるフィールドが空欄なら、前STEPの outputText で自動補完。
-  // 既に値があれば上書きしない（ユーザーの手動編集を尊重）。
-  // 「自動振り分け」ボタンを押す手間を省くための自動化。
+  // 永続化された stepData.inputData を見て判定する（局所 state の inputs を見ると
+  // ページ遷移直後の React state 更新タイミングで誤判定するため）。
+  // 既に保存値があれば上書きしない（ユーザーの手動編集を尊重）。
   useEffect(() => {
     if (!step.inputs || !allSteps) return;
+    const baseInputs = stepData?.inputData || {};
     const updates = {};
     step.inputs.forEach((field) => {
       if (field.autoFill !== true || !field.source) return;
-      if ((inputs[field.name] || "").trim()) return; // 既に値があればスキップ
+      if ((baseInputs[field.name] || "").trim()) return; // 永続化された値があればスキップ
       const srcMatch = field.source.match(/^STEP(\d+)$/);
       if (!srcMatch) return;
       const srcNum = parseInt(srcMatch[1], 10);
@@ -2625,12 +2627,16 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     });
     if (Object.keys(updates).length === 0) return;
     setInputs((prev) => {
-      const merged = { ...prev, ...updates };
+      // 局所 state 側も空欄のものだけ投入（既にユーザーが入力中なら邪魔しない）
+      const merged = { ...prev };
+      Object.entries(updates).forEach(([k, v]) => {
+        if (!(merged[k] || "").trim()) merged[k] = v;
+      });
       onInputChange?.(step.num, merged);
       return merged;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step.num, allSteps]);
+  }, [step.num, allSteps, stepData]);
 
   const prevStep = step.num > 1 ? STEPS[step.num - 2] : null;
   const nextStep = step.num < 9 ? STEPS[step.num] : null;
