@@ -2487,8 +2487,30 @@ const Step4ConfirmPanel = ({ outputText }) => {
         </div>
       )}
 
-      {/* どちらでもない: 完全手動入力を促す */}
-      {!parsed && !autoFilledFromSingle && outputText && (
+      {/* 抽出は成功したが既存値があり上書きされなかった → 上書きボタンを提示 */}
+      {!parsed && !autoFilledFromSingle && singleExtracted && (
+        ((singleExtracted.title && singleExtracted.title !== titleInput) ||
+         (singleExtracted.subtitle && singleExtracted.subtitle !== subtitleInput)) && (
+          <div style={{ padding: "10px 12px", background: C.goldPale, border: `1px solid ${C.goldLight}`, borderRadius: 3, fontSize: 12.5, color: C.text, marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+            <div style={{ lineHeight: 1.7 }}>
+              📋 出力欄から新しいタイトル／サブタイトルを検出しました（下の欄には前回の確定値が残っています）。上書きしますか？
+            </div>
+            <button onClick={() => {
+              if (singleExtracted.title) setTitleInput(singleExtracted.title);
+              if (singleExtracted.subtitle) setSubtitleInput(singleExtracted.subtitle);
+              setAutoFilledFromSingle(true);
+            }} style={{
+              fontSize: 12.5, fontWeight: 700, color: C.white, background: C.gold,
+              border: "none", borderRadius: 3, padding: "7px 14px", cursor: "pointer", flexShrink: 0,
+            }}>
+              📥 出力欄の値で上書き
+            </button>
+          </div>
+        )
+      )}
+
+      {/* どちらでもない: 完全手動入力を促す（抽出本当に失敗のときだけ表示） */}
+      {!parsed && !singleExtracted && outputText && (
         <div style={{ padding: "8px 12px", background: "#fff", border: `1px solid ${C.border}`, borderRadius: 3, fontSize: 12.5, color: C.textSub, marginBottom: 10 }}>
           ※ 出力欄からタイトル・サブタイトルを自動取得できませんでした。下のフォームに手動で入力してください。
         </div>
