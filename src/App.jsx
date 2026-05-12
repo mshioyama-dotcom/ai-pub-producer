@@ -2598,10 +2598,13 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     setExpandedFields({});
   }, [step.num]);
 
-  // STEP7 専用: ページを開いた瞬間にSTEP6の出力から章を自動抽出してプレビュー表示する。
+  // STEP6/STEP7 専用: ページを開いた瞬間に前STEP出力から章を自動抽出してプレビュー表示する。
+  // STEP6 は STEP5（目次）から章を抽出して章ごとに章構成を生成、
+  // STEP7 は STEP6（章構成）から章を抽出して章ごとに詳細プロットを生成。
   useEffect(() => {
-    if (step.num !== 7) return;
-    const srcOutput = allSteps?.[6]?.outputText;
+    if (step.num !== 6 && step.num !== 7) return;
+    const srcNum = step.num === 6 ? 5 : 6;
+    const srcOutput = allSteps?.[srcNum]?.outputText;
     if (!srcOutput) { setChapterOptions([]); return; }
     const extracted = extractChapters(srcOutput);
     setChapterOptions(extracted);
@@ -2740,6 +2743,68 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
       }
     } catch (e) { setChatError("通信エラーが発生しました。時間をおいて再度お試しください。"); }
     finally { setChatLoading(false); }
+  };
+
+  // STEP6 専用: 抽出された全章を順次 Dify に投げて、各章の章構成（節リスト＋要約）を生成し
+  // outputText に結合して蓄積する。Dify Cloud の iteration ノードが Flask app_context エラーで
+  // 動かないため、フロント側でループする STEP7 と同じパターンを採用。
+  const handleRunAllChaptersForStep6 = async () => {
+    if (step.num !== 6) return;
+    if (!chapterOptions || chapterOptions.length === 0) {
+      alert("STEP5（目次）の出力から章を検出できませんでした。STEP5の出力をご確認ください。");
+      return;
+    }
+    const interviewText = (inputs.interview_text || "").trim();
+    if (!interviewText) {
+      alert("「エピソードインタビューのアウトプット」が未入力です。先に STEP3 を完了させて自動投入してください。");
+      return;
+    }
+    if ((outputText || "").trim()) {
+      const ok = window.confirm("現在の出力データは上書きされます。続行しますか？");
+      if (!ok) return;
+    }
+    setIsRunning(true);
+    setRunError("");
+    setChapterStockProgress({ total: chapterOptions.length, current: 0, currentItemName: "" });
+    const results = [];
+    try {
+      for (let i = 0; i < chapterOptions.length; i++) {
+        const ch = chapterOptions[i];
+        setChapterStockProgress({ total: chapterOptions.length, current: i + 1, currentItemName: ch.chapterTitle });
+        const execInputs = {
+          ...getAutoInjectedProfiles(),
+          // ai-pub-producer のキー名は toc_text、/api/dify.js が refined_toc にマップする。
+          // ここには「1章分のテキスト」だけを詰めて送る。
+          toc_text: ch.body.trim(),
+          interview_text: interviewText,
+        };
+        const response = await fetch("/api/dify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ stepNum: 6, inputs: execInputs }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(`「${ch.chapterTitle}」の生成で失敗：${data.error || "不明なエラー"}`);
+        }
+        const out = (data.output || "").trim();
+        if (!out || out.length < 30) {
+          throw new Error(`「${ch.chapterTitle}」で有効な出力が返りませんでした（${out.length}文字）`);
+        }
+        results.push({ title: ch.chapterTitle, content: out });
+        if (i < chapterOptions.length - 1) {
+          await new Promise((r) => setTimeout(r, 3000));
+        }
+      }
+      const combined = results.map((r) => `=== ${r.title} ===\n\n${r.content}`).join("\n\n---\n\n");
+      setOutputText(combined);
+      setChapterStockProgress(null);
+    } catch (e) {
+      setRunError(e.message + "\n\n途中までの結果は破棄されます。少し時間をおいてから「全章を順次生成」をもう一度お試しください。");
+      setChapterStockProgress(null);
+    } finally {
+      setIsRunning(false);
+    }
   };
 
   // STEP7 専用: 抽出された全章を順次 Dify に投げて、結果を outputText に蓄積する。
@@ -3225,6 +3290,64 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                   <span style={{ fontSize: 11.5, color: C.textLight, marginLeft: 8 }}>新しいテーマで試すときはリセットしてください</span>
                 </div>
               </div>
+            </div>
+          ) : step.num === 6 ? (
+            // STEP6 は STEP5（目次）から章を抽出し、章ごとに章構成を生成して結果を結合する。
+            // Dify Cloud の iteration ノードが Flask app_context エラーで動かないため、
+            // フロント側でループ実行する（STEP7 と同じパターン）。
+            <div>
+              {runError && <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginBottom: 12, fontSize: 13, color: C.red, whiteSpace: "pre-wrap", lineHeight: 1.7 }}>{runError}</div>}
+              {chapterStockProgress ? (
+                <div style={{ padding: "12px 14px", background: C.navyLight, border: `1px solid rgba(42,68,104,0.2)`, borderRadius: 4 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, fontSize: 12.5, color: C.navyMid, fontWeight: 600 }}>
+                    <span>章の一括生成中：{chapterStockProgress.current} / {chapterStockProgress.total} 章</span>
+                    <span>{Math.round((chapterStockProgress.current / chapterStockProgress.total) * 100)}%</span>
+                  </div>
+                  <div style={{ height: 8, background: "rgba(0,0,0,0.08)", borderRadius: 4, overflow: "hidden" }}>
+                    <div style={{ width: `${(chapterStockProgress.current / chapterStockProgress.total) * 100}%`, height: "100%", background: C.navy, transition: "width 0.3s ease" }} />
+                  </div>
+                  <div style={{ marginTop: 8, fontSize: 12, color: C.textSub, lineHeight: 1.6 }}>⏳ 生成中：<span style={{ color: C.text, fontWeight: 600 }}>{chapterStockProgress.currentItemName}</span></div>
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 13, color: C.textSub, lineHeight: 1.8, marginBottom: 12 }}>
+                    STEP5 の目次から章を自動抽出し、章ごとに Dify を呼び出して全章分の章構成を一括生成します。
+                    章間に3秒のウェイトを挟むため、章数 × 約30秒〜1分程度かかります。
+                  </div>
+                  {!allSteps?.[5]?.outputText && (
+                    <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginBottom: 12, fontSize: 13, color: C.red }}>
+                      ⚠ STEP5 の出力データがまだ保存されていません。STEP5 で「出力データを保存」を押してから戻ってきてください。
+                    </div>
+                  )}
+                  {allSteps?.[5]?.outputText && chapterOptions.length === 0 && (
+                    <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginBottom: 12, fontSize: 13, color: C.red, lineHeight: 1.7 }}>
+                      ⚠ STEP5 の出力から章を検出できませんでした。「はじめに」「第N章: xxx」「おわりに」のような章見出しが含まれているか、STEP5 の出力を確認してください。
+                    </div>
+                  )}
+                  {chapterOptions.length > 0 && (
+                    <>
+                      <button onClick={handleRunAllChaptersForStep6} disabled={isRunning}
+                        title="検出された全ての章を順番にDifyに投げて、全章分の章構成を一気に生成します。"
+                        style={{ padding: "12px 36px", background: isRunning ? "#93c5fd" : C.navy, color: C.white, border: "none", borderRadius: 3, fontWeight: 700, fontSize: 14, cursor: isRunning ? "default" : "pointer", letterSpacing: "0.04em" }}>
+                        🚀 全章を順次生成（{chapterOptions.length}章）
+                      </button>
+                      <div style={{ marginTop: 12, padding: "10px 14px", background: C.white, border: `1px solid ${C.border}`, borderRadius: 4 }}>
+                        <div style={{ fontSize: 12, color: C.textSub, marginBottom: 8, fontWeight: 600 }}>
+                          検出された章（{chapterOptions.length}章 — 全て順次処理されます）：
+                        </div>
+                        <ol style={{ margin: 0, paddingLeft: 22, fontSize: 13, color: C.text, lineHeight: 1.9 }}>
+                          {chapterOptions.map((ch, i) => (
+                            <li key={i} style={{ wordBreak: "break-word" }}>
+                              {ch.chapterTitle}
+                              <span style={{ fontSize: 11, color: C.textLight, marginLeft: 6 }}>（{ch.body.trim().length.toLocaleString()}文字）</span>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
             </div>
           ) : step.num === 7 ? (
             // STEP7 は入力データセクション内の「🚀 全章を順次生成」ボタンで実行する設計のため、

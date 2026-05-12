@@ -70,57 +70,21 @@ workflow:
         isInIteration: false
         isInLoop: false
         sourceType: start
-        targetType: code
-      id: 1772945917672-source-1772952194627-target
-      source: '1772945917672'
-      sourceHandle: source
-      target: '1772952194627'
-      targetHandle: target
-      type: custom
-      zIndex: 0
-    - data:
-        isInIteration: false
-        isInLoop: false
-        sourceType: code
-        targetType: iteration
-      id: 1772952194627-source-1772952541934-target
-      source: '1772952194627'
-      sourceHandle: source
-      target: '1772952541934'
-      targetHandle: target
-      type: custom
-      zIndex: 0
-    - data:
-        isInIteration: true
-        isInLoop: false
-        iteration_id: '1772952541934'
-        sourceType: iteration-start
         targetType: llm
-      id: 1772952541934start-source-1772952562841-target
-      source: 1772952541934start
+      id: 1772945917672-source-1772952562841-target
+      source: '1772945917672'
       sourceHandle: source
       target: '1772952562841'
       targetHandle: target
       type: custom
-      zIndex: 1002
+      zIndex: 0
     - data:
         isInIteration: false
         isInLoop: false
-        sourceType: iteration
-        targetType: code
-      id: 1772952541934-source-1772953308664-target
-      source: '1772952541934'
-      sourceHandle: source
-      target: '1772953308664'
-      targetHandle: target
-      type: custom
-      zIndex: 0
-    - data:
-        isInLoop: false
-        sourceType: code
+        sourceType: llm
         targetType: end
-      id: 1772953308664-source-1772947207354-target
-      source: '1772953308664'
+      id: 1772952562841-source-1772947207354-target
+      source: '1772952562841'
       sourceHandle: source
       target: '1772947207354'
       targetHandle: target
@@ -151,8 +115,8 @@ workflow:
           type: text-input
           variable: subtitle
         - default: ''
-          hint: ''
-          label: 目次作成のアウトプット（必須）
+          hint: '1章分のテキスト（章タイトル＋節リスト）を渡してください。ai-pub-producer のフロント側で全章をループしてこのワークフローを章数回呼び出します。'
+          label: 1章分の目次テキスト（章タイトル＋節リスト・必須）
           max_length: 5000
           options: []
           placeholder: ''
@@ -220,8 +184,8 @@ workflow:
     - data:
         outputs:
         - value_selector:
-          - '1772953308664'
-          - final_outline
+          - '1772952562841'
+          - text
           value_type: string
           variable: text
         selected: false
@@ -241,130 +205,11 @@ workflow:
       type: custom
       width: 242
     - data:
-        code: "import re\nimport json\n\ndef main(toc_text: str, target_chapter: str\
-          \ = \"\"):\n    # --- 1. テキストのパースとクリーニング ---\n    content = toc_text\n \
-          \   try:\n        if isinstance(toc_text, str) and toc_text.strip().startswith('{'):\n\
-          \            data = json.loads(toc_text)\n            content = data.get(\"\
-          text\", toc_text)\n    except:\n        content = toc_text\n\n    if content\
-          \ is None:\n        content = \"\"\n\n    # コードブロック記号などを掃除\n    content\
-          \ = str(content).replace(\"```markdown\", \"\").replace(\"```\", \"\").strip()\n\
-          \n    # --- 2. 章ごとに分割 ---\n    # 「はじめに / 第N章：xxx / おわりに」を見出しとして検出。\n\
-          \    # 太字記法（**...**）の有無、見出しレベル（##/###）の有無に依存しないよう柔軟にマッチさせる。\n\
-          \    heading_pattern = r'(?=^\\s*[#*]*\\s*(?:はじめに|第\\s*\\d+\\s*章[:：].*?|おわりに)\\s*[#*]*\\s*$)'\n\
-          \    parts = re.split(heading_pattern, content, flags=re.MULTILINE)\n\n\
-          \    is_heading = re.compile(r'^\\s*[#*]*\\s*(?:はじめに|第\\s*\\d+\\s*章[:：].*?|おわりに)\\s*[#*]*\\s*$')\n\
-          \n    all_chapters = []\n    for p in parts:\n        p = p.strip()\n  \
-          \      if not p:\n            continue\n        first_line = p.split('\\\
-          n')[0].strip()\n        if is_heading.match(first_line):\n            all_chapters.append(p)\n\
-          \n    # --- 3. フィルタリング判定 ---\n    query = str(target_chapter or \"\").strip()\n\n\
-          \    if not query:\n        return {\"chapters_list\": all_chapters}\n\n\
-          \    filtered = []\n    for chapter in all_chapters:\n        first_line\
-          \ = chapter.split('\\n')[0].strip()\n        # 比較時は装飾記号を除いて正規化\n        \
-          normalized_first_line = re.sub(r'[#*\\s]', '', first_line)\n        normalized_query\
-          \ = re.sub(r'[#*\\s]', '', query)\n\n        # 例: \"3\" -> 第3章\n       \
-          \ if normalized_query in normalized_first_line:\n            filtered.append(chapter)\n\
-          \            continue\n\n        # \"第3章\" でも拾えるようにする\n        if re.search(rf'第\\\
-          s*{re.escape(query)}\\s*章', first_line):\n            filtered.append(chapter)\n\
-          \            continue\n\n        # はじめに / おわりに の完全一致\n        if normalized_query\
-          \ == normalized_first_line:\n            filtered.append(chapter)\n\n  \
-          \  return {\n        \"chapters_list\": filtered if filtered else all_chapters\n\
-          \    }"
-        code_language: python3
-        outputs:
-          chapters_list:
-            children: null
-            type: array[string]
-        selected: false
-        title: 目次分割
-        type: code
-        variables:
-        - value_selector:
-          - '1772945917672'
-          - refined_toc
-          value_type: string
-          variable: toc_text
-      height: 52
-      id: '1772952194627'
-      position:
-        x: 123
-        y: 287
-      positionAbsolute:
-        x: 123
-        y: 287
-      selected: false
-      sourcePosition: right
-      targetPosition: left
-      type: custom
-      width: 242
-    - data:
-        # 失敗した章があっても残りを続行（部分結果でも返す）
-        error_handle_mode: continue_on_error
-        flatten_output: true
-        height: 175
-        # 並列度のチューニング履歴：
-        #   parallel_nums: 5 → Dify Cloud のサンドボックスで
-        #     "Working outside of application context" (Flask) が発生
-        #   parallel_nums: 1 (is_parallel: false) → 逐次実行で章数×LLM時間が伸び、
-        #     Cloudflare 504 Gateway Time-out（api.dify.ai 上限超え）
-        #   parallel_nums: 3 → 並列子プロセス数を抑えつつ処理時間も短縮するバランス案
-        is_parallel: true
-        iterator_input_type: array[string]
-        iterator_selector:
-        - '1772952194627'
-        - chapters_list
-        output_selector:
-        - '1772952562841'
-        - text
-        output_type: array[string]
-        parallel_nums: 3
-        selected: false
-        start_node_id: 1772952541934start
-        title: イテレーション
-        type: iteration
-        width: 386
-      height: 175
-      id: '1772952541934'
-      position:
-        x: 425
-        y: 287
-      positionAbsolute:
-        x: 425
-        y: 287
-      selected: false
-      sourcePosition: right
-      targetPosition: left
-      type: custom
-      width: 386
-      zIndex: 1
-    - data:
-        desc: ''
-        isInIteration: true
-        selected: false
-        title: ''
-        type: iteration-start
-      draggable: false
-      height: 48
-      id: 1772952541934start
-      parentId: '1772952541934'
-      position:
-        x: 24
-        y: 68
-      positionAbsolute:
-        x: 449
-        y: 355
-      selectable: false
-      sourcePosition: right
-      targetPosition: left
-      type: custom-iteration-start
-      width: 44
-      zIndex: 1002
-    - data:
         context:
           enabled: false
           variable_selector: []
-        isInIteration: true
+        isInIteration: false
         isInLoop: false
-        iteration_id: '1772952541934'
         model:
           completion_params:
             enable_stream: false
@@ -379,13 +224,13 @@ workflow:
           role: system
           text: "# [Profile Context]\n■ 確定タイトル・サブタイトル（STEP4で確定済み・本書の核）\nメインタイトル: {{#1772945917672.title#}}\nサブタイトル: {{#1772945917672.subtitle#}}\n\n■ 著者プロファイル（参考情報・自動転記／空欄の場合は無視）\n{{#1772945917672.author_profile#}}\n\n■ 書籍プロファイル（参考情報・自動転記／空欄の場合は無視）\n{{#1772945917672.work_profile#}}\n\n■ プロファイルの扱い\n著者プロファイル・書籍プロファイルが提供されています。著者の角度・読者像・読了後の状態・差分を踏まえて出力してください。\nタイトル・サブタイトルは本書の核となる約束です。各節の要約は、この約束を満たす内容に整えてください（タイトル・サブタイトルが空欄の場合は無視）。\n\n# [0. Role]\nあなたは、書籍の特定「1章分」の設計を担当するシニア編集者です。\n他の章には踏み込みすぎず、今処理する章について、読者にとって価値が伝わる具体的な構成案を作成してください。\n\
             目的は、抽象論ではなく、この章で何を扱い、どんな具体例を出し、読者をどう変えるかが分かる要約を作ることです。\n\n# [1. Rules]\n\
-            - 渡された {{#1772952541934.item#}} 内の各節（- で始まる項目）ごとに、必ず具体的な要約を付けてください。\n\
+            - 渡された {{#1772945917672.refined_toc#}} 内の各節（- で始まる項目）ごとに、必ず具体的な要約を付けてください。\n\
             - 1節あたり **80〜140文字程度** を目安にしてください。長くしすぎないでください。\n- 抽象的な説明だけで終わらせず、その節で扱う具体場面・具体例・読者の変化が分かるようにしてください。\n\
             - 「〜を解説する」「〜を紹介する」だけの弱い表現は避けてください。\n- 素材（インタビューノート）: {{#1772945917672.interview_notes#}}\
             \ に、その節に関連する具体的な失敗、言葉、数字、感情、行動変化があれば、**各節につき1つ以上**反映してください。\n- 章タイトルと節タイトルは入力をそのまま使ってください。\n\
             - 要約は簡潔でよいですが、一般論ではなく、この本ならではの内容にしてください。\n\n# [2. Inputs]\n今回の処理対象（1章分）:\
-            \ {{#1772952541934.item#}}\n書籍の全体設計図: 書籍プロファイル（自動転記済み）から読み取ってください。\n\
-            素材（インタビューノート）: {{#1772945917672.interview_notes#}}\n前回出力（改善要望機構用・iterationごとに参照）:\
+            \ {{#1772945917672.refined_toc#}}\n書籍の全体設計図: 書籍プロファイル（自動転記済み）から読み取ってください。\n\
+            素材（インタビューノート）: {{#1772945917672.interview_notes#}}\n前回出力（改善要望機構用・章ごとに参照）:\
             \ {{#1772945917672.previous_output#}}\n改善要望（相談機能でユーザーがAIと議論した結果の方針）:\
             \ {{#1772945917672.improvement_request#}}\n\n#\
             \ [3. Writing Logic]\n- この章の役割を書籍プロファイル（読者像・読了後の状態・狙い目の切り口）から確認する\n- この章に対応する interview_notes\
@@ -393,7 +238,7 @@ workflow:
             \ 2. どんな具体例・行動・気づきを入れるか\n  3. 読者がどう変わるか\n- 一般論や理論の説明に寄りすぎない\n- 次の節につながる流れを意識する\n\
             \n# [3.5. 改善要望の扱い（STEP6 章構成 専用）]\n\
             previous_output と improvement_request の両方が空でない場合、以下の手順で出力してください。\n\n\
-            手順1: 今回処理する章タイトル（item 内の章タイトル）と一致する章セクションを previous_output から探す。\n\
+            手順1: 今回処理する章タイトル（refined_toc 内の章タイトル）と一致する章セクションを previous_output から探す。\n\
             一致する章があれば、その章の節構成と要約は「前回の結果」として参照可能。\n\n\
             手順2: improvement_request の内容を読み、現在処理中の章が修正対象に含まれるか判定する。\n  - 「3章の◯◯を修正したい」のように章番号・章タイトルが指定されている場合：その章のみが修正対象。\n  - 「全章で節数を5から4に減らして」のように全章共通の場合：すべての章が修正対象。\n  - 「文体を柔らかく」「具体例を増やして」のような全体方針の場合：すべての章が修正対象。\n\n\
             手順3: 現在処理中の章が「修正対象でない」場合：\n  previous_output から該当章の節構成・要約をそのまま出力する。一字も変更しない。\n\n\
@@ -427,50 +272,18 @@ workflow:
           enabled: false
       height: 88
       id: '1772952562841'
-      parentId: '1772952541934'
       position:
-        x: 128
-        y: 66
-      positionAbsolute:
-        x: 553
-        y: 353
-      selected: false
-      sourcePosition: right
-      targetPosition: left
-      type: custom
-      width: 242
-      zIndex: 1002
-    - data:
-        code: "def main(output_array: list):\n    separator = \"\\n\\n---\\n\\n\"\n\
-          \    full_text = separator.join(output_array)\n\n    return {\n        \"\
-          final_outline\": full_text\n    }"
-        code_language: python3
-        outputs:
-          final_outline:
-            children: null
-            type: string
-        selected: false
-        title: アウトライン整形
-        type: code
-        variables:
-        - value_selector:
-          - '1772952541934'
-          - output
-          value_type: array[string]
-          variable: output_array
-      height: 52
-      id: '1772953308664'
-      position:
-        x: 871
+        x: 425
         y: 287
       positionAbsolute:
-        x: 871
+        x: 425
         y: 287
       selected: false
       sourcePosition: right
       targetPosition: left
       type: custom
       width: 242
+      zIndex: 0
     viewport:
       x: 378.8316627035382
       y: -320.74837165457814
