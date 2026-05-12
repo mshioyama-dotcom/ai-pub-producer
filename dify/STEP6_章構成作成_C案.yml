@@ -300,7 +300,10 @@ workflow:
         error_handle_mode: terminated
         flatten_output: true
         height: 175
-        is_parallel: true
+        # Dify Cloud のサンドボックスで並列イテレーション時に
+        # "Working outside of application context" (Flask) が発生するため逐次実行に変更。
+        # 章数 × LLM応答時間 がそのまま処理時間になるが、確実に成功する方を優先。
+        is_parallel: false
         iterator_input_type: array[string]
         iterator_selector:
         - '1772952194627'
@@ -309,7 +312,7 @@ workflow:
         - '1772952562841'
         - text
         output_type: array[string]
-        parallel_nums: 5
+        parallel_nums: 1
         selected: false
         start_node_id: 1772952541934start
         title: イテレーション
