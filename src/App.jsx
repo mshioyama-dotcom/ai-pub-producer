@@ -517,7 +517,7 @@ function splitStep2Output(text) {
     market: marketParts.join("\n\n"),
     suggestions: extract("STEP1修正提案"),
     confirmed: extract("書籍プロファイル確定版"),
-    competitors: extract("📚 検証で参照した競合本（Keepa取得）") || extract("検証で参照した競合本"),
+    competitors: extract("検証で参照した上位本") || extract("📚 検証で参照した競合本（Keepa取得）") || extract("検証で参照した競合本"),
     raw: text,
   };
 }
@@ -2142,7 +2142,7 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
     const timeoutId = setTimeout(() => controller.abort(), 4 * 60 * 1000);
     try {
       const motivation = extractMotivation(savedWorkProfileDraft);
-      // 主題軸キーワードを半角スペースで2分割（旧STEP2 Keepaパイプラインの keyword1/keyword2 互換）
+      // 主題軸キーワードを半角スペースで2分割（STEP2 の keyword1/keyword2 入力変数互換のため維持）
       const themeWords = keywordTheme.trim().split(/\s+/);
       const keyword1 = themeWords[0] || "";
       const keyword2 = themeWords.slice(1).join(" ") || keyword1;
@@ -2178,7 +2178,7 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
             const d = data.diagnostic;
             diag = `\n\n【Dify 応答の診断情報】\n・ワークフロー status: ${d.workflowStatus}\n・出力キー: [${d.outputKeys || "(空)"}]\n${d.workflowError ? "・Dify エラー: " + d.workflowError + "\n" : ""}・raw outputs: ${JSON.stringify(d.outputsRaw, null, 2).slice(0, 500)}`;
           }
-          setRunError(`Dify から有効な出力が返ってきませんでした（出力長 ${out.length} 文字）。\n\n原因の可能性：\n・Keepa API キーが Dify 側に設定されていない／無効\n・主題軸キーワードでの Amazon 検索結果が0件で Keepa 呼び出しが空\n・Dify ワークフロー内部でエラー（Dify cloud のログを確認）\n・YML 改修後に Dify への再 import を忘れている${diag}`);
+          setRunError(`Dify から有効な出力が返ってきませんでした（出力長 ${out.length} 文字）。\n\n原因の可能性：\n・主題軸キーワードでの Amazon 検索結果が空（HTMLから上位本が抽出できない）\n・3軸とも HTML が極端に短い／検索結果ページではない\n・Dify ワークフロー内部でエラー（Dify cloud のログを確認）\n・YML 改修後に Dify への再 import を忘れている${diag}`);
         } else {
           setOutputText(out);
           try { localStorage.setItem(WORK_PROFILE_STEP2_FULL_KEY, out); } catch (e) {}
@@ -2186,7 +2186,7 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
       }
     } catch (e) {
       if (e.name === "AbortError") {
-        setRunError("4分以上応答がなかったため処理を中断しました。\n\n原因の可能性：\n・Dify ワークフローに想定以上の時間がかかっている\n・Vercel Function のタイムアウト（プランの maxDuration 上限）に達した\n・Keepa API の応答遅延\n\nもう一度「実行する」を押すか、HTML のサイズを小さく（読者軸／差分軸を一旦なしに）して再試行してください。");
+        setRunError("4分以上応答がなかったため処理を中断しました。\n\n原因の可能性：\n・Dify ワークフローに想定以上の時間がかかっている\n・Vercel Function のタイムアウト（プランの maxDuration 上限）に達した\n・HTML が非常に大きく LLM 処理に時間がかかっている\n\nもう一度「実行する」を押すか、HTML のサイズを小さく（読者軸／差分軸を一旦なしに）して再試行してください。");
       } else {
         setRunError(`通信エラーが発生しました：${e.message}`);
       }
@@ -2429,7 +2429,7 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
         <div style={{ marginBottom: 24 }}>
           <div onClick={() => setCompetitorsOpen(!competitorsOpen)} style={{ fontSize: 12.5, color: C.navyMid, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 0", fontWeight: 600 }}>
             <span style={{ transform: competitorsOpen ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.15s", display: "inline-block" }}>▶</span>
-            📚 検証で参照した競合本（Keepa取得・参考）
+            📚 検証で参照した上位本（Amazon HTML から抽出・参考）
           </div>
           {competitorsOpen && (
             <Card style={{ background: "#f8f8f8", border: `1px solid ${C.border}`, marginTop: 8 }}>
