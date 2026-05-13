@@ -319,13 +319,24 @@ function sendDebugLog(label, data) {
 
 // 出力データの会話的ノイズ（前置き・相槌・受け止め要約）を取り除く。
 // 1) <<<出力データ>>> ... <<<出力データここまで>>> マーカーがあれば中身のみ抽出
+//    ただし誤検出を避けるため、以下のガードを設ける：
+//    - マーカーは独立した行（行頭・行末で他のテキストと混ざらない）にあること
+//    - 抽出結果が元テキストの 30% 未満ならマーカーは「本文に偶然紛れ込んだ」とみなして抽出しない
 // 2) なければ単純に trim（既存挙動を壊さない）
 function cleanOutputText(text) {
   if (typeof text !== "string") return text;
   let cleaned = text.replace(/\r\n/g, "\n").trim();
-  const markerRe = /<<<\s*出力データ\s*>>>\s*([\s\S]*?)\s*<<<\s*出力データここまで\s*>>>/;
+  // マーカーは行頭・行末を要求（本文中に偶然混ざった「<<<出力データ>>>」を抽出しない）
+  const markerRe = /(?:^|\n)\s*<<<\s*出力データ\s*>>>\s*\n([\s\S]*?)\n\s*<<<\s*出力データここまで\s*>>>\s*(?:\n|$)/;
   const m = cleaned.match(markerRe);
-  if (m) cleaned = m[1].trim();
+  if (m) {
+    const extracted = m[1].trim();
+    // 抽出結果が元テキストの 30% 以上を占める場合のみ採用。
+    // 極端に短い抽出（本文中に紛れ込んだマーカー由来の誤検出）は無視して元テキストを残す。
+    if (extracted.length >= Math.max(cleaned.length * 0.3, 50)) {
+      cleaned = extracted;
+    }
+  }
   return cleaned;
 }
 
