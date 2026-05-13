@@ -634,27 +634,43 @@ workflow:
           \    \"top10_list\": f\"Keepaエラー: {msg}\"\n            }\n\n        products\
           \ = body.get(\"products\", []) if isinstance(body, dict) else []\n     \
           \   if not isinstance(products, list):\n            products = []\n\n  \
-          \      valid_products: List[Dict[str, Any]] = []\n\n        for product\
-          \ in products:\n            if not isinstance(product, dict):\n        \
-          \        continue\n\n            # 書籍以外の商品を除外\n            if not is_book_product(product):\n\
-          \                continue\n\n            title = product.get(\"title\")\
-          \ or \"タイトル不明\"\n            asin = product.get(\"asin\") or \"\"\n    \
-          \        sales_rank = extract_sales_rank(product)\n            review_count\
-          \ = extract_review_count(product)\n\n            if sales_rank is None:\n\
-          \                continue\n\n            valid_products.append({\n     \
-          \           \"asin\": asin,\n                \"title\": title,\n       \
-          \         \"sales_rank\": sales_rank,\n                \"review_count\"\
-          : review_count,\n            })\n\n        valid_products = sorted(valid_products,\
-          \ key=lambda x: x[\"sales_rank\"])[:10]\n\n        if not valid_products:\n\
-          \            return {\n                \"top10_list\": \"書籍候補が取得できませんでした\"\
-          \n            }\n\n        lines = []\n        for item in valid_products:\n\
+          \      valid_products: List[Dict[str, Any]] = []\n        total_count =\
+          \ len(products)\n        foreign_book_count = 0\n        no_rank_count =\
+          \ 0\n        non_book_count = 0\n\n        # 日本市場の「本」カテゴリのルートID（和書）。\n\
+          \        # 52033011 が「洋書」なので、ここで明示的に除外する。\n        JAPANESE_BOOKS_ROOT\
+          \ = 465392\n\n        for product in products:\n            if not isinstance(product,\
+          \ dict):\n                continue\n\n            # 1. 洋書を最初から除外（日本Amazonの売上ランク基準で競合分析するため）\n\
+          \            root_cat = safe_int(product.get(\"rootCategory\"))\n      \
+          \      if root_cat is not None and root_cat != JAPANESE_BOOKS_ROOT:\n  \
+          \              foreign_book_count += 1\n                continue\n\n   \
+          \         # 2. 書籍以外の商品を除外\n            if not is_book_product(product):\n\
+          \                non_book_count += 1\n                continue\n\n     \
+          \       title = product.get(\"title\") or \"タイトル不明\"\n            asin = product.get(\"\
+          asin\") or \"\"\n            sales_rank = extract_sales_rank(product)\n\
+          \            review_count = extract_review_count(product)\n\n          \
+          \  if sales_rank is None:\n                no_rank_count += 1\n        \
+          \        continue\n\n            valid_products.append({\n             \
+          \   \"asin\": asin,\n                \"title\": title,\n               \
+          \ \"sales_rank\": sales_rank,\n                \"review_count\": review_count,\n\
+          \            })\n\n        valid_products = sorted(valid_products, key=lambda\
+          \ x: x[\"sales_rank\"])[:10]\n\n        # 警告メッセージ（後段LLMが市場像を判断する材料にする）\n\
+          \        warnings = []\n        if foreign_book_count > 0:\n           \
+          \ warnings.append(f\"※ 取得ASIN {total_count}件のうち {foreign_book_count}件は洋書のため除外\"\
+          )\n        if non_book_count > 0:\n            warnings.append(f\"※ {non_book_count}件は書籍以外（雑誌・グッズ等）のため除外\"\
+          )\n        if no_rank_count > 0:\n            warnings.append(f\"※ {no_rank_count}件は日本Amazon売上ランク未取得のため除外\"\
+          )\n        if len(valid_products) < 5:\n            warnings.append(f\"⚠\
+          \ 日本市場で抽出できた競合本は {len(valid_products)}件のみ。検索キーワードに対して日本Kindle競合が少ない可能性が高い（市場機会または市場不存在のシグナル）。キーワード選定の見直しを推奨\"\
+          )\n\n        warning_block = (\"\\n\".join(warnings) + \"\\n\\n\") if warnings\
+          \ else \"\"\n\n        if not valid_products:\n            return {\n  \
+          \              \"top10_list\": warning_block + \"書籍候補が取得できませんでした\"\n   \
+          \         }\n\n        lines = []\n        for item in valid_products:\n\
           \            lines.append(\n                f\"■ASIN: {item['asin']}\\n\"\
           \n                f\"タイトル: {item['title']}\\n\"\n                f\"全体順位:\
           \ {format_int_or_unknown(item['sales_rank'])}\\n\"\n                f\"\
           レビュー数: {format_int_or_unknown(item['review_count'])}\"\n            )\n\n\
-          \        return {\n            \"top10_list\": \"\\n\\n\".join(lines)\n\
-          \        }\n\n    except Exception as e:\n        return {\n           \
-          \ \"top10_list\": f\"Keepa解析エラー: {str(e)}\"\n        }\n"
+          \        return {\n            \"top10_list\": warning_block + \"\\n\\n\"\
+          .join(lines)\n        }\n\n    except Exception as e:\n        return {\n\
+          \            \"top10_list\": f\"Keepa解析エラー: {str(e)}\"\n        }\n"
         code_language: python3
         outputs:
           top10_list:
