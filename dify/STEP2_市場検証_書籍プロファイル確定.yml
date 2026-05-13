@@ -358,16 +358,19 @@ workflow:
       type: custom
       width: 242
     - data:
-        code: "import re\n\ndef main(**kwargs):\n    html_content = str(kwargs.get(\"\
-          html\", kwargs.get(\"amazon_url\", \"\")))\n\n    if not html_content.strip():\n\
-          \        return {\n            \"asin_query\": \"\",\n            \"count\"\
-          : 0\n        }\n\n    # エスケープを少し戻す\n    text = html_content.replace('\\\\\
-          \"', '\"').replace(\"\\\\/\", \"/\")\n\n    # --- ASIN取得側フィルタ：スポンサー広告枠を除去してからASINを探す\
-          \ ---\n    # スポンサー広告枠（AdHolder等）を除去\n    cleaned = re.sub(r'<div[^>]*class=\"\
-          [^\"]*(?:AdHolder|ad-feedback|s-ad-feedback)[^\"]*\"[\\s\\S]*?</div>', '',\
-          \ text, flags=re.IGNORECASE)\n\n    # まず検索結果ブロックの data-asin を最優先で取る\n  \
-          \  primary_pattern = r'data-component-type=\"s-search-result\"[^>]*data-asin=\"\
-          ([A-Za-z0-9]{10})\"|data-asin=\"([A-Za-z0-9]{10})\"[^>]*data-component-type=\"\
+        code: "import re\n\ndef main(**kwargs):\n    # 主題軸・読者軸・差分軸 の3つの HTML を統合してASINを抽出する。\n\
+          \    # Keepa API は1回呼び出しのため、3軸分のASINを最大20件まで重複除去して渡す。\n    parts =\
+          \ []\n    for key in [\"html\", \"amazon_url\", \"html_theme\", \"html_reader\"\
+          , \"html_diff\"]:\n        val = kwargs.get(key)\n        if val and str(val).strip():\n\
+          \            parts.append(str(val))\n    html_content = \"\\n\".join(parts)\n\
+          \n    if not html_content.strip():\n        return {\n            \"asin_query\"\
+          : \"\",\n            \"count\": 0\n        }\n\n    # エスケープを少し戻す\n    text\
+          \ = html_content.replace('\\\\\"', '\"').replace(\"\\\\/\", \"/\")\n\n  \
+          \  # --- ASIN取得側フィルタ：スポンサー広告枠を除去してからASINを探す ---\n    # スポンサー広告枠（AdHolder等）を除去\n\
+          \    cleaned = re.sub(r'<div[^>]*class=\"[^\"]*(?:AdHolder|ad-feedback|s-ad-feedback)[^\"\
+          ]*\"[\\s\\S]*?</div>', '', text, flags=re.IGNORECASE)\n\n    # まず検索結果ブロックの\
+          \ data-asin を最優先で取る\n    primary_pattern = r'data-component-type=\"s-search-result\"\
+          [^>]*data-asin=\"([A-Za-z0-9]{10})\"|data-asin=\"([A-Za-z0-9]{10})\"[^>]*data-component-type=\"\
           s-search-result\"'\n    matches = re.findall(primary_pattern, cleaned, flags=re.IGNORECASE)\n\
           \n    found_asins = []\n    for m in matches:\n        asin = m[0] if m[0]\
           \ else m[1]\n        if asin:\n            found_asins.append(asin)\n\n\
@@ -399,6 +402,16 @@ workflow:
           - HTML
           value_type: string
           variable: amazon_url
+        - value_selector:
+          - '1771119975121'
+          - html_reader
+          value_type: string
+          variable: html_reader
+        - value_selector:
+          - '1771119975121'
+          - html_diff
+          value_type: string
+          variable: html_diff
       height: 52
       id: '1772791217407'
       position:
@@ -1198,11 +1211,17 @@ workflow:
       type: custom
       width: 242
     - data:
-        code: "import re\n\ndef main(top10_list=\"\", **kwargs):\n    blocks = [b\
-          \ for b in str(top10_list).split(\"■ASIN:\") if b.strip()]\n    formatted_results\
-          \ = []\n\n    for block in blocks:\n        asin_m = re.search(r\"([A-Z0-9]{10})\"\
-          , block)\n        asin = asin_m.group(1) if asin_m else \"不明\"\n\n     \
-          \   title_m = re.search(r\"タイトル[:：]\\s*(.*)\", block)\n        title = title_m.group(1).split(\"\
+        code: "import re\n\ndef main(top10_list=\"\", **kwargs):\n    raw = str(top10_list)\n\
+          \    # 「■ASIN:」で split すると先頭ブロックは「■ASIN:」より手前のテキスト（警告メッセージ等）になる。\n\
+          \    # それを header として保持し、本データブロックのみを整形対象にする。\n    blocks = raw.split(\"\
+          ■ASIN:\")\n    header = blocks[0].strip() if blocks else \"\"\n    data_blocks\
+          \ = [b for b in blocks[1:] if b.strip()]\n\n    formatted_results = []\n\
+          \    if header:\n        # 警告メッセージ（例：「※ N件のうち X件は洋書のため除外」）はリストの先頭に保持。\n\
+          \        formatted_results.append(header)\n\n    for block in data_blocks:\n\
+          \        asin_m = re.search(r\"([A-Z0-9]{10})\", block)\n        if not\
+          \ asin_m:\n            # ASIN が抽出できないブロックはスキップ（旧仕様で出ていた「タイトル不明・ASIN不明」の偽データ防止）\n\
+          \            continue\n        asin = asin_m.group(1)\n\n        title_m\
+          \ = re.search(r\"タイトル[:：]\\s*(.*)\", block)\n        title = title_m.group(1).split(\"\
           \\n\")[0].strip() if title_m else \"タイトル不明\"\n\n        rank_m = re.search(r\"\
           全体順位[:：]\\s*(\\d+)\", block.replace(\",\", \"\"))\n        rank_str = f\"\
           {int(rank_m.group(1)):,}位\" if rank_m else \"不明\"\n\n        review_m =\
