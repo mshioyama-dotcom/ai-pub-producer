@@ -204,6 +204,29 @@ const STEP2_INPUTS_KEY = "aipub:step2_inputs";
 const TITLE_CONFIRMED_KEY = "aipub:title_confirmed";
 const SUBTITLE_CONFIRMED_KEY = "aipub:subtitle_confirmed";
 
+// 出版目標のチェックボックス選択肢（マーケティング観点の主要ゴール）
+const PUBLISHING_GOAL_OPTIONS = [
+  { value: "longseller", label: "ロングセラー化（長期で読まれ続ける）" },
+  { value: "leadmagnet", label: "リードマグネット（自社サービス・コミュニティへの誘導）" },
+  { value: "authority", label: "権威付け（専門家としての立場確立）" },
+  { value: "lecture", label: "講演・登壇依頼の獲得" },
+  { value: "community", label: "読者コミュニティの形成" },
+  { value: "subsidiary", label: "別事業（コーチング・コンサル等）への送客" },
+];
+
+// 出版目標を STEP1 Dify に送る形式の文字列に変換する。
+// 例：「☑ ロングセラー化（長期で読まれ続ける）\n☑ リードマグネット...\n\n補足：...」
+function buildPublishingGoalText(goals, customGoal) {
+  const parts = [];
+  const checked = (goals || []).map((g) => {
+    const opt = PUBLISHING_GOAL_OPTIONS.find((o) => o.value === g);
+    return opt ? `☑ ${opt.label}` : "";
+  }).filter(Boolean);
+  if (checked.length > 0) parts.push(checked.join("\n"));
+  if ((customGoal || "").trim()) parts.push(`補足：${customGoal.trim()}`);
+  return parts.join("\n\n");
+}
+
 const defaultProject = () => ({
   projectName: "新しい企画",
   currentStep: 1,
@@ -1662,21 +1685,29 @@ const Step1Page = ({ savedAuthorProfile, savedWorkProfile, onSaveWorkProfile, on
   const [theme, setTheme] = useState(pending.theme || savedInputs.theme || "");
   const [motivation, setMotivation] = useState(pending.motivation || savedInputs.motivation || "");
   const [readerHypothesis, setReaderHypothesis] = useState(pending.readerHypothesis || savedInputs.readerHypothesis || "");
+  // 出版目標：チェックボックスで選択した主要ゴールの value 配列
+  const [publishingGoals, setPublishingGoals] = useState(Array.isArray(savedInputs.publishingGoals) ? savedInputs.publishingGoals : []);
+  // 出版目標：補足の自由記述
+  const [customPublishingGoal, setCustomPublishingGoal] = useState(savedInputs.customPublishingGoal || "");
   const [inputSaveMsg, setInputSaveMsg] = useState(false);
 
   // 入力欄の変更を localStorage に自動保存（debounce 不要・小さなテキストなので直書きでOK）
   useEffect(() => {
     try {
-      localStorage.setItem(STEP1_INPUTS_KEY, JSON.stringify({ theme, motivation, readerHypothesis }));
+      localStorage.setItem(STEP1_INPUTS_KEY, JSON.stringify({ theme, motivation, readerHypothesis, publishingGoals, customPublishingGoal }));
     } catch (e) { console.error(e); }
-  }, [theme, motivation, readerHypothesis]);
+  }, [theme, motivation, readerHypothesis, publishingGoals, customPublishingGoal]);
 
   const handleSaveInputs = () => {
     try {
-      localStorage.setItem(STEP1_INPUTS_KEY, JSON.stringify({ theme, motivation, readerHypothesis }));
+      localStorage.setItem(STEP1_INPUTS_KEY, JSON.stringify({ theme, motivation, readerHypothesis, publishingGoals, customPublishingGoal }));
       setInputSaveMsg(true);
       setTimeout(() => setInputSaveMsg(false), 2500);
     } catch (e) { console.error(e); }
+  };
+
+  const togglePublishingGoal = (value) => {
+    setPublishingGoals((prev) => prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]);
   };
   const [isRunning, setIsRunning] = useState(false);
   const [runError, setRunError] = useState("");
@@ -1719,6 +1750,7 @@ const Step1Page = ({ savedAuthorProfile, savedWorkProfile, onSaveWorkProfile, on
             motivation: motivation.trim(),
             reader_hypothesis: readerHypothesis.trim(),
             author_profile: savedAuthorProfile || "",
+            publishing_goal: buildPublishingGoalText(publishingGoals, customPublishingGoal),
           },
         }),
       });
@@ -1828,6 +1860,29 @@ const Step1Page = ({ savedAuthorProfile, savedWorkProfile, onSaveWorkProfile, on
             placeholder="例：30代会社員・忙しくてAIに踏み出せていない人"
             rows={3}
             style={{ width: "100%", padding: "10px 12px", fontSize: 14, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.7 }} />
+        </div>
+
+        <div style={{ marginBottom: 20, padding: "14px 16px", background: C.goldPale, border: `1px solid ${C.goldLight}`, borderRadius: 4 }}>
+          <label style={{ fontSize: 13.5, fontWeight: 600, color: C.navy }}>📌 出版目標（複数選択可）</label>
+          <div style={{ fontSize: 13, color: "#444444", marginBottom: 10, lineHeight: 1.7 }}>
+            この本を出版することで達成したい目標を選んでください。後段のSTEP（タイトル設計／目次／本文／Amazon説明文）のレビューで「この目標と整合しているか」が自動チェックされます。
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
+            {PUBLISHING_GOAL_OPTIONS.map((opt) => {
+              const checked = publishingGoals.includes(opt.value);
+              return (
+                <label key={opt.value} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: C.text, cursor: "pointer", padding: "4px 6px", borderRadius: 3, background: checked ? "rgba(184,146,42,0.08)" : "transparent" }}>
+                  <input type="checkbox" checked={checked} onChange={() => togglePublishingGoal(opt.value)} style={{ cursor: "pointer", accentColor: C.gold }} />
+                  <span>{opt.label}</span>
+                </label>
+              );
+            })}
+          </div>
+          <label style={{ fontSize: 12.5, fontWeight: 600, color: C.navy, display: "block", marginBottom: 4 }}>補足（任意）</label>
+          <textarea value={customPublishingGoal} onChange={(e) => setCustomPublishingGoal(e.target.value)}
+            placeholder="例：Note→Kindle→無料相談の導線設計を本書で完成させたい。Life Book Navigator への流入を最大化する位置付け。"
+            rows={2}
+            style={{ width: "100%", padding: "9px 12px", fontSize: 13.5, border: `1px solid ${C.border}`, borderRadius: 3, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.7 }} />
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 12 }}>
