@@ -2445,15 +2445,17 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
         workProfile={extractDiscussionContext(confirmedDraft || "")}
       />
 
-      {/* STEP1への修正提案（整合性診断で不整合が検出された場合のみ表示） */}
+      {/* 整合性診断で不整合が検出された場合のみ表示。修正対象によって2系統のフローを案内する */}
       {sections.suggestions && (
         <div style={{ marginBottom: 24 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
             <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: "50%", background: C.red, color: C.white, fontSize: 14, fontWeight: 700, flexShrink: 0 }}>!</span>
-            <h2 style={{ fontSize: 15, fontWeight: 700, color: C.red, margin: 0 }}>STEP1 への修正提案（整合性診断で不整合あり）</h2>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: C.red, margin: 0 }}>整合性診断で不整合あり：修正案</h2>
           </div>
           <div style={{ fontSize: 13, color: C.textSub, marginBottom: 12, lineHeight: 1.8 }}>
-            草案と市場データのあいだに後段に影響するズレが検出されました。下記の提案を STEP1 に反映してから、再度 STEP2 を実行してください。
+            草案と市場データのあいだに後段に影響するズレが検出されました。<br />
+            <span style={{ color: C.gold, fontWeight: 600 }}>※ 検索キーワード3軸の修正のみなら STEP1 に戻る必要はなく、STEP2 入力欄に反映するだけで再実行できます。</span><br />
+            <span style={{ color: C.navy, fontWeight: 600 }}>※ 想定読者・ポジショニング等の修正がある場合は、STEP1 に戻って反映してから STEP2 を再実行してください。</span>
           </div>
           <Card style={{ background: "#fdf2f2", border: `1px solid rgba(181,43,30,0.25)`, marginBottom: 12 }}>
             <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordWrap: "break-word", fontFamily: "inherit", fontSize: 13, lineHeight: 1.85, color: C.text }}>{sections.suggestions}</pre>
@@ -2494,11 +2496,16 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
             }
             return (
               <div>
-                {/* 検索キーワード3軸の提案 → STEP2 入力欄に直接反映 */}
+                {/* 検索キーワード3軸の提案 → STEP2 入力欄に直接反映（STEP1 に戻る必要なし） */}
                 {kwSuggestion && (
-                  <div style={{ marginBottom: 16, padding: "12px 14px", background: "#fff", border: `1px solid ${C.goldLight}`, borderRadius: 4 }}>
-                    <div style={{ fontSize: 12.5, fontWeight: 600, color: C.navy, marginBottom: 6 }}>🔑 検索キーワード3軸の提案（STEP2 入力欄へ）</div>
-                    <ul style={{ margin: "0 0 10px 0", paddingLeft: 18, fontSize: 13, color: C.text, lineHeight: 1.85 }}>
+                  <div style={{ marginBottom: 16, padding: "14px 16px", background: "#fff", border: `2px solid ${C.gold}`, borderRadius: 4 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: C.gold, marginBottom: 4 }}>
+                      🔑 フロー A：検索キーワード3軸の修正だけで済む場合
+                    </div>
+                    <div style={{ fontSize: 12, color: C.textSub, marginBottom: 10, lineHeight: 1.7 }}>
+                      <strong>STEP1 に戻る必要はありません。</strong>このボタンで STEP2 入力欄に反映 → 上に戻って HTML を取得し直し → STEP2 を再実行するだけで OK。
+                    </div>
+                    <ul style={{ margin: "0 0 12px 0", paddingLeft: 18, fontSize: 13, color: C.text, lineHeight: 1.85 }}>
                       {kwSuggestion.theme && <li>主題軸：<strong style={{ color: C.gold }}>{kwSuggestion.theme}</strong></li>}
                       {kwSuggestion.reader && <li>読者軸：<strong style={{ color: C.gold }}>{kwSuggestion.reader}</strong></li>}
                       {kwSuggestion.diff && <li>差分軸：<strong style={{ color: C.gold }}>{kwSuggestion.diff}</strong></li>}
@@ -2507,23 +2514,27 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
                       if (kwSuggestion.theme) setKeywordTheme(kwSuggestion.theme);
                       if (kwSuggestion.reader) setKeywordReader(kwSuggestion.reader);
                       if (kwSuggestion.diff) setKeywordDiff(kwSuggestion.diff);
-                      // 読者軸／差分軸が新しく入る場合は折りたたみを展開
                       if (kwSuggestion.reader && !readerExpanded) setReaderExpanded(true);
                       if (kwSuggestion.diff && !diffExpanded) setDiffExpanded(true);
                       window.scrollTo({ top: 0, behavior: "smooth" });
-                    }} style={{ padding: "8px 14px", background: C.gold, color: C.white, border: "none", borderRadius: 4, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                    }} style={{ padding: "9px 16px", background: C.gold, color: C.white, border: "none", borderRadius: 4, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                       ✨ 提案キーワードを STEP2 入力欄に反映
                     </button>
                     <div style={{ fontSize: 11.5, color: C.textLight, marginTop: 8, lineHeight: 1.7 }}>
-                      ※ 反映後、上に戻って「Amazon で Kindle 検索を開く」→ HTML を取得し直してから再実行してください
+                      次の手順：① 上の入力エリアで Amazon で再検索 → HTML を取得し直し<br />② 「入力データを保存」 → ③「市場検証＋書籍プロファイル確定を実行」
                     </div>
                   </div>
                 )}
 
-                {/* 検索キーワード以外の提案 → STEP1 に反映 */}
+                {/* 検索キーワード以外の提案 → STEP1 に反映（草案そのものを修正する必要あり） */}
                 {step1Actionable.length > 0 && (
-                  <div style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 12.5, fontWeight: 600, color: C.navy, marginBottom: 8 }}>📥 個別の提案を STEP1 に反映：</div>
+                  <div style={{ marginBottom: 12, padding: "14px 16px", background: "#fff", border: `2px solid ${C.navy}`, borderRadius: 4 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: C.navy, marginBottom: 4 }}>
+                      📥 フロー B：想定読者・ポジショニング等の修正が必要な場合
+                    </div>
+                    <div style={{ fontSize: 12, color: C.textSub, marginBottom: 10, lineHeight: 1.7 }}>
+                      <strong>STEP1 に戻って草案を修正する必要があります。</strong>下のボタンで STEP1 入力欄にプリセット → STEP1 を再生成 → STEP2 を再実行。
+                    </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
                       {step1Actionable.map((item, i) => (
                         <ApplyToStep1Button
@@ -2534,12 +2545,20 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
                         />
                       ))}
                     </div>
+                    <BtnSecondary onClick={() => onNavigate("step_1")} style={{ fontSize: 13 }}>
+                      ← STEP1 へ戻る
+                    </BtnSecondary>
                   </div>
                 )}
 
-                <BtnSecondary onClick={() => onNavigate("step_1")} style={{ fontSize: 13 }}>
-                  ← STEP1 へ戻る
-                </BtnSecondary>
+                {/* どちらの提案も無い場合のフォールバック（手動修正案内） */}
+                {!kwSuggestion && step1Actionable.length === 0 && (
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <BtnSecondary onClick={() => onNavigate("step_1")} style={{ fontSize: 13 }}>
+                      ← STEP1 へ戻って手動で反映
+                    </BtnSecondary>
+                  </div>
+                )}
               </div>
             );
           })()}
