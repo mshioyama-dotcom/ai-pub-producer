@@ -1090,24 +1090,60 @@ const AutoInjectedProfilesPanel = ({ onNavigate, stepNum }) => {
   );
 };
 
+// Amazon検索結果HTMLから「検索結果ブロック全体」を抽出して残す（旧仕様で ASIN だけを抽出していたのを改修）。
+// 新 STEP2 は Keepa を使わず HTMLパースで上位本のタイトル・著者・評価・価格 を抽出する設計のため、
+// 検索結果ブロック内の本文タグ（h2/a/span 等）も保持する必要がある。
+// ただし script/style/svg/iframe など重い装飾要素は除去して通信サイズを抑える。
 function cleanHtmlMinimal(html) {
-  const results = []; const seen = new Set();
-  const searchResultTags = html.match(/<[^>]*data-component-type\s*=\s*"s-search-result"[^>]*>/gi) || [];
-  for (const tag of searchResultTags) {
-    const asinMatch = tag.match(/data-asin="([A-Za-z0-9]{10})"/i);
-    if (asinMatch) { const c = `<div data-asin="${asinMatch[1]}" data-component-type="s-search-result">`; if (!seen.has(c)) { seen.add(c); results.push(c); } }
+  if (!html) return "";
+
+  // 1. script/style/noscript/svg/iframe を除去（本文情報には無関係で重い）
+  let text = String(html)
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, "")
+    .replace(/<svg[\s\S]*?<\/svg>/gi, "")
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
+    .replace(/<!--[\s\S]*?-->/g, "");
+
+  // 2. スポンサー広告枠を除去（s-search-result 抽出より先に消す）
+  text = text.replace(/<div[^>]*class="[^"]*(?:AdHolder|ad-feedback|s-ad-feedback)[^"]*"[\s\S]*?<\/div>/gi, "");
+
+  // 3. 検索結果ブロック（data-component-type="s-search-result" を持つ div）を ASIN ごとに抽出
+  //    各ブロックは「次の s-search-result」または「</body>」または末尾までを含む。
+  const blocks = [];
+  const seenAsins = new Set();
+  const blockRegex = /<div[^>]*data-component-type="s-search-result"[^>]*data-asin="([A-Za-z0-9]{10})"[\s\S]*?(?=<div[^>]*data-component-type="s-search-result"|<\/body>|$)/gi;
+  let m;
+  while ((m = blockRegex.exec(text)) !== null) {
+    const asin = m[1];
+    if (seenAsins.has(asin)) continue;
+    seenAsins.add(asin);
+    // ブロック内の冗長な属性を削減（class, style, data-* の長い値）してサイズを抑える
+    let block = m[0]
+      .replace(/\s+class="[^"]*"/gi, "")
+      .replace(/\s+style="[^"]*"/gi, "")
+      .replace(/\s+data-(?!asin|component-type)[a-z-]+="[^"]*"/gi, "")
+      .replace(/\s+aria-(?!label)[a-z-]+="[^"]*"/gi, "")
+      .replace(/\s+role="[^"]*"/gi, "")
+      .replace(/\s+id="[^"]*"/gi, "");
+    blocks.push(block);
   }
-  const asinTags = html.match(/<[^>]*data-asin="[A-Za-z0-9]{10}"[^>]*>/gi) || [];
-  for (const tag of asinTags) {
-    const asinMatch = tag.match(/data-asin="([A-Za-z0-9]{10})"/i);
-    if (asinMatch) { const c = `<div data-asin="${asinMatch[1]}">`;  if (!seen.has(c)) { seen.add(c); results.push(c); } }
+
+  // 4. 検索結果ブロックが取れなかった場合のフォールバック（古い形式や DOM 差分）：
+  //    /dp/ASIN リンクを含む div ブロックを ASIN ごとに抽出
+  if (blocks.length === 0) {
+    const dpLinkBlockRegex = /<div[^>]*>[\s\S]{0,3000}?\/dp\/([A-Za-z0-9]{10})[\s\S]{0,3000}?<\/div>/gi;
+    let m2;
+    while ((m2 = dpLinkBlockRegex.exec(text)) !== null) {
+      const asin = m2[1];
+      if (seenAsins.has(asin)) continue;
+      seenAsins.add(asin);
+      blocks.push(m2[0]);
+    }
   }
-  const dpLinks = html.match(/<a[^>]*href="[^"]*(?:\/dp\/|\/gp\/product\/)[A-Za-z0-9]{10}[^"]*"[^>]*>/gi) || [];
-  for (const tag of dpLinks) {
-    const hrefMatch = tag.match(/href="([^"]*(?:\/dp\/|\/gp\/product\/)[A-Za-z0-9]{10}[^"]*)"/i);
-    if (hrefMatch) { let href = hrefMatch[1]; const qIdx = href.indexOf("?"); if (qIdx !== -1) href = href.substring(0, qIdx); const c = `<a href="${href}">`; if (!seen.has(c)) { seen.add(c); results.push(c); } }
-  }
-  return results.join("\n");
+
+  return blocks.join("\n\n");
 }
 
 const Step2HtmlHelper = ({ inputs, currentHtml }) => {
