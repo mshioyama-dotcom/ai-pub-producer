@@ -2186,8 +2186,26 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
           },
         }),
       });
-      const data = await response.json();
+      // 504 や Cloudflare からの HTML 応答を先に検出
+      const contentType = response.headers.get("content-type") || "";
+      let data;
+      if (contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        const is504 = /504|Gateway time-out|Gateway timeout/i.test(text);
+        if (is504) {
+          setRunError("Dify Cloud（api.dify.ai）が 504 Gateway Time-out を返しました。\n\n原因の可能性：\n・LLM の処理時間が Cloudflare のタイムアウト上限（約100秒）を超えた\n・3軸のHTMLが大きすぎて LLM の入力トークンが膨らんでいる\n・Dify Cloud 側の一時的な負荷\n\n対策：\n1. もう一度「実行する」を押してみてください（再実行で通ることが多い）\n2. それでもダメなら、読者軸／差分軸のHTMLを一旦空欄にして主題軸だけで実行\n3. それでもダメなら、HTMLが大きすぎる可能性があるので、Amazon検索結果の上の方だけをコピー");
+          return;
+        }
+        setRunError(`Dify から非JSONレスポンスが返りました（${response.status}）。\n\n応答の冒頭：${text.slice(0, 200)}`);
+        return;
+      }
       if (!response.ok) {
+        if (response.status === 504 || response.status === 502) {
+          setRunError("Dify Cloud がタイムアウトしました（" + response.status + "）。\n\nもう一度「実行する」を押してみてください。それでもダメなら、読者軸／差分軸のHTMLを一旦空欄にして主題軸だけで実行してみてください。");
+          return;
+        }
         setRunError(data.error || "生成中にエラーが発生しました。少し時間をおいて再度お試しください。");
       } else {
         const out = data.output || "";
