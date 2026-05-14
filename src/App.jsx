@@ -509,7 +509,8 @@ function splitStep2Output(text) {
     return m ? m[1].trim() : "";
   };
   const marketParts = [];
-  ["市場像", "書籍プロファイル需要診断", "総合勝率診断"].forEach((h) => {
+  // 新プロンプト（Keepa廃止版）の見出し + 旧プロンプトの見出しを後方互換で両方拾う
+  ["市場像", "整合性診断", "市場勝率診断", "狙い目の切り口", "書籍プロファイル需要診断", "総合勝率診断"].forEach((h) => {
     const content = extract(h);
     if (content) marketParts.push(`### ${h}\n\n${content}`);
   });
@@ -517,7 +518,7 @@ function splitStep2Output(text) {
     market: marketParts.join("\n\n"),
     suggestions: extract("STEP1修正提案"),
     confirmed: extract("書籍プロファイル確定版"),
-    competitors: extract("検証で参照した上位本") || extract("📚 検証で参照した競合本（Keepa取得）") || extract("検証で参照した競合本"),
+    competitors: extract("検証で参照した上位本（参考）") || extract("検証で参照した上位本") || extract("📚 検証で参照した競合本（Keepa取得）") || extract("検証で参照した競合本"),
     raw: text,
   };
 }
@@ -2401,6 +2402,54 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
         authorProfile={savedAuthorProfile || ""}
         workProfile={extractDiscussionContext(confirmedDraft || "")}
       />
+
+      {/* STEP1への修正提案（整合性診断で不整合が検出された場合のみ表示） */}
+      {sections.suggestions && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: "50%", background: C.red, color: C.white, fontSize: 14, fontWeight: 700, flexShrink: 0 }}>!</span>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: C.red, margin: 0 }}>STEP1 への修正提案（整合性診断で不整合あり）</h2>
+          </div>
+          <div style={{ fontSize: 13, color: C.textSub, marginBottom: 12, lineHeight: 1.8 }}>
+            草案と市場データのあいだに後段に影響するズレが検出されました。下記の提案を STEP1 に反映してから、再度 STEP2 を実行してください。
+          </div>
+          <Card style={{ background: "#fdf2f2", border: `1px solid rgba(181,43,30,0.25)`, marginBottom: 12 }}>
+            <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordWrap: "break-word", fontFamily: "inherit", fontSize: 13, lineHeight: 1.85, color: C.text }}>{sections.suggestions}</pre>
+          </Card>
+          {(() => {
+            const items = parseStep1Suggestions(sections.suggestions);
+            const actionable = items.filter((item) => !isUnchanged(item.proposal));
+            if (actionable.length === 0) {
+              return (
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <BtnSecondary onClick={() => onNavigate("step_1")} style={{ fontSize: 13 }}>
+                    ← STEP1 へ戻って手動で反映
+                  </BtnSecondary>
+                  <span style={{ fontSize: 12, color: C.textLight }}>※ 構造化されていない提案のため、自動反映ボタンは表示されていません</span>
+                </div>
+              );
+            }
+            return (
+              <div>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: C.navy, marginBottom: 8 }}>📥 個別の提案を STEP1 に反映：</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                  {actionable.map((item, i) => (
+                    <ApplyToStep1Button
+                      key={i}
+                      title={item.title}
+                      proposal={item.proposal}
+                      onApply={onApplyToStep1Pending}
+                    />
+                  ))}
+                </div>
+                <BtnSecondary onClick={() => onNavigate("step_1")} style={{ fontSize: 13 }}>
+                  ← STEP1 へ戻る
+                </BtnSecondary>
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
