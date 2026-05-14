@@ -2008,13 +2008,20 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
   };
 
   const [keywordTheme, setKeywordTheme] = useState(pickInitial(initialKeywords.theme, savedInputs.keywordTheme));
-  const [htmlTheme, setHtmlTheme] = useState("");
+  // HTML は localStorage の別キーに保存（容量大のため inputs JSON と分離）
+  const [htmlTheme, setHtmlTheme] = useState(() => {
+    try { return localStorage.getItem("aipub:step2_html_theme") || ""; } catch { return ""; }
+  });
   const [readerExpanded, setReaderExpanded] = useState(!!savedInputs.readerExpanded);
   const [keywordReader, setKeywordReader] = useState(pickInitial(initialKeywords.reader, savedInputs.keywordReader));
-  const [htmlReader, setHtmlReader] = useState("");
+  const [htmlReader, setHtmlReader] = useState(() => {
+    try { return localStorage.getItem("aipub:step2_html_reader") || ""; } catch { return ""; }
+  });
   const [diffExpanded, setDiffExpanded] = useState(!!savedInputs.diffExpanded);
   const [keywordDiff, setKeywordDiff] = useState(pickInitial(initialKeywords.diff, savedInputs.keywordDiff));
-  const [htmlDiff, setHtmlDiff] = useState("");
+  const [htmlDiff, setHtmlDiff] = useState(() => {
+    try { return localStorage.getItem("aipub:step2_html_diff") || ""; } catch { return ""; }
+  });
 
   // STEP1 から最新値を強制取り込み（ユーザーが手動でリセットしたいときの操作）
   const handleResyncFromStep1 = () => {
@@ -2037,7 +2044,9 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
   }, [keywordTheme, keywordReader, keywordDiff, readerExpanded, diffExpanded, initialKeywords.theme, initialKeywords.reader, initialKeywords.diff]);
 
   const [inputSaveMsg, setInputSaveMsg] = useState(false);
+  const [inputSaveError, setInputSaveError] = useState("");
   const handleSaveInputs = () => {
+    setInputSaveError("");
     try {
       localStorage.setItem(STEP2_INPUTS_KEY, JSON.stringify({
         keywordTheme, keywordReader, keywordDiff, readerExpanded, diffExpanded,
@@ -2045,9 +2054,19 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
         lastStep1Reader: initialKeywords.reader,
         lastStep1Diff: initialKeywords.diff,
       }));
+      // HTML も保存（別キーで分離・容量大のため try/catch でクオータ超過に対応）
+      try { localStorage.setItem("aipub:step2_html_theme", htmlTheme || ""); } catch {}
+      try { localStorage.setItem("aipub:step2_html_reader", htmlReader || ""); } catch {}
+      try { localStorage.setItem("aipub:step2_html_diff", htmlDiff || ""); } catch (e) {
+        // 容量超過時はエラー表示
+        setInputSaveError("HTMLが大きすぎて保存できませんでした（ブラウザの localStorage 容量上限）。3軸すべて貼り付けた場合に発生しやすいです。次回の実行までにブラウザを開き直さなければ、入力したHTMLはそのまま使えます。");
+      }
       setInputSaveMsg(true);
       setTimeout(() => setInputSaveMsg(false), 2500);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      setInputSaveError("保存に失敗しました：" + e.message);
+    }
   };
 
   const [isRunning, setIsRunning] = useState(false);
@@ -2359,9 +2378,14 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 12 }}>
           <BtnPrimary onClick={handleSaveInputs}>入力データを保存</BtnPrimary>
           <BtnSecondary onClick={handleResyncFromStep1} style={{ fontSize: 12 }}>↻ STEP1から再取得</BtnSecondary>
-          {inputSaveMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました（キーワード3軸）</span>}
+          {inputSaveMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました（キーワード＋HTML、次回も残ります）</span>}
           <span style={{ fontSize: 11.5, color: C.textLight }}>※ STEP1 を再生成した時は「↻ STEP1から再取得」で最新キーワードを取り込めます</span>
         </div>
+        {inputSaveError && (
+          <div style={{ marginTop: 8, padding: "8px 12px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, fontSize: 12.5, color: C.red, lineHeight: 1.7 }}>
+            ⚠ {inputSaveError}
+          </div>
+        )}
       </div>
 
       <div style={{ marginBottom: 28 }}>
