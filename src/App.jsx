@@ -2419,7 +2419,28 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
           {(() => {
             const items = parseStep1Suggestions(sections.suggestions);
             const actionable = items.filter((item) => !isUnchanged(item.proposal));
-            if (actionable.length === 0) {
+
+            // 検索キーワード3軸の提案を抽出（STEP2 入力欄に直接反映するため）
+            const kwItem = items.find((i) => /検索キーワード|キーワード3軸/.test(i.title));
+            let kwSuggestion = null;
+            if (kwItem && kwItem.proposal) {
+              const p = kwItem.proposal;
+              const themeM = p.match(/(?:^|\n)\s*[\-・*+]?\s*主題軸[\s：:]*\*?\*?([^\n*（(]+?)\*?\*?\s*(?:\n|（|\(|$)/);
+              const readerM = p.match(/(?:^|\n)\s*[\-・*+]?\s*読者軸[\s：:]*\*?\*?([^\n*（(]+?)\*?\*?\s*(?:\n|（|\(|$)/);
+              const diffM = p.match(/(?:^|\n)\s*[\-・*+]?\s*差分軸[\s：:]*\*?\*?([^\n*（(]+?)\*?\*?\s*(?:\n|（|\(|$)/);
+              const theme = themeM ? themeM[1].trim() : "";
+              const reader = readerM ? readerM[1].trim() : "";
+              const diff = diffM ? diffM[1].trim() : "";
+              if (theme || reader || diff) {
+                kwSuggestion = { theme, reader, diff };
+              }
+            }
+
+            // 検索キーワード以外の項目（想定読者・ポジショニング 等）は STEP1 に反映可能
+            const step1Actionable = actionable.filter((item) => !/検索キーワード|キーワード3軸/.test(item.title));
+
+            const hasAnyAction = kwSuggestion || step1Actionable.length > 0;
+            if (!hasAnyAction) {
               return (
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                   <BtnSecondary onClick={() => onNavigate("step_1")} style={{ fontSize: 13 }}>
@@ -2431,17 +2452,49 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
             }
             return (
               <div>
-                <div style={{ fontSize: 12.5, fontWeight: 600, color: C.navy, marginBottom: 8 }}>📥 個別の提案を STEP1 に反映：</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-                  {actionable.map((item, i) => (
-                    <ApplyToStep1Button
-                      key={i}
-                      title={item.title}
-                      proposal={item.proposal}
-                      onApply={onApplyToStep1Pending}
-                    />
-                  ))}
-                </div>
+                {/* 検索キーワード3軸の提案 → STEP2 入力欄に直接反映 */}
+                {kwSuggestion && (
+                  <div style={{ marginBottom: 16, padding: "12px 14px", background: "#fff", border: `1px solid ${C.goldLight}`, borderRadius: 4 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: C.navy, marginBottom: 6 }}>🔑 検索キーワード3軸の提案（STEP2 入力欄へ）</div>
+                    <ul style={{ margin: "0 0 10px 0", paddingLeft: 18, fontSize: 13, color: C.text, lineHeight: 1.85 }}>
+                      {kwSuggestion.theme && <li>主題軸：<strong style={{ color: C.gold }}>{kwSuggestion.theme}</strong></li>}
+                      {kwSuggestion.reader && <li>読者軸：<strong style={{ color: C.gold }}>{kwSuggestion.reader}</strong></li>}
+                      {kwSuggestion.diff && <li>差分軸：<strong style={{ color: C.gold }}>{kwSuggestion.diff}</strong></li>}
+                    </ul>
+                    <button onClick={() => {
+                      if (kwSuggestion.theme) setKeywordTheme(kwSuggestion.theme);
+                      if (kwSuggestion.reader) setKeywordReader(kwSuggestion.reader);
+                      if (kwSuggestion.diff) setKeywordDiff(kwSuggestion.diff);
+                      // 読者軸／差分軸が新しく入る場合は折りたたみを展開
+                      if (kwSuggestion.reader && !readerExpanded) setReaderExpanded(true);
+                      if (kwSuggestion.diff && !diffExpanded) setDiffExpanded(true);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }} style={{ padding: "8px 14px", background: C.gold, color: C.white, border: "none", borderRadius: 4, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                      ✨ 提案キーワードを STEP2 入力欄に反映
+                    </button>
+                    <div style={{ fontSize: 11.5, color: C.textLight, marginTop: 8, lineHeight: 1.7 }}>
+                      ※ 反映後、上に戻って「Amazon で Kindle 検索を開く」→ HTML を取得し直してから再実行してください
+                    </div>
+                  </div>
+                )}
+
+                {/* 検索キーワード以外の提案 → STEP1 に反映 */}
+                {step1Actionable.length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: C.navy, marginBottom: 8 }}>📥 個別の提案を STEP1 に反映：</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                      {step1Actionable.map((item, i) => (
+                        <ApplyToStep1Button
+                          key={i}
+                          title={item.title}
+                          proposal={item.proposal}
+                          onApply={onApplyToStep1Pending}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <BtnSecondary onClick={() => onNavigate("step_1")} style={{ fontSize: 13 }}>
                   ← STEP1 へ戻る
                 </BtnSecondary>
