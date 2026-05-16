@@ -1310,7 +1310,7 @@ const Step2HtmlHelper = ({ inputs, currentHtml }) => {
   );
 };
 
-const SideMenu = ({ currentPage, onNavigate, stepStatuses }) => {
+const SideMenu = ({ currentPage, onNavigate, stepStatuses, confirmStatus }) => {
   const menuItem = (label, page, status) => {
     const active = currentPage === page;
     return (
@@ -1351,7 +1351,21 @@ const SideMenu = ({ currentPage, onNavigate, stepStatuses }) => {
         {CATEGORIES.map((cat) => (
           <div key={cat.label}>
             {catLabel(cat.label)}
-            {cat.steps.map((n) => { const s = STEPS[n - 1]; return menuItem(`STEP${n}　${s.title}`, `step_${n}`, stepStatuses[n]); })}
+            {cat.steps.map((n) => {
+              const s = STEPS[n - 1];
+              const item = menuItem(`STEP${n}　${s.title}`, `step_${n}`, stepStatuses[n]);
+              // v4: STEP3 (競合レビュー評価) と STEP4 (エピソードインタビュー) の間に
+              // 「書籍プロファイル確定」アクションを挿入する。サイドナビからもアクセス可能に。
+              if (n === 3) {
+                return (
+                  <div key={`stepwrap_${n}`}>
+                    {item}
+                    {menuItem("　　確定　書籍プロファイル確定", "step_confirm", confirmStatus)}
+                  </div>
+                );
+              }
+              return item;
+            })}
           </div>
         ))}
         {catLabel("データ管理")}
@@ -4266,6 +4280,9 @@ export default function App() {
 
   const stepStatuses = {};
   for (let i = 1; i <= 10; i++) stepStatuses[i] = allSteps[i]?.status || "not_started";
+  // v4: 書籍プロファイル確定アクションの進捗ステータス（サイドナビ表示用）
+  // workProfileConfirmed (localStorage の確定版テキスト) が空でなければ「completed」扱い。
+  const confirmStatus = (workProfileConfirmed || "").trim() ? "completed" : "not_started";
   // STEP0 は専用ページ（Step0Page）で著者プロファイルを localStorage に保存する設計のため、
   // ステータスは aipub:author_profile の有無で判定する。
   stepStatuses[0] = (typeof window !== "undefined" && (localStorage.getItem(AUTHOR_PROFILE_KEY) || "").trim())
@@ -4401,7 +4418,7 @@ export default function App() {
     <>
       {menuOpen && <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 200 }} />}
       <div style={{ position: "fixed", top: 56, left: 0, bottom: 0, width: 280, background: C.navy, zIndex: 300, overflowY: "auto", transform: menuOpen ? "translateX(0)" : "translateX(-100%)", transition: "transform 0.25s ease" }}>
-        <SideMenu currentPage={page} onNavigate={navigateAndClose} stepStatuses={stepStatuses} />
+        <SideMenu currentPage={page} onNavigate={navigateAndClose} stepStatuses={stepStatuses} confirmStatus={confirmStatus} />
       </div>
     </>
   );
@@ -4422,7 +4439,7 @@ export default function App() {
   return (
     <div style={{ display: "flex", minHeight: "100vh", fontFamily: "'Noto Sans JP', sans-serif", background: C.bg }}>
       <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-      <SideMenu currentPage={page} onNavigate={navigate} stepStatuses={stepStatuses} />
+      <SideMenu currentPage={page} onNavigate={navigate} stepStatuses={stepStatuses} confirmStatus={confirmStatus} />
       <div style={{ marginLeft: 300, flex: 1, padding: "20px 44px 36px", maxWidth: refPanel ? 560 : 820, boxSizing: "border-box", transition: "max-width 0.2s" }}>
         {renderPage()}
       </div>
