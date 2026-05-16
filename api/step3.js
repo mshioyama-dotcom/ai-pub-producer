@@ -65,27 +65,50 @@ async function runDifyWorkflow(apiKey, inputs) {
   return output;
 }
 
-// 単一ASINのTop Product Reviewsを取得
-async function fetchTopProductReviews(asin, apiKey, host, endpoint) {
+// 単一ASINのTop Product Reviewsを取得（429リトライ付き）
+async function fetchTopProductReviews(asin, apiKey, host, endpoint, maxRetries = 3) {
   const url = `https://${host}${endpoint}?asin=${encodeURIComponent(asin)}&country=JP`;
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "x-rapidapi-key": apiKey,
-      "x-rapidapi-host": host,
-    },
-  });
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`RapidAPI reviews error for ${asin} (${response.status}): ${errText.slice(0, 200)}`);
+  let lastError = null;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "x-rapidapi-key": apiKey,
+        "x-rapidapi-host": host,
+      },
+    });
+    if (response.status === 429 && attempt < maxRetries) {
+      const waitMs = 1000 * Math.pow(2, attempt);
+      await new Promise((r) => setTimeout(r, waitMs));
+      continue;
+    }
+    if (!response.ok) {
+      const errText = await response.text();
+      lastError = new Error(`RapidAPI reviews error for ${asin} (${response.status}): ${errText.slice(0, 200)}`);
+      throw lastError;
+    }
+    const data = await response.json();
+    // PoC実測: data.data.rating_distribution と data.data.reviews[] が返る
+    return {
+      asin,
+      rating_distribution: data?.data?.rating_distribution || {},
+      reviews: Array.isArray(data?.data?.reviews) ? data.data.reviews : [],
+    };
   }
-  const data = await response.json();
-  // PoC実測: data.data.rating_distribution と data.data.reviews[] が返る
-  return {
-    asin,
-    rating_distribution: data?.data?.rating_distribution || {},
-    reviews: Array.isArray(data?.data?.reviews) ? data.data.reviews : [],
-  };
+  throw lastError || new Error(`RapidAPI reviews: max retries reached for ${asin}`);
+}
+
+// 3冊を順次取得（Basic プランレート制限対応）
+async function fetchReviewsSequential(asins, apiKey, host, endpoint, delayMs = 1100) {
+  const results = [];
+  for (let i = 0; i < asins.length; i++) {
+    const r = await Promise.allSettled([fetchTopProductReviews(asins[i], apiKey, host, endpoint)]);
+    results.push(r[0]);
+    if (i < asins.length - 1) {
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+  return results;
 }
 
 // LLMに渡すレビュー要約テキストを生成（★分布 + ★1〜2と★4〜5を分けて整理）
@@ -169,9 +192,14 @@ export default async function handler(req, res) {
       warnings.push(`分析対象本が ${eligibleBooks.length}冊 / ${TARGET_BOOK_COUNT}冊 です。レビュー分析の精度が下がる可能性があります。`);
     }
 
-    // === Stage 2: Top Product Reviews を並列取得 ===
-    const reviewResults = await Promise.allSettled(
-      eligibleBooks.map((b) => fetchTopProductReviews(b.asin, rapidApiKey, rapidApiHost, reviewsEndpoint))
+    // === Stage 2: Top Product Reviews を順次取得（Basic プランレート制限対応） ===
+    // 3冊なので1.1秒×3=約3〜5秒で完了。429リトライ付き。
+    const reviewResults = await fetchReviewsSequential(
+      eligibleBooks.map((b) => b.asin),
+      rapidApiKey,
+      rapidApiHost,
+      reviewsEndpoint,
+      1100
     );
 
     const analyzedBooks = reviewResults.map((r, idx) => {

@@ -84,27 +84,57 @@ function extractJsonArray(text) {
   return null;
 }
 
-// RapidAPI Product Search 単発呼出
-async function searchAmazonProducts(keyword, apiKey, host) {
+// RapidAPI Product Search 単発呼出（429 リトライ付き）
+// Basic プラン（無料）は秒間レート制限が厳しいため、429 を受けたら指数バックオフで再試行する
+async function searchAmazonProducts(keyword, apiKey, host, maxRetries = 3) {
   const url = `https://${host}${RAPIDAPI_SEARCH_ENDPOINT}?query=${encodeURIComponent(keyword)}&country=JP&page=1`;
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "x-rapidapi-key": apiKey,
-      "x-rapidapi-host": host,
-    },
-  });
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`RapidAPI error for "${keyword}" (${response.status}): ${errText.slice(0, 200)}`);
+  let lastError = null;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "x-rapidapi-key": apiKey,
+        "x-rapidapi-host": host,
+      },
+    });
+    if (response.status === 429 && attempt < maxRetries) {
+      // 指数バックオフ: 1秒, 2秒, 4秒
+      const waitMs = 1000 * Math.pow(2, attempt);
+      await new Promise((r) => setTimeout(r, waitMs));
+      continue;
+    }
+    if (!response.ok) {
+      const errText = await response.text();
+      lastError = new Error(`RapidAPI error for "${keyword}" (${response.status}): ${errText.slice(0, 200)}`);
+      throw lastError;
+    }
+    const data = await response.json();
+    // 仕様: data.data.total_products と data.data.products[] が返る
+    return {
+      keyword,
+      total_products: Number(data?.data?.total_products) || 0,
+      products: Array.isArray(data?.data?.products) ? data.data.products : [],
+    };
   }
-  const data = await response.json();
-  // 仕様: data.data.total_products と data.data.products[] が返る
-  return {
-    keyword,
-    total_products: Number(data?.data?.total_products) || 0,
-    products: Array.isArray(data?.data?.products) ? data.data.products : [],
-  };
+  throw lastError || new Error(`RapidAPI: max retries reached for "${keyword}"`);
+}
+
+// 並列度を制限してキーワードを順次バッチ処理する
+// Basic プラン対応のため concurrency=2 (秒2リクエストまで)
+async function searchAmazonProductsBatched(keywords, apiKey, host, concurrency = 2, batchDelayMs = 1100) {
+  const results = [];
+  for (let i = 0; i < keywords.length; i += concurrency) {
+    const batch = keywords.slice(i, i + concurrency);
+    const batchResults = await Promise.allSettled(
+      batch.map((kw) => searchAmazonProducts(kw, apiKey, host))
+    );
+    results.push(...batchResults);
+    // 最後のバッチでなければレート制限回避のため少し待つ
+    if (i + concurrency < keywords.length) {
+      await new Promise((r) => setTimeout(r, batchDelayMs));
+    }
+  }
+  return results;
 }
 
 // 「発売予定日」表記の本を除外（v4 仕様: 未発売本はスコアリングから除外）
@@ -255,10 +285,11 @@ export default async function handler(req, res) {
       warnings.push(`キーワード生成数が ${trimmedKeywords.length}/${KEYWORD_COUNT} 個でした。後段スコアリング精度に影響する可能性があります。`);
     }
 
-    // === Stage 2: RapidAPI Product Search を並列呼出 ===
-    const marketDataResults = await Promise.allSettled(
-      trimmedKeywords.map((kw) => searchAmazonProducts(kw, rapidApiKey, rapidApiHost))
-    );
+    // === Stage 2: RapidAPI Product Search をバッチ処理（並列度2・429リトライ付き） ===
+    // Basic プラン (無料) の秒間レート制限を回避するため、Promise.all の一括並列ではなく
+    // concurrency=2 で2件ずつ実行し、バッチ間に約1.1秒のディレイを入れる。
+    // 10キーワードなら計5バッチ・約5〜10秒で完了。
+    const marketDataResults = await searchAmazonProductsBatched(trimmedKeywords, rapidApiKey, rapidApiHost, 2, 1100);
     const marketData = marketDataResults.map((r, idx) => {
       if (r.status === "fulfilled") return r.value;
       warnings.push(`キーワード "${trimmedKeywords[idx]}" のAmazon検索でエラー: ${r.reason?.message || r.reason}`);
