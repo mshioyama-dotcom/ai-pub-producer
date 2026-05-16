@@ -30,12 +30,14 @@
 //   - DIFY_API_KEY_STEP03_REVIEW  (新STEP3 レビュー分析 Difyワークフロー)
 //   - RAPIDAPI_KEY                (Real-Time Amazon Data 認証)
 //   - RAPIDAPI_HOST               (デフォルト: real-time-amazon-data.p.rapidapi.com)
-//   - RAPIDAPI_REVIEWS_ENDPOINT   (Top Product Reviews パス・デフォルト: /product-reviews。
-//                                  実装時に RapidAPI コンソールで正確なパスを再確認)
+//   - RAPIDAPI_REVIEWS_ENDPOINT   (Top Product Reviews パス・デフォルト: /top-product-reviews。
+//                                  PoC実機検証 2026-05-16 で確認済み)
 
 const DIFY_API_BASE = "https://api.dify.ai/v1";
 const RAPIDAPI_DEFAULT_HOST = "real-time-amazon-data.p.rapidapi.com";
-const RAPIDAPI_DEFAULT_REVIEWS_ENDPOINT = "/product-reviews";
+// PoC実機検証で確認した正確なパス: /top-product-reviews
+// (Real-Time Amazon Data API・FlyByAPIs提供・RapidAPI経由)
+const RAPIDAPI_DEFAULT_REVIEWS_ENDPOINT = "/top-product-reviews";
 const TARGET_BOOK_COUNT = 3;
 
 async function runDifyWorkflow(apiKey, inputs) {
