@@ -1,0 +1,318 @@
+app:
+  description: v4新規。書籍プロファイル確定アクション専用ワークフロー。STEP1草案+STEP2選定キーワード+STEP3差別化分析の3情報を統合し、書籍プロファイル確定版（マークダウン構造化テキスト）を生成する。STEP4以降のDifyワークフローがこの確定版を「書籍プロファイル」変数として参照する設計。出力フォーマットを厳密に保つこと（後段が見出しで構造抽出するため）。
+  icon: 📘
+  icon_background: '#E8EEF5'
+  icon_type: emoji
+  mode: workflow
+  name: STEP_書籍プロファイル確定
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/openai:0.2.10@7ca552fb9e48caa4deddfdef5aa71c200d06d03c26c2e8bb428b3250101b9cb3
+    version: null
+kind: app
+version: 0.6.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        attachment_image_file_size_limit: 2
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        file_upload_limit: 50
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: llm
+      id: 4000000000001-source-4000000000002-target
+      source: '4000000000001'
+      sourceHandle: source
+      target: '4000000000002'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: end
+      id: 4000000000002-source-4000000000003-target
+      source: '4000000000002'
+      sourceHandle: source
+      target: '4000000000003'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: ユーザー入力
+        type: start
+        variables:
+        - default: ''
+          hint: STEP1の書籍プロファイル草案。仮テーマ・想定読者・コア・ベネフィット・動機・出版目標・著者の角度・ポジショニング仮説・読了後の状態仮説 を含む。
+          label: 書籍プロファイル草案
+          max_length: 16000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: work_profile_draft
+        - default: ''
+          hint: 著者プロファイル全文（補助）。
+          label: 著者プロファイル
+          max_length: 10000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: author_profile
+        - default: ''
+          hint: 出版目標。
+          label: 出版目標
+          max_length: 2000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: publishing_goal
+        - default: ''
+          hint: STEP2で選定したキーワード（複数なら読点区切り）。
+          label: 選定キーワード
+          max_length: 500
+          options: []
+          placeholder: ''
+          required: true
+          type: text-input
+          variable: selected_keywords_text
+        - default: ''
+          hint: STEP2 スコア表上位本のタイトル一覧（マークダウン箇条書き）。競合本の傾向セクションに反映する。
+          label: 競合本タイトル一覧
+          max_length: 4000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: top_books_titles
+        - default: ''
+          hint: STEP3 の競合レビュー分析結果全文（マークダウン）。読者の真のニーズ・差別化ポイント・落とし穴の抽出元となる。
+          label: STEP3分析結果
+          max_length: 16000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: step3_analysis_text
+      height: 260
+      id: '4000000000001'
+      position:
+        x: 80
+        y: 282
+      positionAbsolute:
+        x: 80
+        y: 282
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            enable_stream: false
+            max_tokens: 6144
+            reasoning_effort: medium
+            verbosity: medium
+          mode: chat
+          name: gpt-5.2
+          provider: langgenius/openai/openai
+        prompt_template:
+        - id: 4000000000002-prompt-001
+          role: system
+          text: |
+            あなたは「Kindle出版の市場分析家・コンセプト設計者」です。
+            STEP1で生成された書籍プロファイル草案を、STEP2の市場検証（選定キーワード+競合本傾向）と STEP3の競合レビュー分析（差別化ポイント+落とし穴）で補強・統合し、書籍プロファイル確定版を生成します。
+
+            この確定版は STEP4「エピソードインタビュー」以降のすべてのSTEPで「書籍プロファイル」として自動注入され、タイトル設計・目次・本文・Amazon説明文の生成元になります。マークダウン構造を厳守してください。
+
+            v4実装指示書 §6.4 のフォーマットに従う。
+
+            ■ 入力
+
+            STEP1 書籍プロファイル草案：
+            {{#4000000000001.work_profile_draft#}}
+
+            著者プロファイル（補助）：
+            {{#4000000000001.author_profile#}}
+
+            出版目標：
+            {{#4000000000001.publishing_goal#}}
+
+            STEP2 選定キーワード：
+            {{#4000000000001.selected_keywords_text#}}
+
+            STEP2 上位本タイトル一覧：
+            {{#4000000000001.top_books_titles#}}
+
+            STEP3 競合レビュー分析結果：
+            {{#4000000000001.step3_analysis_text#}}
+
+            ■ 生成原則
+
+            - **STEP1の主観コンセプトを軸に、STEP2/3の客観データで補強する**。仮テーマ自体の改変は最小限。
+            - **STEP1の動機・出版目標・著者の角度は基本的に変更しない**（著者が決めた意図を尊重）。
+            - **想定読者・ポジショニング・コア・ベネフィット**は、STEP3で見えた読者ニーズに合わせて精緻化してよい。
+            - **追加項目（主要検索キーワード／競合本の傾向／読者の真のニーズ／本企画の差別化ポイント／既存本がカバーできていない切り口／注意すべき落とし穴）は STEP2/3 の結果から忠実に転記**する（要約OK、創作禁止）。
+            - 各項目は **3行以内で簡潔に**。装飾語を避け、事実ベースで記述。
+            - **マークダウン形式を厳守**（STEP4以降が見出しで構造抽出するため）。
+
+            ■ 出力フォーマット（厳守）
+
+            # 書籍プロファイル確定版
+
+            ## 仮テーマ
+            （STEP1の仮テーマをベース。市場検証で具体化された情報があれば反映）
+
+            ## 想定読者
+            （STEP1の想定読者をベース。STEP3で見えた読者ニーズで補強・精緻化）
+
+            ## コア・ベネフィット
+            （STEP1のコア・ベネフィットをベース。読者目線の自然な日本語1文）
+
+            ## 動機
+            （STEP1の動機。原文の意図を保持。サブスク誘導・サービス集客・権威構築などの目的が書かれていれば必ず保持）
+
+            ## 出版目標
+            （STEP1の出版目標。原文を保持）
+
+            ## 著者の角度
+            （STEP1の著者の角度。原文を保持）
+
+            ## ポジショニング仮説
+            （STEP1のポジショニング仮説+STEP3の差別化ポイントで強化）
+
+            ## 読了後の状態仮説
+            （STEP1の読了後の状態仮説。原文を保持）
+
+            ## 主要検索キーワード
+            （STEP2で選定された1〜2個のキーワードを箇条書き）
+
+            ## 競合本の傾向
+            （STEP2の上位本タイトル群から抽出した3〜5行の定番パターン要約）
+
+            ## 読者の真のニーズ
+            （STEP3の不満点分析から抽出した3〜5項目）
+
+            ## 本企画の差別化ポイント
+            （STEP3の差別化分析から抽出した3項目）
+
+            ## 既存本がカバーできていない切り口
+            （STEP3の分析結果から抽出した1〜3項目）
+
+            ## 注意すべき落とし穴
+            （STEP3の分析結果から抽出した1〜2項目）
+
+            ■ 重要
+
+            - 出力は上記フォーマットのみ。前置き・解説・コードフェンスは禁止
+            - 「# 書籍プロファイル確定版」から始まること
+            - 各 ## 見出しは必ず上記の順序・名前で記述
+            - 本文中に本のタイトル・著者名・ASIN等の固有名詞を含めない（一般化した形で記述）
+        - id: 4000000000002-prompt-002
+          role: user
+          text: 上記の入力情報に基づき、書籍プロファイル確定版をマークダウンで生成してください。
+        selected: false
+        title: 書籍プロファイル確定版生成
+        type: llm
+        vision:
+          enabled: false
+      height: 88
+      id: '4000000000002'
+      position:
+        x: 561
+        y: 303
+      positionAbsolute:
+        x: 561
+        y: 303
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        outputs:
+        - value_selector:
+          - '4000000000002'
+          - text
+          value_type: string
+          variable: text
+        selected: false
+        title: 出力
+        type: end
+      height: 88
+      id: '4000000000003'
+      position:
+        x: 864
+        y: 303
+      positionAbsolute:
+        x: 864
+        y: 303
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    viewport:
+      x: 0
+      y: 0
+      zoom: 1
+  rag_pipeline_variables: []
