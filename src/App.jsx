@@ -2284,6 +2284,17 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
   const recommendsProceed = analysis?.ai_recommendation === "proceed_to_step3";
   const generatedKeywords = Array.isArray(analysis?.keywords) ? analysis.keywords : [];
 
+  // 分析結果と選定キーワードを localStorage に再保存（手動）
+  const [saveMsg, setSaveMsg] = useState(false);
+  const handleSaveAnalysis = () => {
+    try {
+      if (analysis) localStorage.setItem(STEP2_ANALYSIS_KEY, JSON.stringify(analysis));
+      localStorage.setItem(STEP2_SELECTED_KEYWORDS_KEY, JSON.stringify(selectedKeywords || []));
+      setSaveMsg(true);
+      setTimeout(() => setSaveMsg(false), 2500);
+    } catch (e) { console.error(e); }
+  };
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
@@ -2374,6 +2385,11 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
           <Card style={{ background: C.white, border: `1px solid ${C.border}` }}>
             <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordWrap: "break-word", fontFamily: "inherit", fontSize: 13, lineHeight: 1.85, color: C.text }}>{analysis.judgment_text || "（出力なし）"}</pre>
           </Card>
+          <div style={{ display: "flex", gap: 10, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <BtnPrimary onClick={handleSaveAnalysis}>分析結果＋選定キーワードを保存</BtnPrimary>
+            {saveMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました（次回もここから再開できます）</span>}
+            <span style={{ fontSize: 11.5, color: C.textLight }}>※ 分析実行直後にも自動保存されています</span>
+          </div>
         </div>
       )}
 
@@ -2597,6 +2613,16 @@ const Step3Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
   const recommendsReturn = analysis?.ai_recommendation === "return_to_step1";
   const recommendsProceed = analysis?.ai_recommendation === "proceed_to_confirmation";
 
+  // 分析結果を localStorage に再保存（手動）
+  const [saveMsg, setSaveMsg] = useState(false);
+  const handleSaveAnalysis = () => {
+    try {
+      if (analysis) localStorage.setItem(STEP3_ANALYSIS_KEY, JSON.stringify(analysis));
+      setSaveMsg(true);
+      setTimeout(() => setSaveMsg(false), 2500);
+    } catch (e) { console.error(e); }
+  };
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
@@ -2691,6 +2717,11 @@ const Step3Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
           {Number.isFinite(analysis.differentiation_count) && (
             <div style={{ marginTop: 8, fontSize: 12, color: C.textLight }}>抽出された差別化ポイント数: <strong style={{ color: C.navy }}>{analysis.differentiation_count} 個</strong></div>
           )}
+          <div style={{ display: "flex", gap: 10, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <BtnPrimary onClick={handleSaveAnalysis}>分析結果を保存</BtnPrimary>
+            {saveMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました（次回もここから再開できます）</span>}
+            <span style={{ fontSize: 11.5, color: C.textLight }}>※ 分析実行直後にも自動保存されています</span>
+          </div>
         </div>
       )}
 
@@ -2867,12 +2898,27 @@ const ConfirmActionPage = ({ savedAuthorProfile, savedWorkProfileDraft, onSaveWo
     }
   };
 
+  // 確定版だけ保存（STEP4 へ進まない・編集→保存→外部AIで再相談のループに使う）
+  const handleSaveOnly = async () => {
+    const cleaned = cleanOutputText(confirmedText);
+    if (!cleaned.trim()) {
+      setRunError("確定版が空のままです。先に「確定版を生成」を実行してください。");
+      return;
+    }
+    setRunError("");
+    if (cleaned !== confirmedText) setConfirmedText(cleaned);
+    await onSaveWorkProfileConfirmed(cleaned);
+    setSaveMsg(true);
+    setTimeout(() => setSaveMsg(false), 2500);
+  };
+
   const handleSaveAndProceed = async () => {
     const cleaned = cleanOutputText(confirmedText);
     if (!cleaned.trim()) {
       setRunError("確定版が空のままです。先に「確定版を生成」を実行してください。");
       return;
     }
+    setRunError("");
     if (cleaned !== confirmedText) setConfirmedText(cleaned);
     await onSaveWorkProfileConfirmed(cleaned);
     setSaveMsg(true);
@@ -2937,6 +2983,11 @@ const ConfirmActionPage = ({ savedAuthorProfile, savedWorkProfileDraft, onSaveWo
           rows={24}
           placeholder="確定版生成後にここにマークダウンが表示されます。手動編集も可能です。"
           style={{ width: "100%", padding: "12px 14px", fontSize: 13.5, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.85 }} />
+        <div style={{ display: "flex", gap: 10, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <BtnPrimary onClick={handleSaveOnly} disabled={!confirmedText.trim()}>確定版を保存（STEP4に進まない）</BtnPrimary>
+          {saveMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました</span>}
+          <span style={{ fontSize: 11.5, color: C.textLight }}>※ 外部AI相談 → textarea で編集 → 保存 → 再相談 のループに使えます</span>
+        </div>
       </div>
 
       {/* ③ 外部AI相談（v4新規・確定アクション専用6観点） */}
