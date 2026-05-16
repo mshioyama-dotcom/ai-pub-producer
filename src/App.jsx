@@ -32,7 +32,7 @@ const C = {
 const STEPS = [
   {
     id: "step_01", num: 1, title: "書籍プロファイル草案",
-    description: "仮テーマと著者プロファイルから「書籍プロファイル草案」を生成します。これがSTEP2の市場検証→確定版への入口になります。",
+    description: "仮テーマと著者プロファイルから「書籍プロファイル草案」を生成します。続くSTEP2（キーワード絞り込み）・STEP3（競合レビュー評価）の市場検証を経て、確定アクションで書籍プロファイル確定版に進化させます。",
     category: "企画設計", type: "custom",
     url: "",
     inputs: [
@@ -43,8 +43,8 @@ const STEPS = [
     outputTitle: "書籍プロファイル草案",
     help: [
       "仮テーマ・動機・想定読者を入力すると、著者プロファイル（STEP0で生成）と組み合わせて書籍プロファイル草案を生成します",
-      "出力には次のSTEP2で使う「検索キーワード3軸」が含まれます",
-      "STEP2を実行すると、市場知見を反映した書籍プロファイル確定版に進化します"
+      "STEP2（キーワード絞り込み）・STEP3（競合レビュー評価）で市場検証し、確定アクションで書籍プロファイル確定版へ進化させます",
+      "STEP2/3から「STEP1に戻る」で戻ってきた場合、市場検証からのフィードバックが画面上部に表示され、その示唆を踏まえて草案を再生成できます"
     ]
   },
   {
@@ -203,6 +203,9 @@ const STEP1_INPUTS_KEY = "aipub:step1_inputs";
 const STEP2_INPUTS_KEY = "aipub:step2_inputs";
 const TITLE_CONFIRMED_KEY = "aipub:title_confirmed";
 const SUBTITLE_CONFIRMED_KEY = "aipub:subtitle_confirmed";
+// v4新規：新STEP2/3から戻ってきた時にSTEP1上部に表示する市場検証フィードバック
+// 形式: { from: "STEP2" | "STEP3", content: string (markdown), generated_at: ISO string }
+const RETURN_FEEDBACK_KEY = "aipub:return_feedback";
 
 // 出版目標のチェックボックス選択肢（マーケティング観点の主要ゴール）
 const PUBLISHING_GOAL_OPTIONS = [
@@ -365,6 +368,7 @@ async function resetAllData() {
     localStorage.removeItem(STEP1_PENDING_KEY);
     localStorage.removeItem(STEP1_INPUTS_KEY);
     localStorage.removeItem(STEP2_INPUTS_KEY);
+    localStorage.removeItem(RETURN_FEEDBACK_KEY);
   } catch (e) { console.error(e); }
 }
 
@@ -1739,6 +1743,19 @@ const Step1Page = ({ savedAuthorProfile, savedWorkProfile, onSaveWorkProfile, on
   const [customPublishingGoal, setCustomPublishingGoal] = useState(savedInputs.customPublishingGoal || "");
   const [inputSaveMsg, setInputSaveMsg] = useState(false);
 
+  // v4新規：新STEP2/3から戻ってきた時のフィードバック表示
+  // localStorage RETURN_FEEDBACK_KEY から読み込む。閉じると null になる。
+  const [returnFeedback, setReturnFeedback] = useState(() => {
+    try {
+      const raw = (typeof window !== "undefined") ? localStorage.getItem(RETURN_FEEDBACK_KEY) : null;
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  });
+  const handleCloseReturnFeedback = () => {
+    try { localStorage.removeItem(RETURN_FEEDBACK_KEY); } catch (e) { console.error(e); }
+    setReturnFeedback(null);
+  };
+
   // 入力欄の変更を localStorage に自動保存（debounce 不要・小さなテキストなので直書きでOK）
   useEffect(() => {
     try {
@@ -1799,6 +1816,8 @@ const Step1Page = ({ savedAuthorProfile, savedWorkProfile, onSaveWorkProfile, on
             reader_hypothesis: readerHypothesis.trim(),
             author_profile: savedAuthorProfile || "",
             publishing_goal: buildPublishingGoalText(publishingGoals, customPublishingGoal),
+            // v4新規：新STEP2/3からの戻り時フィードバックがあればDifyに渡す（無ければ空文字）
+            return_feedback: (returnFeedback && returnFeedback.content) ? returnFeedback.content : "",
           },
         }),
       });
@@ -1834,6 +1853,27 @@ const Step1Page = ({ savedAuthorProfile, savedWorkProfile, onSaveWorkProfile, on
         </div>
       </div>
       <div style={{ height: 1, background: `linear-gradient(to right, ${C.gold}, ${C.goldLight}, transparent)`, width: "100%", opacity: 0.9, marginBottom: 20 }} />
+
+      {/* v4新規：新STEP2/3 から戻ってきた時に表示される市場検証フィードバック */}
+      {returnFeedback && returnFeedback.content && (
+        <Card style={{ marginBottom: 16, background: "#fff8e6", border: `1px solid ${C.gold}` }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700, color: C.navy, marginBottom: 8 }}>
+            📊 {returnFeedback.from || "STEP2/3"} の分析からのフィードバック
+          </div>
+          <div style={{ fontSize: 12.5, color: C.textSub, marginBottom: 10, lineHeight: 1.7 }}>
+            市場検証の結果から、書籍コンセプトの改善示唆が届いています。下の入力欄（仮テーマ・想定読者・動機）を必要に応じて修正してから、AIに再生成させてください。再生成時、このフィードバックも自動でAIに渡されます。
+          </div>
+          <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 4, padding: "10px 14px", maxHeight: 360, overflow: "auto", fontSize: 12.5, color: C.text, lineHeight: 1.85, whiteSpace: "pre-wrap" }}>
+            {returnFeedback.content}
+          </div>
+          <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <button onClick={handleCloseReturnFeedback} style={{ fontSize: 11.5, padding: "4px 10px", background: "transparent", color: C.textSub, border: `1px solid ${C.border}`, borderRadius: 4, cursor: "pointer" }}>このフィードバックを閉じる</button>
+            {returnFeedback.generated_at && (
+              <span style={{ fontSize: 11, color: C.textLight }}>生成日時: {new Date(returnFeedback.generated_at).toLocaleString("ja-JP")}</span>
+            )}
+          </div>
+        </Card>
+      )}
 
       {pendingAppliedFields.length > 0 && (
         <Card style={{ marginBottom: 16, background: "#e7f5ec", border: `1px solid ${C.green}` }}>
