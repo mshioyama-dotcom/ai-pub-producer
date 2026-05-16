@@ -1,0 +1,304 @@
+app:
+  description: v4新規。新STEP3「競合レビュー評価」。Node側でRapidAPI(Real-Time Amazon Data・Top Product Reviews)から取得した競合本3冊のレビュー要約と書籍プロファイル草案を受け取り、LLMで読者の共通不満点・既存本がカバーできていない切り口・本企画が差別化できるポイント・注意すべき落とし穴を抽出する。差別化ポイント数で戻り判定（2個以下なら戻り推奨）。出力はマークダウン構造化テキスト。
+  icon: 📝
+  icon_background: '#FDF6E3'
+  icon_type: emoji
+  mode: workflow
+  name: STEP3_競合レビュー評価
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/openai:0.2.10@7ca552fb9e48caa4deddfdef5aa71c200d06d03c26c2e8bb428b3250101b9cb3
+    version: null
+kind: app
+version: 0.6.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        attachment_image_file_size_limit: 2
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        file_upload_limit: 50
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: llm
+      id: 3000000000001-source-3000000000002-target
+      source: '3000000000001'
+      sourceHandle: source
+      target: '3000000000002'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: end
+      id: 3000000000002-source-3000000000003-target
+      source: '3000000000002'
+      sourceHandle: source
+      target: '3000000000003'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: ユーザー入力
+        type: start
+        variables:
+        - default: ''
+          hint: STEP1の書籍プロファイル草案。
+          label: 書籍プロファイル草案
+          max_length: 16000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: work_profile_draft
+        - default: ''
+          hint: 著者プロファイル全文（補助）。
+          label: 著者プロファイル
+          max_length: 10000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: author_profile
+        - default: ''
+          hint: 出版目標。
+          label: 出版目標
+          max_length: 2000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: publishing_goal
+        - default: ''
+          hint: STEP2で選定したキーワード（複数なら読点区切り）。
+          label: 選定キーワード
+          max_length: 500
+          options: []
+          placeholder: ''
+          required: true
+          type: text-input
+          variable: selected_keywords_text
+        - default: ''
+          hint: Node側でRapidAPI(Top Product Reviews)から取得した3冊分のレビュー要約。各本ごとに★分布、★1〜3不満レビュー、★4〜5肯定レビューがマークダウンで整理されている。
+          label: 競合本3冊のレビュー要約
+          max_length: 32000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: reviews_summary
+      height: 240
+      id: '3000000000001'
+      position:
+        x: 80
+        y: 282
+      positionAbsolute:
+        x: 80
+        y: 282
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            enable_stream: false
+            max_tokens: 4096
+            reasoning_effort: medium
+            verbosity: medium
+          mode: chat
+          name: gpt-5.2
+          provider: langgenius/openai/openai
+        prompt_template:
+        - id: 3000000000002-prompt-001
+          role: system
+          text: |
+            あなたは「Kindle出版の市場分析家」です。
+            STEP2で選定したキーワードの上位本3冊のAmazonレビューを分析し、本企画（書籍プロファイル草案）が市場に対してどのような立ち位置を取るべきかを抽出します。
+            v4実装指示書 §5.6 の分析プロンプト設計に従う。
+
+            ■ 入力
+
+            本企画の書籍プロファイル草案：
+            {{#3000000000001.work_profile_draft#}}
+
+            著者プロファイル（補助）：
+            {{#3000000000001.author_profile#}}
+
+            出版目標：
+            {{#3000000000001.publishing_goal#}}
+
+            STEP2で選定したキーワード：
+            {{#3000000000001.selected_keywords_text#}}
+
+            競合本3冊のレビュー要約（Node側でRapidAPI Top Product Reviewsから取得・整形済み）：
+            {{#3000000000001.reviews_summary#}}
+
+            ■ あなたのタスク
+
+            上記情報を踏まえて、以下を抽出してください。
+
+            ## タスク1: 読者の共通不満点を3〜5個抽出
+
+            ★1〜3レビューに優先フォーカス。3冊に共通して見られる不満を「3〜5個」抽出する。
+            ・本のタイトル名やASINを具体的に書かない（読者目線の不満として抽象化する）
+            ・抽象論ではなく、具体的な不満をそのまま読者の言葉で抽出
+            ・本企画と関係のない不満（誤字脱字、印刷品質、配送など）は除外
+
+            ## タスク2: 既存本がカバーできていない切り口を抽出
+
+            ★1〜3レビューと書籍プロファイル草案を見比べ、「読者が求めているが既存本では十分カバーされていない切り口」を1〜3個抽出する。
+            本企画の「想定読者」「コア・ベネフィット」「ポジショニング仮説」が、これらの未カバー領域に応えているかも判定する。
+
+            ## タスク3: 本企画が差別化できるポイントを3個（または「困難」なら少なめ）
+
+            書籍プロファイル草案の「ポジショニング仮説」「著者の角度」と、未カバーの切り口を組み合わせて、本企画が差別化できる具体ポイントを抽出する。
+            **3個以上抽出することを目標にする**（後段の戻り判定で「差別化ポイント数」が判定材料になる）。
+            ・抽象論「読者の役に立つ」は禁止。本の中身として表現できる具体性が必須
+            ・著者プロファイルの強みと組み合わせた「この著者だから差別化できる」要素を優先
+
+            **重要**：差別化ポイントが3個も抽出できない場合は、無理に水増しせず2個以下のまま出力すること。後段の自動判定で「STEP1に戻る推奨」が出される。
+
+            ## タスク4: 注意すべき落とし穴を抽出
+
+            ★4〜5レビューを参照し、競合本が高評価を得ている「読者が満足する要素」を分析。本企画がこれを軽視すると読者離脱につながる「落とし穴」を1〜2個指摘する。
+
+            ■ 出力フォーマット（厳守・マークダウン構造化）
+
+            ## 【読者の共通不満点】
+            1. ◯◯
+            2. ◯◯
+            3. ◯◯
+            （3〜5個）
+
+            ## 【既存本がカバーできていない切り口】
+            - ◯◯
+            - ◯◯（任意）
+
+            ## 【本企画が差別化できるポイント】
+            1. ◯◯
+            2. ◯◯
+            3. ◯◯
+            （3個目標。困難なら2個以下のまま）
+
+            ## 【注意すべき落とし穴】
+            - ◯◯
+            - ◯◯（任意）
+
+            ## 【AIによる総合判定】
+            （差別化ポイント数を踏まえて）
+            ✓ 差別化ポイント: 3個以上明確 → 書籍プロファイル確定アクションへ進むことを推奨します
+            または
+            ⚠ 差別化ポイント: 2個以下 → STEP1に戻ってコンセプトを調整することを推奨します
+
+            ■ 重要
+
+            - 出力は上記フォーマットのみ。前置き・解説・コードフェンスは禁止
+            - 差別化ポイントは「3個目標」だが、空虚に水増ししない（後段の自動判定が機能するよう、本当に3個出せる時だけ3個書く）
+            - 本のタイトル・著者名・ASIN等の固有名詞を出力に含めない（一般化した形で記述）
+        - id: 3000000000002-prompt-002
+          role: user
+          text: 上記の入力情報に基づき、競合本3冊のレビュー分析を実施し、指定フォーマットでマークダウン出力してください。
+        selected: false
+        title: 競合レビュー分析＋差別化抽出
+        type: llm
+        vision:
+          enabled: false
+      height: 88
+      id: '3000000000002'
+      position:
+        x: 561
+        y: 303
+      positionAbsolute:
+        x: 561
+        y: 303
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        outputs:
+        - value_selector:
+          - '3000000000002'
+          - text
+          value_type: string
+          variable: text
+        selected: false
+        title: 出力
+        type: end
+      height: 88
+      id: '3000000000003'
+      position:
+        x: 864
+        y: 303
+      positionAbsolute:
+        x: 864
+        y: 303
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    viewport:
+      x: 0
+      y: 0
+      zoom: 1
+  rag_pipeline_variables: []

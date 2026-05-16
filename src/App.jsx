@@ -220,6 +220,9 @@ const RETURN_FEEDBACK_KEY = "aipub:return_feedback";
 const STEP2_ANALYSIS_KEY = "aipub:step2_analysis";
 // v4新規：新STEP2で著者が選定したキーワード（1〜2個）。STEP3 と確定アクションへ引き渡す。
 const STEP2_SELECTED_KEYWORDS_KEY = "aipub:step2_selected_keywords";
+// v4新規：新STEP3「競合レビュー評価」の分析結果（api/step3 の戻り値そのまま）
+// 形式: { analyzed_books, analysis_text, ai_recommendation, differentiation_count, return_feedback_for_step1, warnings }
+const STEP3_ANALYSIS_KEY = "aipub:step3_analysis";
 
 // 出版目標のチェックボックス選択肢（マーケティング観点の主要ゴール）
 const PUBLISHING_GOAL_OPTIONS = [
@@ -444,6 +447,7 @@ async function resetAllData() {
     localStorage.removeItem(RETURN_FEEDBACK_KEY);
     localStorage.removeItem(STEP2_ANALYSIS_KEY);
     localStorage.removeItem(STEP2_SELECTED_KEYWORDS_KEY);
+    localStorage.removeItem(STEP3_ANALYSIS_KEY);
   } catch (e) { console.error(e); }
 }
 
@@ -2452,22 +2456,149 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
   );
 };
 
-// v4新規：新STEP3「競合レビュー評価」のページコンポーネント（スタブ）
-// 優先度3 ステージ2 で完全実装予定。現状はSTEP2 → STEP4（旧STEP3 エピソードインタビュー）への
-// ナビゲーションが機能するための placeholder として配置。
-// 実装後は api/step3.js を呼び、STEP2 で選定したキーワードの上位本3冊の Top Product Reviews を
-// 取得して LLM 分析（不満点・差別化ポイント・落とし穴）を行う。
+// v4新規：新STEP3「競合レビュー評価」のページコンポーネント。
+// STEP2 で選定したキーワードの上位本3冊の Amazon レビューを Node オーケストレータ (api/step3.js)
+// 経由で取得し、Dify LLM で読者の共通不満点・差別化ポイント・落とし穴を分析する。
 // 相談機能（DiscussionPanel）は無し（v4 §9-2 のとおり、客観データ分析のためAI判定アシストで代替）。
+// 確定アクション（優先度4）への遷移は本ページ完了後に行う。
 const Step3Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, project }) => {
-  // STEP2 の選定キーワードを取得（無ければ STEP2 へ戻す）
+  // STEP2 関連データの取得（無ければ STEP2 へ戻る案内）
+  const step2Analysis = (() => {
+    try {
+      const raw = (typeof window !== "undefined") ? localStorage.getItem(STEP2_ANALYSIS_KEY) : null;
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  })();
   const selectedKeywords = (() => {
     try {
       const raw = (typeof window !== "undefined") ? localStorage.getItem(STEP2_SELECTED_KEYWORDS_KEY) : null;
       return raw ? (JSON.parse(raw) || []) : [];
     } catch { return []; }
   })();
+  // STEP1 入力欄から publishing_goal を再構築
+  const savedPublishingGoal = (() => {
+    try {
+      const raw = (typeof window !== "undefined") ? localStorage.getItem(STEP1_INPUTS_KEY) : null;
+      if (!raw) return "";
+      const parsed = JSON.parse(raw) || {};
+      return buildPublishingGoalText(parsed.publishingGoals || [], parsed.customPublishingGoal || "");
+    } catch { return ""; }
+  })();
+
+  // 既存の STEP3 分析結果（あれば復元）
+  const initialAnalysis = (() => {
+    try {
+      const raw = (typeof window !== "undefined") ? localStorage.getItem(STEP3_ANALYSIS_KEY) : null;
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  })();
+
+  const [analysis, setAnalysis] = useState(initialAnalysis);
+  const [isRunning, setIsRunning] = useState(false);
+  const [runError, setRunError] = useState("");
+  const [stageMsg, setStageMsg] = useState("");
+
   const hasDraft = !!(savedWorkProfileDraft || "").trim();
   const hasSelectedKeywords = Array.isArray(selectedKeywords) && selectedKeywords.length > 0;
+  const hasStep2Data = !!step2Analysis && Array.isArray(step2Analysis.scored);
+
+  // STEP2 の選定キーワードに紐づく上位本データを取得（api/step3.js への入力用）
+  const selectedBooks = useMemo(() => {
+    if (!hasStep2Data || !hasSelectedKeywords) return [];
+    const scored = step2Analysis.scored || [];
+    const books = [];
+    for (const kw of selectedKeywords) {
+      const entry = scored.find((s) => s.keyword === kw);
+      if (entry && Array.isArray(entry.top_books)) {
+        for (const b of entry.top_books) {
+          if (b && b.asin && !books.find((x) => x.asin === b.asin)) {
+            books.push({ ...b, is_released: true });
+          }
+        }
+      }
+    }
+    return books;
+  }, [hasStep2Data, hasSelectedKeywords, selectedKeywords, step2Analysis]);
+
+  const canRunAnalysis = hasDraft && hasSelectedKeywords && selectedBooks.length > 0;
+
+  const handleRunAnalysis = async () => {
+    setRunError("");
+    if (!canRunAnalysis) {
+      setRunError("STEP3を実行するには、書籍プロファイル草案・STEP2 選定キーワード・上位本データの3つが必要です。");
+      return;
+    }
+    setIsRunning(true);
+    setStageMsg("競合本3冊のAmazonレビューを並列取得中…");
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4 * 60 * 1000);
+    const stageTicker = setTimeout(() => setStageMsg("レビューデータをLLMで分析中（不満点・差別化抽出）…"), 12000);
+    try {
+      const response = await fetch("/api/step3", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          work_profile_draft: savedWorkProfileDraft || "",
+          author_profile: savedAuthorProfile || "",
+          publishing_goal: savedPublishingGoal || "",
+          selected_keywords: selectedKeywords,
+          selected_books: selectedBooks,
+        }),
+      });
+      const contentType = response.headers.get("content-type") || "";
+      let data;
+      if (contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        setRunError(`サーバから非JSON応答（${response.status}）：${text.slice(0, 300)}`);
+        return;
+      }
+      if (!response.ok) {
+        const missing = Array.isArray(data?.missingEnv) && data.missingEnv.length > 0
+          ? `\n\n未設定の環境変数：${data.missingEnv.join(", ")}\n→ Vercelの環境変数設定をご確認ください。`
+          : "";
+        setRunError((data?.error || `HTTP ${response.status} エラー`) + missing);
+        return;
+      }
+      setAnalysis(data);
+      try { localStorage.setItem(STEP3_ANALYSIS_KEY, JSON.stringify(data)); } catch (e) {}
+    } catch (e) {
+      if (e.name === "AbortError") {
+        setRunError("4分以上応答がなかったため処理を中断しました。もう一度「深掘り分析実行」を押してみてください。");
+      } else {
+        setRunError(`通信エラーが発生しました：${e.message}`);
+      }
+    } finally {
+      clearTimeout(timeoutId);
+      clearTimeout(stageTicker);
+      setStageMsg("");
+      setIsRunning(false);
+    }
+  };
+
+  const handleReturnToStep1 = () => {
+    const content = analysis?.return_feedback_for_step1 || analysis?.analysis_text || "";
+    if (!content.trim()) {
+      try { localStorage.removeItem(RETURN_FEEDBACK_KEY); } catch (e) {}
+    } else {
+      const payload = { from: "STEP3", content, generated_at: new Date().toISOString() };
+      try { localStorage.setItem(RETURN_FEEDBACK_KEY, JSON.stringify(payload)); } catch (e) { console.error(e); }
+    }
+    onNavigate("step_1");
+  };
+
+  // 「書籍プロファイル確定アクションへ」: 優先度4 で実装される確定アクション画面へ遷移。
+  // 現状は STEP4 (エピソードインタビュー) へ直接遷移するスタブ。優先度4 実装後に正式な
+  // confirm 画面 (例: step_confirm) へ書き換える。
+  const handleProceedToConfirm = () => {
+    // TODO(優先度4): 「書籍プロファイル確定アクション」専用画面へのルーティングを追加
+    onNavigate("step_4");
+  };
+
+  const recommendsReturn = analysis?.ai_recommendation === "return_to_step1";
+  const recommendsProceed = analysis?.ai_recommendation === "proceed_to_confirmation";
 
   return (
     <div>
@@ -2475,11 +2606,12 @@ const Step3Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: C.gold, marginBottom: 4, letterSpacing: "0.08em" }}>STEP 3</div>
           <h1 style={{ fontSize: 20, fontWeight: 700, color: C.navy, margin: "0 0 6px", letterSpacing: "-0.01em" }}>競合レビュー評価</h1>
-          <p style={{ fontSize: 13.5, color: C.textSub, margin: 0, lineHeight: 1.7 }}>STEP2で選定したキーワードの上位本3冊のAmazonレビューを取得・分析し、読者の共通不満点・差別化ポイント・落とし穴を抽出します。</p>
+          <p style={{ fontSize: 13.5, color: C.textSub, margin: 0, lineHeight: 1.7 }}>STEP2で選定したキーワードの上位本3冊のAmazonレビューを取得・分析し、読者の共通不満点・差別化ポイント・落とし穴を抽出します。差別化ポイントが3個以上なら確定アクションへ、2個以下ならSTEP1に戻ってコンセプトを調整しましょう。</p>
         </div>
       </div>
       <div style={{ height: 1, background: `linear-gradient(to right, ${C.gold}, ${C.goldLight}, transparent)`, width: "100%", opacity: 0.9, marginBottom: 20 }} />
 
+      {/* 前提条件チェック */}
       <Card style={{ marginBottom: 16, background: hasDraft ? "#eef7ee" : "#fff7e6", border: `1px solid ${hasDraft ? "#c8d4c8" : "#e0c8a0"}` }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: C.navy, marginBottom: 6 }}>
           📋 書籍プロファイル草案（STEP1）：{hasDraft ? "✓ 設定済み" : "⚠ 未設定"}
@@ -2489,7 +2621,7 @@ const Step3Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
         )}
       </Card>
 
-      <Card style={{ marginBottom: 24, background: hasSelectedKeywords ? "#eef7ee" : "#fff7e6", border: `1px solid ${hasSelectedKeywords ? "#c8d4c8" : "#e0c8a0"}` }}>
+      <Card style={{ marginBottom: 16, background: hasSelectedKeywords ? "#eef7ee" : "#fff7e6", border: `1px solid ${hasSelectedKeywords ? "#c8d4c8" : "#e0c8a0"}` }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: C.navy, marginBottom: 6 }}>
           🔑 STEP2で選定したキーワード：{hasSelectedKeywords ? `✓ ${selectedKeywords.length}個` : "⚠ 未選定"}
         </div>
@@ -2502,20 +2634,124 @@ const Step3Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
         )}
       </Card>
 
-      <Card style={{ marginBottom: 24, background: "#fff8e1", border: `1px solid ${C.gold}` }}>
-        <div style={{ fontSize: 13.5, fontWeight: 700, color: C.navy, marginBottom: 6 }}>
-          🚧 STEP3「競合レビュー評価」は実装中です（v4 Phase 1A 優先度3 後半）
-        </div>
-        <div style={{ fontSize: 12.5, color: C.textSub, lineHeight: 1.8 }}>
-          このSTEPでは Real-Time Amazon Data API の Top Product Reviews エンドポイントで上位本3冊のレビューを取得し、AIが「読者の共通不満点／既存本がカバーできていない切り口／本企画の差別化ポイント／注意すべき落とし穴」を抽出します。<br /><br />
-          実装完了次第、ここに「深掘り分析実行」ボタンが表示されます。実装ロードマップは <code>AI出版プロデューサー_Step1-3改修_実装指示書_v4.md</code> §5 を参照。
-        </div>
-      </Card>
+      {/* 分析対象本 */}
+      {selectedBooks.length > 0 && (
+        <Card style={{ marginBottom: 24, background: C.white, border: `1px solid ${C.border}` }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.navy, marginBottom: 8 }}>
+            📚 分析対象（上位3冊のレビューを取得します）
+          </div>
+          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: C.text, lineHeight: 1.85 }}>
+            {selectedBooks.slice(0, 3).map((b) => (
+              <li key={b.asin}>{b.product_title || "（タイトル不明）"} <span style={{ color: C.textLight, fontFamily: "monospace" }}>(ASIN: {b.asin})</span></li>
+            ))}
+          </ul>
+          {selectedBooks.length > 3 && (
+            <div style={{ fontSize: 11.5, color: C.textLight, marginTop: 8 }}>※ 全 {selectedBooks.length} 冊の候補からレビュー数の多い順に上位3冊を分析対象にします</div>
+          )}
+        </Card>
+      )}
 
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <BtnSecondary onClick={() => onNavigate("step_2")}>← STEP2に戻る</BtnSecondary>
-        <BtnSecondary onClick={() => onNavigate("step_1")}>← STEP1に戻る</BtnSecondary>
+      {/* ① 分析実行 */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <StepBadge num="①" />
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>深掘り分析を実行する</h2>
+        </div>
+        <Card style={{ background: "#eef2f7", border: "1px solid #c8d4e0" }}>
+          <div style={{ fontSize: 13, color: C.textSub, marginBottom: 12, lineHeight: 1.8 }}>
+            ボタンを押すと、上位3冊のAmazonレビューを並列取得→★分布と本文をLLMで分析→「読者の共通不満点／既存本がカバーできていない切り口／本企画が差別化できるポイント／注意すべき落とし穴」を抽出します。1〜2分かかります。
+          </div>
+          <BtnPrimary onClick={handleRunAnalysis} disabled={isRunning || !canRunAnalysis}>
+            {isRunning ? "分析中..." : "▶ 深掘り分析を実行"}
+          </BtnPrimary>
+          {isRunning && stageMsg && (
+            <div style={{ marginTop: 10, padding: "8px 12px", background: C.white, border: `1px solid ${C.border}`, borderRadius: 4, fontSize: 12.5, color: C.navy, fontWeight: 600 }}>
+              ⏳ {stageMsg}
+            </div>
+          )}
+          {runError && <div style={{ marginTop: 12, padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, fontSize: 13, color: C.red, whiteSpace: "pre-wrap", lineHeight: 1.7 }}>{runError}</div>}
+          {Array.isArray(analysis?.warnings) && analysis.warnings.length > 0 && (
+            <div style={{ marginTop: 10, padding: "8px 12px", background: "#fff8e1", border: `1px solid ${C.gold}`, borderRadius: 4, fontSize: 12, color: C.navyMid, lineHeight: 1.7 }}>
+              <strong>⚠ 警告：</strong>
+              <ul style={{ margin: "4px 0 0 0", paddingLeft: 18 }}>
+                {analysis.warnings.map((w, i) => <li key={i}>{w}</li>)}
+              </ul>
+            </div>
+          )}
+        </Card>
       </div>
+
+      {/* ② 分析結果 */}
+      {analysis && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <StepBadge num="②" />
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>分析結果（不満点／差別化ポイント／落とし穴）</h2>
+          </div>
+          <Card style={{ background: C.white, border: `1px solid ${C.border}` }}>
+            <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordWrap: "break-word", fontFamily: "inherit", fontSize: 13, lineHeight: 1.85, color: C.text }}>{analysis.analysis_text || "（出力なし）"}</pre>
+          </Card>
+          {Number.isFinite(analysis.differentiation_count) && (
+            <div style={{ marginTop: 8, fontSize: 12, color: C.textLight }}>抽出された差別化ポイント数: <strong style={{ color: C.navy }}>{analysis.differentiation_count} 個</strong></div>
+          )}
+        </div>
+      )}
+
+      {/* ③ AI判定アシスト */}
+      {analysis && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <StepBadge num="③" />
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>AI判定アシスト</h2>
+          </div>
+          {recommendsReturn && (
+            <Card style={{ background: "#fff8e1", border: `1px solid ${C.gold}` }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.navy, marginBottom: 6 }}>⚠ STEP1に戻ってコンセプトを調整することを推奨します</div>
+              <div style={{ fontSize: 12.5, color: C.textSub, lineHeight: 1.7, marginBottom: 10 }}>
+                差別化ポイントが {analysis.differentiation_count || 0} 個と少なめでした。市場検証からのフィードバックを踏まえてSTEP1で草案を修正→STEP2/3を再実行することを推奨します。フィードバックは戻り先のSTEP1で表示されます。
+              </div>
+              <BtnPrimary onClick={handleReturnToStep1}>← STEP1に戻る（フィードバックを引き継ぐ）</BtnPrimary>
+            </Card>
+          )}
+          {recommendsProceed && (
+            <Card style={{ background: "#eef7ee", border: `1px solid ${C.green}` }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.green, marginBottom: 6 }}>✓ 書籍プロファイル確定アクションへ進むことを推奨します</div>
+              <div style={{ fontSize: 12.5, color: C.textSub, lineHeight: 1.7 }}>
+                差別化ポイントが {analysis.differentiation_count || 0} 個明確に抽出できました。書籍プロファイル確定版を生成して STEP4 以降の制作フェーズに進みましょう。
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* ④ 次のアクション */}
+      {analysis && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <StepBadge num="④" />
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>次のステップ</h2>
+          </div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <BtnSecondary onClick={handleReturnToStep1}>← STEP1に戻る</BtnSecondary>
+            <BtnSecondary onClick={() => onNavigate("step_2")}>← STEP2に戻る</BtnSecondary>
+            <BtnPrimary onClick={handleProceedToConfirm} disabled={!recommendsProceed}>
+              書籍プロファイルを確定してSTEP4へ進む →
+            </BtnPrimary>
+          </div>
+          <div style={{ marginTop: 8, fontSize: 11.5, color: C.textLight, lineHeight: 1.7 }}>
+            ※ STEP3には外部AI相談機能（DiscussionPanel）はありません。客観データ分析のため、上のAI判定アシストが相談機能の代替として機能します（v4設計）。<br />
+            ※ 現状は「STEP4へ進む」ボタンが直接STEP4に遷移します。優先度4で実装予定の「書籍プロファイル確定アクション」専用画面が間に入る予定です。
+          </div>
+        </div>
+      )}
+
+      {/* 分析が未実行の場合のフォールバック導線 */}
+      {!analysis && (
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <BtnSecondary onClick={() => onNavigate("step_2")}>← STEP2に戻る</BtnSecondary>
+          <BtnSecondary onClick={() => onNavigate("step_1")}>← STEP1に戻る</BtnSecondary>
+        </div>
+      )}
     </div>
   );
 };
