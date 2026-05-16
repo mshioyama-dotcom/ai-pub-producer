@@ -48,23 +48,17 @@ const STEPS = [
     ]
   },
   {
-    id: "step_02", num: 2, title: "市場検証→書籍プロファイル確定",
-    description: "STEP1の書籍プロファイル草案を、Amazon検索結果（最大3軸）で市場検証して、確定版を生成します。STEP1への修正提案も同時に出力します。",
+    id: "step_02", num: 2, title: "キーワード絞り込み",
+    description: "STEP1の書籍プロファイル草案から、Amazon Kindle で読者が実際に検索しそうなキーワード候補10個をAIが生成し、Real-Time Amazon Data API で各キーワードの市場データを取得して3軸（需要・競合の弱さ・意図合致）でスコアリングします。AIが上位1〜2個に推奨マークを付け、合計スコアが低い場合はSTEP1に戻って草案を調整するよう示唆します。",
     category: "企画設計", type: "custom",
     url: "",
-    inputs: [
-      { name: "keyword_theme", label: "主題軸キーワード", desc: "STEP1出力の主題軸（編集可）", source: "STEP1", required: true, type: "text", maxChars: 200 },
-      { name: "html_theme", label: "主題軸 Amazon HTML", desc: "主題軸キーワードでAmazon検索した結果のHTML", source: null, required: true, type: "textarea", maxChars: 300000 },
-      { name: "keyword_reader", label: "読者軸キーワード（任意）", desc: "STEP1出力の読者軸（編集可）", source: "STEP1", required: false, type: "text", maxChars: 200 },
-      { name: "html_reader", label: "読者軸 Amazon HTML（任意）", desc: "読者軸キーワードで検索した結果のHTML", source: null, required: false, type: "textarea", maxChars: 300000 },
-      { name: "keyword_diff", label: "差分軸キーワード（任意）", desc: "STEP1出力の差分軸（編集可）", source: "STEP1", required: false, type: "text", maxChars: 200 },
-      { name: "html_diff", label: "差分軸 Amazon HTML（任意）", desc: "差分軸キーワードで検索した結果のHTML", source: null, required: false, type: "textarea", maxChars: 300000 }
-    ],
-    outputTitle: "市場検証結果＋書籍プロファイル確定版",
+    inputs: [],
+    outputTitle: "キーワード絞り込み結果",
     help: [
-      "最低1軸（主題軸）必須、推奨は2〜3軸。多いほど精度が上がる",
-      "HTMLの取得方法：検索結果ページで右クリック→「ページのソースを表示」→Ctrl+A で全選択→Ctrl+C でコピー",
-      "出力には「STEP1修正提案」が含まれます。納得できないときはSTEP1からやり直すことができます"
+      "ボタンを押すだけでAIがキーワード候補10個生成・Amazon検索・スコアリングまで自動で行います（1〜2分かかります）",
+      "推奨キーワードが0個（合計スコア18点未満）の場合は、STEP1に戻ってコンセプトを調整することを推奨します",
+      "推奨キーワードが1〜2個出たら、それを選定してSTEP3「競合レビュー評価」に進みます",
+      "STEP2には外部AI相談機能はありません（客観データ分析のためAI判定アシストが代替機能になります）"
     ]
   },
   {
@@ -206,6 +200,12 @@ const SUBTITLE_CONFIRMED_KEY = "aipub:subtitle_confirmed";
 // v4新規：新STEP2/3から戻ってきた時にSTEP1上部に表示する市場検証フィードバック
 // 形式: { from: "STEP2" | "STEP3", content: string (markdown), generated_at: ISO string }
 const RETURN_FEEDBACK_KEY = "aipub:return_feedback";
+
+// v4新規：新STEP2「キーワード絞り込み」の分析結果（api/step2 の戻り値そのまま）
+// 形式: { keywords, market_data, scored, judgment_text, ai_recommendation, return_feedback_for_step1, warnings }
+const STEP2_ANALYSIS_KEY = "aipub:step2_analysis";
+// v4新規：新STEP2で著者が選定したキーワード（1〜2個）。STEP3 と確定アクションへ引き渡す。
+const STEP2_SELECTED_KEYWORDS_KEY = "aipub:step2_selected_keywords";
 
 // 出版目標のチェックボックス選択肢（マーケティング観点の主要ゴール）
 const PUBLISHING_GOAL_OPTIONS = [
@@ -369,6 +369,8 @@ async function resetAllData() {
     localStorage.removeItem(STEP1_INPUTS_KEY);
     localStorage.removeItem(STEP2_INPUTS_KEY);
     localStorage.removeItem(RETURN_FEEDBACK_KEY);
+    localStorage.removeItem(STEP2_ANALYSIS_KEY);
+    localStorage.removeItem(STEP2_SELECTED_KEYWORDS_KEY);
   } catch (e) { console.error(e); }
 }
 
@@ -2058,325 +2060,165 @@ const ApplyToStep1Button = ({ title, proposal, onApply }) => {
   );
 };
 
-const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfileConfirmed, onSaveWorkProfileConfirmed, onNavigate, onApplyToStep1Pending, project }) => {
-  const initialKeywords = useMemo(() => extractKeywords3Axes(savedWorkProfileDraft), [savedWorkProfileDraft]);
-
-  // localStorage から永続化された入力データを読む
-  // ※ HTML はサイズが大きい（数十KB×3軸）ので localStorage 保存対象に含めない
-  const savedInputs = (() => {
+// v4新規：新STEP2「キーワード絞り込み」のページコンポーネント
+// 旧STEP2（市場検証→書籍プロファイル確定・Amazon HTML 手動貼付）は廃止された。
+// 新STEP2 は api/step2.js を呼んでAmazon API経由でキーワード10個を機械的にスコアリングし、
+// 1〜2個に絞り込むだけのSTEPになる。書籍プロファイル確定は後工程の「確定アクション」で行う。
+// 相談機能（DiscussionPanel）は無し（客観データ分析のためAI判定アシストで代替）。
+// v4実装指示書 §4 を参照。
+const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, project }) => {
+  // 既存の分析結果（あれば復元）
+  const initialAnalysis = (() => {
     try {
-      const raw = (typeof window !== "undefined") ? localStorage.getItem(STEP2_INPUTS_KEY) : null;
-      return raw ? (JSON.parse(raw) || {}) : {};
-    } catch { return {}; }
+      const raw = (typeof window !== "undefined") ? localStorage.getItem(STEP2_ANALYSIS_KEY) : null;
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  })();
+  const initialSelected = (() => {
+    try {
+      const raw = (typeof window !== "undefined") ? localStorage.getItem(STEP2_SELECTED_KEYWORDS_KEY) : null;
+      return raw ? (JSON.parse(raw) || []) : [];
+    } catch { return []; }
+  })();
+  // STEP1 入力欄で別途保存されている publishing_goal を取り込む（あれば）
+  const savedPublishingGoal = (() => {
+    try {
+      const raw = (typeof window !== "undefined") ? localStorage.getItem(STEP1_INPUTS_KEY) : null;
+      if (!raw) return "";
+      const parsed = JSON.parse(raw) || {};
+      return buildPublishingGoalText(parsed.publishingGoals || [], parsed.customPublishingGoal || "");
+    } catch { return ""; }
   })();
 
-  // STEP1 のキーワードが前回 Step2 を開いた時から更新されたかを検出
-  // 更新されていれば最新の STEP1 値を初期値に採用（保存値より STEP1 を優先）
-  // 同じならユーザー編集を維持するため savedInputs を優先
-  const step1Changed = (
-    (initialKeywords.theme && savedInputs.lastStep1Theme !== initialKeywords.theme) ||
-    (initialKeywords.reader && savedInputs.lastStep1Reader !== initialKeywords.reader) ||
-    (initialKeywords.diff && savedInputs.lastStep1Diff !== initialKeywords.diff)
-  );
-  const pickInitial = (latestStep1, savedValue) => {
-    if (step1Changed) return latestStep1 || savedValue || "";
-    return savedValue || latestStep1 || "";
-  };
-
-  const [keywordTheme, setKeywordTheme] = useState(pickInitial(initialKeywords.theme, savedInputs.keywordTheme));
-  // HTML は localStorage の別キーに保存（容量大のため inputs JSON と分離）
-  const [htmlTheme, setHtmlTheme] = useState(() => {
-    try { return localStorage.getItem("aipub:step2_html_theme") || ""; } catch { return ""; }
-  });
-  const [readerExpanded, setReaderExpanded] = useState(!!savedInputs.readerExpanded);
-  const [keywordReader, setKeywordReader] = useState(pickInitial(initialKeywords.reader, savedInputs.keywordReader));
-  const [htmlReader, setHtmlReader] = useState(() => {
-    try { return localStorage.getItem("aipub:step2_html_reader") || ""; } catch { return ""; }
-  });
-  const [diffExpanded, setDiffExpanded] = useState(!!savedInputs.diffExpanded);
-  const [keywordDiff, setKeywordDiff] = useState(pickInitial(initialKeywords.diff, savedInputs.keywordDiff));
-  const [htmlDiff, setHtmlDiff] = useState(() => {
-    try { return localStorage.getItem("aipub:step2_html_diff") || ""; } catch { return ""; }
-  });
-
-  // STEP1 から最新値を強制取り込み（ユーザーが手動でリセットしたいときの操作）
-  const handleResyncFromStep1 = () => {
-    if (initialKeywords.theme) setKeywordTheme(initialKeywords.theme);
-    if (initialKeywords.reader) setKeywordReader(initialKeywords.reader);
-    if (initialKeywords.diff) setKeywordDiff(initialKeywords.diff);
-  };
-
-  // キーワード3軸と展開状態を localStorage に自動保存（HTML は除外・容量上限のため）
-  // 同時に「現在の STEP1 キーワード」も記録し、次回 mount 時に変化検出に使う
-  useEffect(() => {
-    try {
-      localStorage.setItem(STEP2_INPUTS_KEY, JSON.stringify({
-        keywordTheme, keywordReader, keywordDiff, readerExpanded, diffExpanded,
-        lastStep1Theme: initialKeywords.theme,
-        lastStep1Reader: initialKeywords.reader,
-        lastStep1Diff: initialKeywords.diff,
-      }));
-    } catch (e) { console.error(e); }
-  }, [keywordTheme, keywordReader, keywordDiff, readerExpanded, diffExpanded, initialKeywords.theme, initialKeywords.reader, initialKeywords.diff]);
-
-  const [inputSaveMsg, setInputSaveMsg] = useState(false);
-  const [inputSaveError, setInputSaveError] = useState("");
-  const handleSaveInputs = () => {
-    setInputSaveError("");
-    try {
-      localStorage.setItem(STEP2_INPUTS_KEY, JSON.stringify({
-        keywordTheme, keywordReader, keywordDiff, readerExpanded, diffExpanded,
-        lastStep1Theme: initialKeywords.theme,
-        lastStep1Reader: initialKeywords.reader,
-        lastStep1Diff: initialKeywords.diff,
-      }));
-      // HTML も保存（別キーで分離・容量大のため try/catch でクオータ超過に対応）
-      try { localStorage.setItem("aipub:step2_html_theme", htmlTheme || ""); } catch {}
-      try { localStorage.setItem("aipub:step2_html_reader", htmlReader || ""); } catch {}
-      try { localStorage.setItem("aipub:step2_html_diff", htmlDiff || ""); } catch (e) {
-        // 容量超過時はエラー表示
-        setInputSaveError("HTMLが大きすぎて保存できませんでした（ブラウザの localStorage 容量上限）。3軸すべて貼り付けた場合に発生しやすいです。次回の実行までにブラウザを開き直さなければ、入力したHTMLはそのまま使えます。");
-      }
-      setInputSaveMsg(true);
-      setTimeout(() => setInputSaveMsg(false), 2500);
-    } catch (e) {
-      console.error(e);
-      setInputSaveError("保存に失敗しました：" + e.message);
-    }
-  };
-
+  const [analysis, setAnalysis] = useState(initialAnalysis);
+  const [selectedKeywords, setSelectedKeywords] = useState(Array.isArray(initialSelected) ? initialSelected : []);
   const [isRunning, setIsRunning] = useState(false);
   const [runError, setRunError] = useState("");
-  const [outputText, setOutputText] = useState(() => {
-    try { return localStorage.getItem(WORK_PROFILE_STEP2_FULL_KEY) || ""; } catch { return ""; }
-  });
-  const [confirmedDraft, setConfirmedDraft] = useState(savedWorkProfileConfirmed || "");
-  const [saveMsg, setSaveMsg] = useState(false);
+  const [stageMsg, setStageMsg] = useState(""); // 「進捗表示」用：いまどの段階か
   const [authorPreviewOpen, setAuthorPreviewOpen] = useState(false);
   const [draftPreviewOpen, setDraftPreviewOpen] = useState(false);
-  const [procedureOpen, setProcedureOpen] = useState(false);
-  const [competitorsOpen, setCompetitorsOpen] = useState(false);
-  const [marketResultOpen, setMarketResultOpen] = useState(false);
-
-  const sections = useMemo(() => splitStep2Output(outputText), [outputText]);
-  useEffect(() => {
-    if (outputText) {
-      const newConfirmed = splitStep2Output(outputText).confirmed;
-      if (newConfirmed) setConfirmedDraft(newConfirmed);
-    }
-  }, [outputText]);
-  // 旧UIで保存された「全文」が確定版localStorageに入っているケースをマイグレーション
-  useEffect(() => {
-    if (!outputText && confirmedDraft) {
-      const parsed = splitStep2Output(confirmedDraft);
-      if (parsed.market || parsed.suggestions) {
-        setOutputText(confirmedDraft);
-        try { localStorage.setItem(WORK_PROFILE_STEP2_FULL_KEY, confirmedDraft); } catch (e) {}
-        if (parsed.confirmed) {
-          setConfirmedDraft(parsed.confirmed);
-        }
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const hasAuthorProfile = !!(savedAuthorProfile || "").trim();
   const hasDraft = !!(savedWorkProfileDraft || "").trim();
 
-  const getHtmlStatus = (html) => {
-    if (!html) return { label: "未入力", color: C.textLight, bg: "rgba(0,0,0,0.04)" };
-    // cleanHtmlMinimal を実際に実行してASIN抽出件数を算出（クリーニング後のサイズ感を可視化）
-    const cleaned = cleanHtmlMinimal(html);
-    const asinMatches = cleaned.match(/data-asin="[A-Za-z0-9]{10}"/g) || [];
-    const asinCount = new Set(asinMatches.map((s) => s)).size;
-    const rawKb = Math.round(html.length / 1024);
-    const cleanedKb = Math.round(cleaned.length / 1024);
-    if (asinCount === 0) {
-      return { label: `⚠ ASIN抽出0件（生${rawKb}KB→処理0KB）／検索結果ページか確認`, color: C.gold, bg: C.goldPale };
-    }
-    return { label: `✓ ASIN ${asinCount}件抽出（生${rawKb}KB→処理${cleanedKb}KB）`, color: C.green, bg: C.greenLight };
+  const handleToggleKeyword = (kw) => {
+    setSelectedKeywords((prev) => {
+      const exists = prev.includes(kw);
+      if (exists) return prev.filter((k) => k !== kw);
+      if (prev.length >= 2) return prev; // 最大2個
+      return [...prev, kw];
+    });
   };
 
-  const handleGenerate = async () => {
+  // 選定キーワードを localStorage に自動保存
+  useEffect(() => {
+    try { localStorage.setItem(STEP2_SELECTED_KEYWORDS_KEY, JSON.stringify(selectedKeywords || [])); } catch (e) { console.error(e); }
+  }, [selectedKeywords]);
+
+  const handleRunAnalysis = async () => {
     setRunError("");
-    if (!hasAuthorProfile) {
-      setRunError("先にSTEP0で著者プロファイルを生成してください。");
-      return;
-    }
-    if (!hasDraft) {
-      setRunError("先にSTEP1で書籍プロファイル草案を生成してください。");
-      return;
-    }
-    if (!keywordTheme.trim()) {
-      setRunError("主題軸キーワードを入力してください（必須）。");
-      return;
-    }
-    if (!htmlTheme.trim()) {
-      setRunError("主題軸のAmazon HTMLを貼り付けてください（必須・最低1軸）。");
-      return;
-    }
-    // HTMLクリーニング → 空ならエラー表示して停止（生HTMLをそのまま送る旧フォールバックは削除）
-    const cleanedTheme = cleanHtmlMinimal(htmlTheme);
-    if (!cleanedTheme || cleanedTheme.length === 0) {
-      setRunError("主題軸のAmazon HTMLから検索結果（ASIN）を抽出できませんでした。\n\n貼り付けたテキストが Amazon Kindleストアの検索結果ページのソースHTML（右クリック→「ページのソースを表示」→Ctrl+A→Ctrl+C）になっているか確認してください。\n\n別のページ（商品詳細・カテゴリTOP等）のHTMLでは ASIN が抽出できません。");
-      return;
-    }
-    const cleanedReader = htmlReader ? cleanHtmlMinimal(htmlReader) : "";
-    const cleanedDiff = htmlDiff ? cleanHtmlMinimal(htmlDiff) : "";
-    if (htmlReader && htmlReader.trim() && (!cleanedReader || cleanedReader.length === 0)) {
-      setRunError("読者軸のAmazon HTMLから検索結果（ASIN）を抽出できませんでした。読者軸のHTMLが正しいか確認するか、空欄にして再実行してください。");
-      return;
-    }
-    if (htmlDiff && htmlDiff.trim() && (!cleanedDiff || cleanedDiff.length === 0)) {
-      setRunError("差分軸のAmazon HTMLから検索結果（ASIN）を抽出できませんでした。差分軸のHTMLが正しいか確認するか、空欄にして再実行してください。");
-      return;
-    }
+    if (!hasAuthorProfile) { setRunError("先にSTEP0で著者プロファイルを生成してください。"); return; }
+    if (!hasDraft) { setRunError("先にSTEP1で書籍プロファイル草案を生成してください。"); return; }
+
     setIsRunning(true);
-    // クライアント側タイムアウト（4分）：Vercel Function 側 maxDuration=300 と組み合わせて、
-    // どちらかが先に切れたら必ずユーザーにエラー表示が届く
+    setStageMsg("キーワード10個を生成中（AI）…");
+    // クライアント側タイムアウト（4分）
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 4 * 60 * 1000);
+    // 段階表示用の擬似進捗（実際の段階区切りはサーバ側だが、ユーザーに目安を見せる）
+    const stageTicker = setTimeout(() => setStageMsg("Amazon検索データを取得中（10並列）…"), 8000);
+    const stageTicker2 = setTimeout(() => setStageMsg("スコアを計算してAIで意図合致判定中…"), 35000);
     try {
-      const motivation = extractMotivation(savedWorkProfileDraft);
-      // 主題軸キーワードを半角スペースで2分割（STEP2 の keyword1/keyword2 入力変数互換のため維持）
-      const themeWords = keywordTheme.trim().split(/\s+/);
-      const keyword1 = themeWords[0] || "";
-      const keyword2 = themeWords.slice(1).join(" ") || keyword1;
-      const response = await fetch("/api/dify", {
+      const response = await fetch("/api/step2", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: controller.signal,
         body: JSON.stringify({
-          stepNum: 2,
-          inputs: {
-            keyword1,
-            keyword2,
-            HTML: cleanedTheme,
-            author_profile: savedAuthorProfile || "",
-            work_profile_draft: savedWorkProfileDraft || "",
-            motivation: motivation,
-            keyword_reader: keywordReader.trim(),
-            html_reader: cleanedReader,
-            keyword_diff: keywordDiff.trim(),
-            html_diff: cleanedDiff,
-          },
+          work_profile_draft: savedWorkProfileDraft || "",
+          author_profile: savedAuthorProfile || "",
+          publishing_goal: savedPublishingGoal || "",
+          // 戻り時フィードバックの再消費は本ボタンではしない（STEP1で消費済み想定）
+          return_feedback: "",
         }),
       });
-      // 504 や Cloudflare からの HTML 応答を先に検出
       const contentType = response.headers.get("content-type") || "";
       let data;
       if (contentType.includes("application/json")) {
         data = await response.json();
       } else {
         const text = await response.text();
-        const is504 = /504|Gateway time-out|Gateway timeout/i.test(text);
-        if (is504) {
-          setRunError("Dify Cloud（api.dify.ai）が 504 Gateway Time-out を返しました。\n\n原因の可能性：\n・LLM の処理時間が Cloudflare のタイムアウト上限（約100秒）を超えた\n・3軸のHTMLが大きすぎて LLM の入力トークンが膨らんでいる\n・Dify Cloud 側の一時的な負荷\n\n対策：\n1. もう一度「実行する」を押してみてください（再実行で通ることが多い）\n2. それでもダメなら、読者軸／差分軸のHTMLを一旦空欄にして主題軸だけで実行\n3. それでもダメなら、HTMLが大きすぎる可能性があるので、Amazon検索結果の上の方だけをコピー");
-          return;
-        }
-        setRunError(`Dify から非JSONレスポンスが返りました（${response.status}）。\n\n応答の冒頭：${text.slice(0, 200)}`);
+        setRunError(`サーバから非JSON応答（${response.status}）：${text.slice(0, 300)}`);
         return;
       }
       if (!response.ok) {
-        if (response.status === 504 || response.status === 502) {
-          setRunError("Dify Cloud がタイムアウトしました（" + response.status + "）。\n\nもう一度「実行する」を押してみてください。それでもダメなら、読者軸／差分軸のHTMLを一旦空欄にして主題軸だけで実行してみてください。");
-          return;
-        }
-        setRunError(data.error || "生成中にエラーが発生しました。少し時間をおいて再度お試しください。");
-      } else {
-        const out = data.output || "";
-        if (!out || out.length < 50) {
-          // 出力が空または異常に短い場合は警告（成功レスポンスを装って空が返るケース）
-          let diag = "";
-          if (data.diagnostic) {
-            const d = data.diagnostic;
-            diag = `\n\n【Dify 応答の診断情報】\n・ワークフロー status: ${d.workflowStatus}\n・出力キー: [${d.outputKeys || "(空)"}]\n${d.workflowError ? "・Dify エラー: " + d.workflowError + "\n" : ""}・raw outputs: ${JSON.stringify(d.outputsRaw, null, 2).slice(0, 500)}`;
-          }
-          setRunError(`Dify から有効な出力が返ってきませんでした（出力長 ${out.length} 文字）。\n\n原因の可能性：\n・主題軸キーワードでの Amazon 検索結果が空（HTMLから上位本が抽出できない）\n・3軸とも HTML が極端に短い／検索結果ページではない\n・Dify ワークフロー内部でエラー（Dify cloud のログを確認）\n・YML 改修後に Dify への再 import を忘れている${diag}`);
-        } else {
-          setOutputText(out);
-          try { localStorage.setItem(WORK_PROFILE_STEP2_FULL_KEY, out); } catch (e) {}
-        }
+        const missing = Array.isArray(data?.missingEnv) && data.missingEnv.length > 0
+          ? `\n\n未設定の環境変数：${data.missingEnv.join(", ")}\n→ Vercelの環境変数設定をご確認ください。`
+          : "";
+        setRunError((data?.error || `HTTP ${response.status} エラー`) + missing);
+        return;
       }
+      // 成功
+      setAnalysis(data);
+      try { localStorage.setItem(STEP2_ANALYSIS_KEY, JSON.stringify(data)); } catch (e) {}
+      // 既存の選定は分析が変わったらリセット
+      setSelectedKeywords([]);
     } catch (e) {
       if (e.name === "AbortError") {
-        setRunError("4分以上応答がなかったため処理を中断しました。\n\n原因の可能性：\n・Dify ワークフローに想定以上の時間がかかっている\n・Vercel Function のタイムアウト（プランの maxDuration 上限）に達した\n・HTML が非常に大きく LLM 処理に時間がかかっている\n\nもう一度「実行する」を押すか、HTML のサイズを小さく（読者軸／差分軸を一旦なしに）して再試行してください。");
+        setRunError("4分以上応答がなかったため処理を中断しました。もう一度「キーワード分析実行」を押してみてください。");
       } else {
         setRunError(`通信エラーが発生しました：${e.message}`);
       }
     } finally {
       clearTimeout(timeoutId);
+      clearTimeout(stageTicker);
+      clearTimeout(stageTicker2);
+      setStageMsg("");
       setIsRunning(false);
     }
   };
 
-  const handleSave = async () => {
-    const cleaned = cleanOutputText(confirmedDraft);
-    if (!cleaned.trim()) return;
-    if (cleaned !== confirmedDraft) setConfirmedDraft(cleaned);
-    await onSaveWorkProfileConfirmed(cleaned);
-    setSaveMsg(true);
-    setTimeout(() => setSaveMsg(false), 2500);
+  // 「STEP1に戻る」：戻り推奨フィードバックを RETURN_FEEDBACK_KEY に保存してSTEP1へ
+  const handleReturnToStep1 = () => {
+    const content = analysis?.return_feedback_for_step1 || analysis?.judgment_text || "";
+    if (!content.trim()) {
+      // フィードバックが無い場合（手動戻り）でも空文字で保存しておく
+      try { localStorage.removeItem(RETURN_FEEDBACK_KEY); } catch (e) {}
+    } else {
+      const payload = {
+        from: "STEP2",
+        content,
+        generated_at: new Date().toISOString(),
+      };
+      try { localStorage.setItem(RETURN_FEEDBACK_KEY, JSON.stringify(payload)); } catch (e) { console.error(e); }
+    }
+    onNavigate("step_1");
   };
 
-  const renderAxisSection = (axisLabel, icon, isRequired, keyword, setKeyword, html, setHtml, expanded, setExpanded) => {
-    const isCollapsible = !isRequired;
-    const showContent = isRequired || expanded;
-    const canOpenAmazon = !!keyword.trim();
-    const handleOpenAmazon = () => {
-      if (!canOpenAmazon) return;
-      const query = encodeURIComponent(keyword.trim());
-      window.open(`https://www.amazon.co.jp/s?i=digital-text&k=${query}`, "_blank", "noopener,noreferrer");
-    };
-    return (
-      <div style={{ marginBottom: 16, border: `1px solid ${C.border}`, borderRadius: 4, background: C.white }}>
-        <div onClick={isCollapsible ? () => setExpanded(!expanded) : undefined}
-          style={{ padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: isCollapsible ? "pointer" : "default", borderBottom: showContent ? `1px solid ${C.border}` : "none", background: isRequired ? "#eef2f7" : "#f8f8f8" }}>
-          <div style={{ fontSize: 13.5, fontWeight: 700, color: C.navy }}>
-            {icon} {axisLabel}{isRequired ? " （必須）" : " （任意）"}
-          </div>
-          {isCollapsible && <div style={{ fontSize: 12, color: C.textSub }}>{expanded ? "▲ 閉じる" : "▼ 展開する"}</div>}
-        </div>
-        {showContent && (
-          <div style={{ padding: 14 }}>
-            <label style={{ fontSize: 12.5, fontWeight: 600, color: C.navy }}>キーワード（編集可・自動転記）</label>
-            <input value={keyword} onChange={(e) => setKeyword(e.target.value)}
-              placeholder={isRequired ? "例：ChatGPT 資料作成" : "STEP1出力から自動転記"}
-              style={{ width: "100%", padding: "8px 10px", fontSize: 13, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", marginTop: 4, marginBottom: 10, background: C.white }} />
-            <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
-              <button onClick={handleOpenAmazon} disabled={!canOpenAmazon}
-                style={{ padding: "7px 14px", background: canOpenAmazon ? C.navy : "rgba(0,0,0,0.1)", color: canOpenAmazon ? C.white : C.textLight, border: "none", borderRadius: 4, fontSize: 12.5, fontWeight: 600, cursor: canOpenAmazon ? "pointer" : "default", flexShrink: 0 }}>
-                🔍 AmazonでKindle検索を開く
-              </button>
-              <div style={{ fontSize: 11.5, color: C.textSub, flex: 1, minWidth: 180, lineHeight: 1.6 }}>
-                {canOpenAmazon ? <>開いたページで<strong>右クリック→「ページのソースを表示」→Ctrl+A→Ctrl+C</strong></> : <>上のキーワードを入力すると検索が開けます</>}
-              </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, padding: "5px 10px", background: getHtmlStatus(html).bg, borderRadius: 4, border: `1px solid rgba(0,0,0,0.06)` }}>
-              <span style={{ fontSize: 12.5, fontWeight: 600, color: C.navy }}>Amazon検索結果(HTML){isRequired ? "（必須）" : "（任意）"}</span>
-              <span style={{ fontSize: 11, fontWeight: 600, color: getHtmlStatus(html).color, marginLeft: "auto" }}>{getHtmlStatus(html).label}</span>
-            </div>
-            <textarea value={html} onChange={(e) => setHtml(e.target.value)}
-              placeholder="上のボタンでAmazon検索 → ページソースを Ctrl+A→Ctrl+C で全選択コピー → ここに Ctrl+V で貼付（実行時に自動で本データだけ抽出されます）"
-              rows={5}
-              style={{ width: "100%", padding: "8px 10px", fontSize: 12, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "monospace", background: C.white, marginTop: 4 }} />
-          </div>
-        )}
-      </div>
-    );
+  // 「STEP3へ進む」：選定キーワードを保存してSTEP3へ
+  const handleProceedToStep3 = () => {
+    if (selectedKeywords.length === 0) {
+      setRunError("STEP3へ進む前に、キーワードを1つ以上選定してください。");
+      return;
+    }
+    onNavigate("step_3");
   };
+
+  const recommendsReturn = analysis?.ai_recommendation === "return_to_step1";
+  const recommendsProceed = analysis?.ai_recommendation === "proceed_to_step3";
+  const generatedKeywords = Array.isArray(analysis?.keywords) ? analysis.keywords : [];
 
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: C.gold, marginBottom: 4, letterSpacing: "0.08em" }}>STEP 2</div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: C.navy, margin: "0 0 6px", letterSpacing: "-0.01em" }}>市場検証 → 書籍プロファイル確定</h1>
-          <p style={{ fontSize: 13.5, color: C.textSub, margin: 0, lineHeight: 1.7 }}>STEP1の書籍プロファイル草案を、Amazon検索結果（最大3軸）で市場検証して確定版にします。STEP1への修正提案も同時に出力されます。</p>
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: C.navy, margin: "0 0 6px", letterSpacing: "-0.01em" }}>キーワード絞り込み</h1>
+          <p style={{ fontSize: 13.5, color: C.textSub, margin: 0, lineHeight: 1.7 }}>AIが書籍プロファイル草案から検索キーワード候補10個を生成し、Amazon Kindle の実データで3軸スコアリング（需要・競合の弱さ・意図合致）。1〜2個に絞り込んでSTEP3「競合レビュー評価」へ進みます。</p>
         </div>
       </div>
       <div style={{ height: 1, background: `linear-gradient(to right, ${C.gold}, ${C.goldLight}, transparent)`, width: "100%", opacity: 0.9, marginBottom: 20 }} />
 
+      {/* 著者プロファイル / 書籍プロファイル草案の存在チェック */}
       <Card style={{ marginBottom: 16, background: hasAuthorProfile ? "#eef7ee" : "#fff7e6", border: `1px solid ${hasAuthorProfile ? "#c8d4c8" : "#e0c8a0"}` }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: C.navy, marginBottom: 6 }}>
           📌 著者プロファイル：{hasAuthorProfile ? "✓ 設定済み（自動転記）" : "⚠ 未設定"}
@@ -2415,269 +2257,124 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
         )}
       </Card>
 
+      {/* ① 分析実行 */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
           <StepBadge num="①" />
-          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>検索シードを使ってAmazon検索 → HTMLを貼付</h2>
-        </div>
-        <div style={{ fontSize: 12.5, color: C.textSub, marginBottom: 14, lineHeight: 1.7 }}>
-          各軸のキーワードはSTEP1出力から自動転記されています（編集可）。<br />
-          最低1軸（主題軸）必須、推奨は2〜3軸。多いほど検証精度が上がります。
-        </div>
-        <div style={{ marginBottom: 14 }}>
-          <div onClick={() => setProcedureOpen(!procedureOpen)} style={{ fontSize: 12.5, color: C.navyMid, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 0", fontWeight: 600 }}>
-            <span style={{ transform: procedureOpen ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.15s", display: "inline-block" }}>▶</span>
-            HTMLを取得する詳しい手順
-          </div>
-          {procedureOpen && (
-            <div style={{ marginTop: 8, padding: "14px 16px", background: "#f4f3ef", border: `1px solid ${C.border}`, borderRadius: 6 }}>
-              <svg width="100%" viewBox="0 0 680 260" xmlns="http://www.w3.org/2000/svg">
-                <defs><marker id="ha2_step2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#555" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></marker></defs>
-                <rect x="10" y="10" width="310" height="240" rx="6" fill="none" stroke="#c8d4e0" strokeWidth="0.5" strokeDasharray="3 3"/>
-                <text fontFamily="sans-serif" fontSize="11" fontWeight="bold" fill="#2a4468" x="20" y="28">Amazon側でやること</text>
-                <rect x="30" y="44" width="270" height="50" rx="6" fill="#edf2f8" stroke="#2a4468" strokeWidth="0.5"/>
-                <text fontFamily="sans-serif" fontSize="12" fontWeight="bold" fill="#1a2e4a" x="45" y="65">①</text>
-                <text fontFamily="sans-serif" fontSize="12" fill="#2a4468" x="60" y="65">Kindleストアでキーワードを検索</text>
-                <text fontFamily="sans-serif" fontSize="10" fill="#688" x="60" y="82">(各軸の青いボタンを使うとワンクリックで開けます)</text>
-                <line x1="165" y1="94" x2="165" y2="110" stroke="#555" strokeWidth="1.2" markerEnd="url(#ha2_step2)"/>
-                <rect x="30" y="114" width="270" height="50" rx="6" fill="#edf2f8" stroke="#2a4468" strokeWidth="0.5"/>
-                <text fontFamily="sans-serif" fontSize="12" fontWeight="bold" fill="#1a2e4a" x="45" y="134">②</text>
-                <text fontFamily="sans-serif" fontSize="12" fill="#2a4468" x="60" y="134">検索結果ページで右クリック</text>
-                <text fontFamily="sans-serif" fontSize="11" fill="#2a4468" x="60" y="151">→ 「ページのソースを表示」</text>
-                <line x1="165" y1="164" x2="165" y2="180" stroke="#555" strokeWidth="1.2" markerEnd="url(#ha2_step2)"/>
-                <rect x="30" y="184" width="270" height="50" rx="6" fill="#edf2f8" stroke="#2a4468" strokeWidth="0.5"/>
-                <text fontFamily="sans-serif" fontSize="12" fontWeight="bold" fill="#1a2e4a" x="45" y="204">③</text>
-                <text fontFamily="sans-serif" fontSize="12" fill="#2a4468" x="60" y="204">Ctrl+A → Ctrl+C で全選択コピー</text>
-                <text fontFamily="sans-serif" fontSize="10" fill="#688" x="60" y="221">(Macの場合は Cmd+A → Cmd+C)</text>
-                <line x1="300" y1="209" x2="350" y2="209" stroke="#555" strokeWidth="1.5" markerEnd="url(#ha2_step2)"/>
-                <rect x="360" y="10" width="310" height="240" rx="6" fill="none" stroke="#c8d4e0" strokeWidth="0.5" strokeDasharray="3 3"/>
-                <text fontFamily="sans-serif" fontSize="11" fontWeight="bold" fill="#1a4a2e" x="370" y="28">このページでやること</text>
-                <rect x="380" y="184" width="270" height="50" rx="6" fill="#e4f2ec" stroke="#1e6b3a" strokeWidth="0.5"/>
-                <text fontFamily="sans-serif" fontSize="12" fontWeight="bold" fill="#1a4a2e" x="395" y="204">④</text>
-                <text fontFamily="sans-serif" fontSize="12" fill="#1e6b3a" x="410" y="204">該当する軸のHTML欄にCtrl+Vで貼付</text>
-                <text fontFamily="sans-serif" fontSize="10" fill="#2d7a4f" x="410" y="221">(貼り付けに少し時間がかかります)</text>
-                <line x1="515" y1="184" x2="515" y2="160" stroke="#555" strokeWidth="1.2" markerEnd="url(#ha2_step2)"/>
-                <rect x="380" y="114" width="270" height="50" rx="6" fill="#e4f2ec" stroke="#1e6b3a" strokeWidth="0.5"/>
-                <text fontFamily="sans-serif" fontSize="12" fontWeight="bold" fill="#1a4a2e" x="395" y="134">⑤</text>
-                <text fontFamily="sans-serif" fontSize="12" fill="#1e6b3a" x="410" y="134">必要な軸を全部貼り終えたら実行</text>
-                <text fontFamily="sans-serif" fontSize="10" fill="#2d7a4f" x="410" y="151">(自動でクリーニングしてAIに渡します)</text>
-              </svg>
-            </div>
-          )}
-        </div>
-        {renderAxisSection("主題軸", "🎯", true, keywordTheme, setKeywordTheme, htmlTheme, setHtmlTheme, true, () => {})}
-        {renderAxisSection("読者軸", "👥", false, keywordReader, setKeywordReader, htmlReader, setHtmlReader, readerExpanded, setReaderExpanded)}
-        {renderAxisSection("差分軸", "🪞", false, keywordDiff, setKeywordDiff, htmlDiff, setHtmlDiff, diffExpanded, setDiffExpanded)}
-
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 12 }}>
-          <BtnPrimary onClick={handleSaveInputs}>入力データを保存</BtnPrimary>
-          <BtnSecondary onClick={handleResyncFromStep1} style={{ fontSize: 12 }}>↻ STEP1から再取得</BtnSecondary>
-          {inputSaveMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました（キーワード＋HTML、次回も残ります）</span>}
-          <span style={{ fontSize: 11.5, color: C.textLight }}>※ STEP1 を再生成した時は「↻ STEP1から再取得」で最新キーワードを取り込めます</span>
-        </div>
-        {inputSaveError && (
-          <div style={{ marginTop: 8, padding: "8px 12px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, fontSize: 12.5, color: C.red, lineHeight: 1.7 }}>
-            ⚠ {inputSaveError}
-          </div>
-        )}
-      </div>
-
-      <div style={{ marginBottom: 28 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-          <StepBadge num="②" />
-          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>市場検証＋書籍プロファイル確定</h2>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>キーワード分析を実行する</h2>
         </div>
         <Card style={{ background: "#eef2f7", border: "1px solid #c8d4e0" }}>
-          <div style={{ fontSize: 13, color: C.textSub, marginBottom: 12, lineHeight: 1.8 }}>少なくとも主題軸のHTMLを貼付したら下のボタンを押してください。生成には30秒〜2分ほどかかります。</div>
-          <BtnPrimary onClick={handleGenerate} disabled={isRunning || !hasAuthorProfile || !hasDraft}>{isRunning ? "検証中..." : "▶ 市場検証＋書籍プロファイル確定を実行"}</BtnPrimary>
+          <div style={{ fontSize: 13, color: C.textSub, marginBottom: 12, lineHeight: 1.8 }}>
+            ボタンを押すと、AIがキーワード候補10個を生成→Real-Time Amazon Data API で各キーワードの市場データを並列取得→需要・競合の弱さ・意図合致の3軸でスコアリングします。1〜2分かかります。
+          </div>
+          <BtnPrimary onClick={handleRunAnalysis} disabled={isRunning || !hasAuthorProfile || !hasDraft}>
+            {isRunning ? "分析中..." : "▶ キーワード分析を実行"}
+          </BtnPrimary>
+          {isRunning && stageMsg && (
+            <div style={{ marginTop: 10, padding: "8px 12px", background: C.white, border: `1px solid ${C.border}`, borderRadius: 4, fontSize: 12.5, color: C.navy, fontWeight: 600 }}>
+              ⏳ {stageMsg}
+            </div>
+          )}
           {runError && <div style={{ marginTop: 12, padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, fontSize: 13, color: C.red, whiteSpace: "pre-wrap", lineHeight: 1.7 }}>{runError}</div>}
+          {Array.isArray(analysis?.warnings) && analysis.warnings.length > 0 && (
+            <div style={{ marginTop: 10, padding: "8px 12px", background: "#fff8e1", border: `1px solid ${C.gold}`, borderRadius: 4, fontSize: 12, color: C.navyMid, lineHeight: 1.7 }}>
+              <strong>⚠ 警告：</strong>
+              <ul style={{ margin: "4px 0 0 0", paddingLeft: 18 }}>
+                {analysis.warnings.map((w, i) => <li key={i}>{w}</li>)}
+              </ul>
+            </div>
+          )}
         </Card>
       </div>
 
-      <div id="output-section" style={{ marginBottom: 28 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-          <StepBadge num="③" />
-          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>出力：書籍プロファイル確定版（保存対象・編集可能）</h2>
-        </div>
-        <div style={{ fontSize: 12, color: C.textSub, marginBottom: 8, lineHeight: 1.7 }}>
-          STEP3以降の各STEPに自動転記される最終データです。保存したものがSTEP3〜9で使われます。
-        </div>
-        <textarea value={confirmedDraft} onChange={(e) => setConfirmedDraft(e.target.value)}
-          rows={20}
-          placeholder="STEP2実行後にここに書籍プロファイル確定版が表示されます。手動で編集も可能です。"
-          style={{ width: "100%", padding: "12px 14px", fontSize: 13.5, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.85 }} />
-        <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <BtnPrimary onClick={handleSave} disabled={!confirmedDraft.trim()}>書籍プロファイル確定版を保存</BtnPrimary>
-          {saveMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました（STEP3以降で使えます）</span>}
-        </div>
-      </div>
-
-      {/* 外部AIで相談するためのプロンプト生成パネル */}
-      <DiscussionPanel
-        stepNum={2}
-        stepName="市場検証→書籍プロファイル確定"
-        stepOutput={confirmedDraft}
-        authorProfile={savedAuthorProfile || ""}
-        workProfile={extractDiscussionContext(confirmedDraft || "")}
-      />
-
-      {/* 整合性診断で不整合が検出された場合のみ表示。修正対象によって2系統のフローを案内する */}
-      {sections.suggestions && (
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-            <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: "50%", background: C.red, color: C.white, fontSize: 14, fontWeight: 700, flexShrink: 0 }}>!</span>
-            <h2 style={{ fontSize: 15, fontWeight: 700, color: C.red, margin: 0 }}>整合性診断で不整合あり：修正案</h2>
+      {/* ② 分析結果表示 */}
+      {analysis && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <StepBadge num="②" />
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>分析結果（スコア表＋AI総合判定）</h2>
           </div>
-          <div style={{ fontSize: 13, color: C.textSub, marginBottom: 12, lineHeight: 1.8 }}>
-            草案と市場データのあいだに後段に影響するズレが検出されました。<br />
-            <span style={{ color: C.gold, fontWeight: 600 }}>※ 検索キーワード3軸の修正のみなら STEP1 に戻る必要はなく、STEP2 入力欄に反映するだけで再実行できます。</span><br />
-            <span style={{ color: C.navy, fontWeight: 600 }}>※ 想定読者・ポジショニング等の修正がある場合は、STEP1 に戻って反映してから STEP2 を再実行してください。</span>
-          </div>
-          <Card style={{ background: "#fdf2f2", border: `1px solid rgba(181,43,30,0.25)`, marginBottom: 12 }}>
-            <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordWrap: "break-word", fontFamily: "inherit", fontSize: 13, lineHeight: 1.85, color: C.text }}>{sections.suggestions}</pre>
+          <Card style={{ background: C.white, border: `1px solid ${C.border}` }}>
+            <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordWrap: "break-word", fontFamily: "inherit", fontSize: 13, lineHeight: 1.85, color: C.text }}>{analysis.judgment_text || "（出力なし）"}</pre>
           </Card>
-          {(() => {
-            const items = parseStep1Suggestions(sections.suggestions);
-            const actionable = items.filter((item) => !isUnchanged(item.proposal));
-
-            // 検索キーワード3軸の提案を抽出（STEP2 入力欄に直接反映するため）
-            const kwItem = items.find((i) => /検索キーワード|キーワード3軸/.test(i.title));
-            let kwSuggestion = null;
-            if (kwItem && kwItem.proposal) {
-              const p = kwItem.proposal;
-              const themeM = p.match(/(?:^|\n)\s*[\-・*+]?\s*主題軸[\s：:]*\*?\*?([^\n*（(]+?)\*?\*?\s*(?:\n|（|\(|$)/);
-              const readerM = p.match(/(?:^|\n)\s*[\-・*+]?\s*読者軸[\s：:]*\*?\*?([^\n*（(]+?)\*?\*?\s*(?:\n|（|\(|$)/);
-              const diffM = p.match(/(?:^|\n)\s*[\-・*+]?\s*差分軸[\s：:]*\*?\*?([^\n*（(]+?)\*?\*?\s*(?:\n|（|\(|$)/);
-              const theme = themeM ? themeM[1].trim() : "";
-              const reader = readerM ? readerM[1].trim() : "";
-              const diff = diffM ? diffM[1].trim() : "";
-              if (theme || reader || diff) {
-                kwSuggestion = { theme, reader, diff };
-              }
-            }
-
-            // 検索キーワード以外の項目（想定読者・ポジショニング 等）は STEP1 に反映可能
-            const step1Actionable = actionable.filter((item) => !/検索キーワード|キーワード3軸/.test(item.title));
-
-            const hasAnyAction = kwSuggestion || step1Actionable.length > 0;
-            if (!hasAnyAction) {
-              return (
-                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                  <BtnSecondary onClick={() => onNavigate("step_1")} style={{ fontSize: 13 }}>
-                    ← STEP1 へ戻って手動で反映
-                  </BtnSecondary>
-                  <span style={{ fontSize: 12, color: C.textLight }}>※ 構造化されていない提案のため、自動反映ボタンは表示されていません</span>
-                </div>
-              );
-            }
-            return (
-              <div>
-                {/* 検索キーワード3軸の提案 → STEP2 入力欄に直接反映（STEP1 に戻る必要なし） */}
-                {kwSuggestion && (
-                  <div style={{ marginBottom: 16, padding: "14px 16px", background: "#fff", border: `2px solid ${C.gold}`, borderRadius: 4 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: C.gold, marginBottom: 4 }}>
-                      🔑 フロー A：検索キーワード3軸の修正だけで済む場合
-                    </div>
-                    <div style={{ fontSize: 12, color: C.textSub, marginBottom: 10, lineHeight: 1.7 }}>
-                      <strong>STEP1 に戻る必要はありません。</strong>このボタンで STEP2 入力欄に反映 → 上に戻って HTML を取得し直し → STEP2 を再実行するだけで OK。
-                    </div>
-                    <ul style={{ margin: "0 0 12px 0", paddingLeft: 18, fontSize: 13, color: C.text, lineHeight: 1.85 }}>
-                      {kwSuggestion.theme && <li>主題軸：<strong style={{ color: C.gold }}>{kwSuggestion.theme}</strong></li>}
-                      {kwSuggestion.reader && <li>読者軸：<strong style={{ color: C.gold }}>{kwSuggestion.reader}</strong></li>}
-                      {kwSuggestion.diff && <li>差分軸：<strong style={{ color: C.gold }}>{kwSuggestion.diff}</strong></li>}
-                    </ul>
-                    <button onClick={() => {
-                      if (kwSuggestion.theme) setKeywordTheme(kwSuggestion.theme);
-                      if (kwSuggestion.reader) setKeywordReader(kwSuggestion.reader);
-                      if (kwSuggestion.diff) setKeywordDiff(kwSuggestion.diff);
-                      if (kwSuggestion.reader && !readerExpanded) setReaderExpanded(true);
-                      if (kwSuggestion.diff && !diffExpanded) setDiffExpanded(true);
-                      window.scrollTo({ top: 0, behavior: "smooth" });
-                    }} style={{ padding: "9px 16px", background: C.gold, color: C.white, border: "none", borderRadius: 4, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                      ✨ 提案キーワードを STEP2 入力欄に反映
-                    </button>
-                    <div style={{ fontSize: 11.5, color: C.textLight, marginTop: 8, lineHeight: 1.7 }}>
-                      次の手順：① 上の入力エリアで Amazon で再検索 → HTML を取得し直し<br />② 「入力データを保存」 → ③「市場検証＋書籍プロファイル確定を実行」
-                    </div>
-                  </div>
-                )}
-
-                {/* 検索キーワード以外の提案 → STEP1 に反映（草案そのものを修正する必要あり） */}
-                {step1Actionable.length > 0 && (
-                  <div style={{ marginBottom: 12, padding: "14px 16px", background: "#fff", border: `2px solid ${C.navy}`, borderRadius: 4 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: C.navy, marginBottom: 4 }}>
-                      📥 フロー B：想定読者・ポジショニング等の修正が必要な場合
-                    </div>
-                    <div style={{ fontSize: 12, color: C.textSub, marginBottom: 10, lineHeight: 1.7 }}>
-                      <strong>STEP1 に戻って草案を修正する必要があります。</strong>下のボタンで STEP1 入力欄にプリセット → STEP1 を再生成 → STEP2 を再実行。
-                    </div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-                      {step1Actionable.map((item, i) => (
-                        <ApplyToStep1Button
-                          key={i}
-                          title={item.title}
-                          proposal={item.proposal}
-                          onApply={onApplyToStep1Pending}
-                        />
-                      ))}
-                    </div>
-                    <BtnSecondary onClick={() => onNavigate("step_1")} style={{ fontSize: 13 }}>
-                      ← STEP1 へ戻る
-                    </BtnSecondary>
-                  </div>
-                )}
-
-                {/* どちらの提案も無い場合のフォールバック（手動修正案内） */}
-                {!kwSuggestion && step1Actionable.length === 0 && (
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <BtnSecondary onClick={() => onNavigate("step_1")} style={{ fontSize: 13 }}>
-                      ← STEP1 へ戻って手動で反映
-                    </BtnSecondary>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
         </div>
       )}
 
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-          <StepBadge num="④" />
-          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>市場検証結果（参考）</h2>
-          {sections.market && (
-            <button onClick={() => setMarketResultOpen(!marketResultOpen)} style={{ marginLeft: "auto", background: "none", border: `1px solid ${C.border}`, padding: "3px 10px", borderRadius: 4, fontSize: 11.5, color: C.navy, cursor: "pointer" }}>
-              {marketResultOpen ? "閉じる" : "開く"}
-            </button>
-          )}
-        </div>
-        {sections.market ? (
-          marketResultOpen ? (
-            <Card style={{ background: "#f8f9fc", border: `1px solid ${C.border}` }}>
-              <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordWrap: "break-word", fontFamily: "inherit", fontSize: 13, lineHeight: 1.85, color: C.text }}>{sections.market}</pre>
-            </Card>
-          ) : (
-            <div style={{ fontSize: 12.5, color: C.textSub, padding: "10px 14px", background: "#f8f8f8", borderRadius: 4, border: `1px dashed ${C.border}` }}>市場像・需要診断・勝率診断の詳細。「開く」ボタンで表示します（検索者の意図・狙い目の切り口は ③ 書籍プロファイル確定版の中に含まれます）。</div>
-          )
-        ) : (
-          <div style={{ padding: "20px 16px", textAlign: "center", color: C.textLight, fontSize: 13, background: "#f8f8f8", borderRadius: 4, border: `1px dashed ${C.border}` }}>市場像・需要診断・勝率診断はSTEP2実行後にここに表示されます（検索者の意図・狙い目の切り口は ③ 書籍プロファイル確定版の中に含まれます）</div>
-        )}
-      </div>
-
-      {sections.competitors && (
-        <div style={{ marginBottom: 24 }}>
-          <div onClick={() => setCompetitorsOpen(!competitorsOpen)} style={{ fontSize: 12.5, color: C.navyMid, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 0", fontWeight: 600 }}>
-            <span style={{ transform: competitorsOpen ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.15s", display: "inline-block" }}>▶</span>
-            📚 検証で参照した上位本（Amazon HTML から抽出・参考）
+      {/* ③ AI判定アシスト：戻り推奨 or 進行推奨 */}
+      {analysis && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <StepBadge num="③" />
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>AI判定アシスト</h2>
           </div>
-          {competitorsOpen && (
-            <Card style={{ background: "#f8f8f8", border: `1px solid ${C.border}`, marginTop: 8 }}>
-              <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordWrap: "break-word", fontFamily: "inherit", fontSize: 12, lineHeight: 1.7, color: C.text }}>{sections.competitors}</pre>
+          {recommendsReturn && (
+            <Card style={{ background: "#fff8e1", border: `1px solid ${C.gold}` }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.navy, marginBottom: 6 }}>⚠ STEP1に戻ってコンセプトを調整することを推奨します</div>
+              <div style={{ fontSize: 12.5, color: C.textSub, lineHeight: 1.7, marginBottom: 10 }}>
+                合計スコア18点以上の推奨キーワードが0個でした。市場検証からのフィードバック（上の②に含まれます）を踏まえて、STEP1で草案を修正してから再度STEP2を実行してください。フィードバックは戻り先のSTEP1で表示されます。
+              </div>
+              <BtnPrimary onClick={handleReturnToStep1}>← STEP1に戻る（フィードバックを引き継ぐ）</BtnPrimary>
+            </Card>
+          )}
+          {recommendsProceed && (
+            <Card style={{ background: "#eef7ee", border: `1px solid ${C.green}` }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.green, marginBottom: 6 }}>✓ STEP3「競合レビュー評価」へ進むことを推奨します</div>
+              <div style={{ fontSize: 12.5, color: C.textSub, lineHeight: 1.7 }}>
+                推奨キーワードが1個以上ありました。下の④で1〜2個を選定してSTEP3へ進んでください。
+              </div>
             </Card>
           )}
         </div>
       )}
 
+      {/* ④ キーワード選定 UI */}
+      {analysis && generatedKeywords.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <StepBadge num="④" />
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>キーワードを選定（1〜2個）</h2>
+          </div>
+          <Card style={{ background: C.white, border: `1px solid ${C.border}` }}>
+            <div style={{ fontSize: 12.5, color: C.textSub, marginBottom: 10, lineHeight: 1.7 }}>
+              STEP3「競合レビュー評価」で深掘りするキーワードを最大2個まで選択してください。AIが「★AI推奨」マークを付けたものを優先的に選ぶのがおすすめです。
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {generatedKeywords.map((kw) => {
+                const isSelected = selectedKeywords.includes(kw);
+                const atMax = !isSelected && selectedKeywords.length >= 2;
+                return (
+                  <label key={kw} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: atMax ? C.textLight : C.text, cursor: atMax ? "not-allowed" : "pointer", padding: "6px 10px", borderRadius: 4, background: isSelected ? "rgba(184,146,42,0.08)" : "transparent", border: `1px solid ${isSelected ? C.gold : "transparent"}` }}>
+                    <input type="checkbox" checked={isSelected} disabled={atMax} onChange={() => handleToggleKeyword(kw)} style={{ cursor: atMax ? "not-allowed" : "pointer", accentColor: C.gold }} />
+                    <span style={{ fontFamily: "monospace", fontSize: 13.5 }}>{kw}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <div style={{ marginTop: 12, fontSize: 12, color: C.textLight }}>
+              選定中: {selectedKeywords.length}/2 個
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* ⑤ 次のアクション */}
+      {analysis && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <StepBadge num="⑤" />
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>次のステップ</h2>
+          </div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <BtnSecondary onClick={handleReturnToStep1}>← STEP1に戻る</BtnSecondary>
+            <BtnPrimary onClick={handleProceedToStep3} disabled={selectedKeywords.length === 0}>
+              STEP3「競合レビュー評価」へ進む →
+            </BtnPrimary>
+          </div>
+          <div style={{ marginTop: 8, fontSize: 11.5, color: C.textLight, lineHeight: 1.7 }}>
+            ※ 新STEP2には外部AI相談機能（DiscussionPanel）はありません。客観データ分析のため、上のAI判定アシストが相談機能の代替として機能します（v4設計）。
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -4021,7 +3718,7 @@ export default function App() {
     if (page === "saved") return <SavedPage project={project} stepStatuses={stepStatuses} allSteps={allSteps} onNavigate={nav} />;
     if (page === "step_0") return <Step0Page savedProfile={authorProfile} onSaveProfile={handleSaveAuthorProfile} onNavigate={nav} />;
     if (page === "step_1") return <Step1Page savedAuthorProfile={authorProfile} savedWorkProfile={workProfile} onSaveWorkProfile={handleSaveWorkProfile} onNavigate={nav} pendingApply={step1PendingApply} project={project} />;
-    if (page === "step_2") return <Step2Page savedAuthorProfile={authorProfile} savedWorkProfileDraft={workProfile} savedWorkProfileConfirmed={workProfileConfirmed} onSaveWorkProfileConfirmed={handleSaveWorkProfileConfirmed} onNavigate={nav} onApplyToStep1Pending={handleApplyToStep1Pending} project={project} />;
+    if (page === "step_2") return <Step2Page savedAuthorProfile={authorProfile} savedWorkProfileDraft={workProfile} onNavigate={nav} project={project} />;
     if (page.startsWith("step_")) {
       const num = parseInt(page.replace("step_", ""), 10);
       const step = STEPS[num - 1];

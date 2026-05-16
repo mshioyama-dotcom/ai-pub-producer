@@ -1,0 +1,322 @@
+app:
+  description: v4新規。新STEP2「キーワード絞り込み」の第2段。Node側でRapidAPI(Real-Time Amazon Data)から取得した10キーワード分の市場データ要約と書籍プロファイル草案を受け取り、LLMで意図合致スコア判定・AI推奨マーク付与・STEP1への戻り判定・戻り推奨時の修正示唆フィードバックを生成する。出力はマークダウン構造化テキスト。
+  icon: 📊
+  icon_background: '#FDF6E3'
+  icon_type: emoji
+  mode: workflow
+  name: STEP2B_スコア判定
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/openai:0.2.10@7ca552fb9e48caa4deddfdef5aa71c200d06d03c26c2e8bb428b3250101b9cb3
+    version: null
+kind: app
+version: 0.6.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        attachment_image_file_size_limit: 2
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        file_upload_limit: 50
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: llm
+      id: 2b00000000001-source-2b00000000002-target
+      source: '2b00000000001'
+      sourceHandle: source
+      target: '2b00000000002'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: end
+      id: 2b00000000002-source-2b00000000003-target
+      source: '2b00000000002'
+      sourceHandle: source
+      target: '2b00000000003'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: ユーザー入力
+        type: start
+        variables:
+        - default: ''
+          hint: STEP1で生成された書籍プロファイル草案の全文。
+          label: 書籍プロファイル草案
+          max_length: 16000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: work_profile_draft
+        - default: ''
+          hint: 著者プロファイル全文（補助）。
+          label: 著者プロファイル
+          max_length: 10000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: author_profile
+        - default: ''
+          hint: STEP1で著者が選択した出版目標。
+          label: 出版目標
+          max_length: 2000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: publishing_goal
+        - default: ''
+          hint: Node側で生成された10キーワード分の市場データ要約。各キーワードごとに「検索ヒット総数」「上位本数」「レビュー数中央値」「需要スコア(機械)」「競合の弱さスコア(機械)」「上位本サンプル5冊」が含まれる。
+          label: 市場データ要約
+          max_length: 32000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: market_data_summary
+        - default: ''
+          hint: 10キーワードのJSON配列。判定時に参照する。
+          label: キーワードJSON
+          max_length: 2000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: keywords_json
+      height: 240
+      id: '2b00000000001'
+      position:
+        x: 80
+        y: 282
+      positionAbsolute:
+        x: 80
+        y: 282
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            enable_stream: false
+            max_tokens: 4096
+            reasoning_effort: medium
+            verbosity: medium
+          mode: chat
+          name: gpt-5.2
+          provider: langgenius/openai/openai
+        prompt_template:
+        - id: 2b00000000002-prompt-001
+          role: system
+          text: |
+            あなたは「Amazon Kindle 市場分析家」です。
+            ユーザーから渡された **書籍プロファイル草案** と、**10キーワード分の Amazon 市場データ要約**（Node側でRapidAPI経由で取得済み）を見て、各キーワードについて意図合致スコアを判定し、AI推奨を絞り込み、STEP1への戻り判定と戻り推奨時の修正示唆フィードバックを生成します。
+
+            ■ 入力
+
+            書籍プロファイル草案（読者像・コア・ベネフィット・ポジショニング仮説などを含む）：
+            {{#2b00000000001.work_profile_draft#}}
+
+            著者プロファイル（補助）：
+            {{#2b00000000001.author_profile#}}
+
+            出版目標：
+            {{#2b00000000001.publishing_goal#}}
+
+            生成された10キーワード（JSON配列）：
+            {{#2b00000000001.keywords_json#}}
+
+            市場データ要約（Node側でRapidAPIから取得・整形済み）：
+            {{#2b00000000001.market_data_summary#}}
+
+            ■ あなたのタスク
+
+            ## タスク1: 各キーワードについて意図合致スコアを判定（10点満点・小数なし）
+
+            判定基準：
+            - そのキーワードでAmazon検索した上位本群の **読者意図** が、書籍プロファイル草案の **想定読者像・コア・ベネフィット** と完全一致するなら 10点
+            - ニアミス（読者層は近いが扱うテーマがズレる）なら 5〜7点
+            - 完全に別ジャンル（想定読者と異なる層が来る、本書を読んでも満足しない）なら 1〜3点
+
+            上位本サンプル（タイトル群）を見て「この検索結果から来た読者は本書を満足して読んでくれるか？」を判定する。
+
+            ## タスク2: 合計スコアを算出してAI推奨マークを付与
+
+            - 合計スコア = 需要スコア(機械) + 競合の弱さスコア(機械) + 意図合致スコア（あなたが付与）
+            - 合計スコアが **18点以上** のキーワードに「★AI推奨」マークを付ける
+            - 18点未満のものには付けない
+            - AI推奨数は **0個、1個、2個** のいずれか（3個以上推奨される場合は上位2個に絞る）
+
+            ## タスク3: 戻り判定
+
+            - AI推奨数が **0個** → 「STEP1に戻る」推奨
+            - AI推奨数が **1個以上** → 「STEP3へ進む」推奨
+
+            ## タスク4: 戻り推奨時のフィードバック生成（推奨数 0 の時のみ）
+
+            STEP1に戻る推奨の場合、市場データから以下の情報を抽出して【AIからのフィードバック】セクションを生成する：
+
+            - **読者が実際に検索している言葉（上位5個）**：市場データ要約の上位本タイトルから読み取れる「読者の生の関心領域」
+            - **既存本でよくあるアプローチ（3つ）**：上位本タイトル群から見える定番パターン
+            - **未カバーの切り口**：書籍プロファイル草案の独自性に対応するが既存本がカバーしきれていない領域
+            - **コンセプト修正の示唆（2〜3個の具体提案）**：想定読者像・コア・ベネフィット・ポジショニング仮説のうち、市場データから見て調整すべき箇所
+
+            ■ 出力フォーマット（厳守・マークダウン構造化）
+
+            ## 【スコア表】
+
+            | キーワード | 需要 | 競合弱 | 意図 | 合計 | AI推奨 |
+            |------------|------|--------|------|------|--------|
+            | （キーワード1） | 9 | 3 | 6 | 18 |  |
+            | （キーワード2） | 7 | 7 | 8 | 22 | ★ |
+            | ...                                                  |
+            | （キーワード10）| ...|
+
+            ※「需要」「競合弱」は市場データ要約の機械スコアをそのまま転記。「意図」はあなたが判定した値。「合計」=3つの合計。
+
+            ## 【AIによる総合判定】
+
+            （以下のどちらかを1行で）
+            ✓ 推奨キーワード: 2個 (合計スコア18点以上) → STEP3へ進むことを推奨します
+            または
+            ⚠ 推奨キーワード: 0個 (合計スコア18点以上) → STEP1に戻ってコンセプトを調整することを推奨します
+
+            ## 【AIからのフィードバック】
+
+            （AI推奨数が0個の場合のみ、以下の構造で具体記述。AI推奨数1個以上の場合はこのセクション全体を省略する。）
+
+            ### 読者が実際に検索している言葉
+            - ◯◯
+            - ◯◯
+            - ◯◯
+            - ◯◯
+            - ◯◯
+
+            ### 既存本でよくあるアプローチ
+            - ◯◯
+            - ◯◯
+            - ◯◯
+
+            ### 未カバーの切り口
+            - ◯◯
+
+            ### コンセプト修正の示唆
+            1. ◯◯
+            2. ◯◯
+            3. ◯◯（任意）
+
+            ■ 重要
+
+            - 上記フォーマット以外の余計な前置き・解説・コードフェンスを出力しない
+            - スコア表は10行ちょうど（10キーワード分）
+            - AI推奨数が1個以上の場合、【AIからのフィードバック】セクションは出力しない
+        - id: 2b00000000002-prompt-002
+          role: user
+          text: 上記の入力情報に基づき、10キーワードのスコア表＋総合判定＋（必要なら）フィードバックを生成してください。
+        selected: false
+        title: 意図合致スコア＋戻り判定＋フィードバック
+        type: llm
+        vision:
+          enabled: false
+      height: 88
+      id: '2b00000000002'
+      position:
+        x: 561
+        y: 303
+      positionAbsolute:
+        x: 561
+        y: 303
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        outputs:
+        - value_selector:
+          - '2b00000000002'
+          - text
+          value_type: string
+          variable: text
+        selected: false
+        title: 出力
+        type: end
+      height: 88
+      id: '2b00000000003'
+      position:
+        x: 864
+        y: 303
+      positionAbsolute:
+        x: 864
+        y: 303
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    viewport:
+      x: 0
+      y: 0
+      zoom: 1
+  rag_pipeline_variables: []

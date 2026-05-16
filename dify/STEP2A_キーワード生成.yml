@@ -1,0 +1,263 @@
+app:
+  description: v4新規。新STEP2「キーワード絞り込み」の第1段。STEP1の書籍プロファイル草案から、Amazon Kindleで読者が実際に検索しそうなキーワード候補を10個生成してJSON配列で返す。後段はNode側でRapidAPI（Real-Time Amazon Data）に渡され、検索結果からスコアリングされる。
+  icon: 🔎
+  icon_background: '#E0EEFE'
+  icon_type: emoji
+  mode: workflow
+  name: STEP2A_キーワード生成
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/openai:0.2.10@7ca552fb9e48caa4deddfdef5aa71c200d06d03c26c2e8bb428b3250101b9cb3
+    version: null
+kind: app
+version: 0.6.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        attachment_image_file_size_limit: 2
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        file_upload_limit: 50
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: llm
+      id: 2a00000000001-source-2a00000000002-target
+      source: '2a00000000001'
+      sourceHandle: source
+      target: '2a00000000002'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: end
+      id: 2a00000000002-source-2a00000000003-target
+      source: '2a00000000002'
+      sourceHandle: source
+      target: '2a00000000003'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: ユーザー入力
+        type: start
+        variables:
+        - default: ''
+          hint: STEP1で生成された書籍プロファイル草案の全文。仮テーマ・想定読者・コア・ベネフィット・動機・出版目標・著者の角度・ポジショニング仮説・読了後の状態仮説を含む。
+          label: 書籍プロファイル草案
+          max_length: 16000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: work_profile_draft
+        - default: ''
+          hint: STEP0で生成された著者プロファイル全文。キーワードに著者の角度を反映させる際の補助情報。
+          label: 著者プロファイル
+          max_length: 10000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: author_profile
+        - default: ''
+          hint: STEP1で著者が選択した出版目標（チェック＋自由記述）。リードマグネット型ならば検索ボリュームが大きい一般語を優先、権威構築型ならば固有性のある語、ロングセラー型ならば時事性に依存しない普遍語をそれぞれ優先する。
+          label: 出版目標
+          max_length: 2000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: publishing_goal
+        - default: ''
+          hint: 前回戻り時のフィードバック（任意）。STEP1から再生成された草案で再実行する場合、前回の戻り示唆との重複を避ける配慮材料として使う。
+          label: 戻り時フィードバック
+          max_length: 8000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: return_feedback
+      height: 220
+      id: '2a00000000001'
+      position:
+        x: 80
+        y: 282
+      positionAbsolute:
+        x: 80
+        y: 282
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            enable_stream: false
+            max_tokens: 2048
+            reasoning_effort: low
+            verbosity: medium
+          mode: chat
+          name: gpt-5.2
+          provider: langgenius/openai/openai
+        prompt_template:
+        - id: 2a00000000002-prompt-001
+          role: system
+          text: |
+            あなたは「Amazon Kindle キーワード戦略家」です。
+            書籍プロファイル草案（仮テーマ・想定読者・コア・ベネフィット・ポジショニング仮説・出版目標など）を読み、Amazon Kindle ストアで読者が実際に検索しそうなキーワード候補を **ちょうど10個** 生成してください。
+
+            ■ 入力
+
+            書籍プロファイル草案：
+            {{#2a00000000001.work_profile_draft#}}
+
+            著者プロファイル（補助・任意）：
+            {{#2a00000000001.author_profile#}}
+
+            出版目標：
+            {{#2a00000000001.publishing_goal#}}
+
+            戻り時フィードバック（前回戻り推奨があった場合の示唆）：
+            {{#2a00000000001.return_feedback#}}
+
+            ■ 生成原則（厳守）
+
+            1. **必ず10個ちょうど**を生成する。9個や11個は不可。
+            2. **各キーワードは半角スペース区切りで2語**（例：「天職 見つけ方」「キャリア 棚卸し」）。3語以上は禁止（Amazon検索結果が極端に少なくなる）。1語のみも禁止（広すぎて市場が大きすぎる）。
+            3. **読者目線の実用検索語**にする。著者・書き手目線の抽象語（使命／自己実現／生き方／覚醒／革命）は禁止。「読者が悩みを解決したくて Amazon Kindle で実際に打ち込む2語」を想像する。
+            4. **3軸的に多様な入口を網羅する**：
+               - 主題そのものの検索語（4〜5個）：本のテーマを正面から探す読者の検索語
+               - 隣接ジャンルからの流入語（3〜4個）：本書のターゲットだが別ジャンルでも検索する読者の語
+               - 差別化補強の語（2〜3個）：本書独自の角度を表す、競合本がカバーしきれていない実在語
+            5. **Amazon Kindle で実在性のある語**を選ぶ（後段でAPI検索される。完全0件になる造語的組み合わせは避ける）。
+            6. **書籍プロファイルの動機・出版目標と整合**させる：
+               - リードマグネット書 → 検索ボリュームが大きい実用語を優先
+               - ノウハウ書（読者単独完結） → 手順・方法系の語を優先
+               - 権威構築書 → 専門性・固有名詞性が伝わる語を優先
+               - ロングセラー型 → 時事性に依存しない普遍語を優先
+            7. **本書のテーマと矛盾するジャンルの語を絶対に含めない**。例：本のテーマが「自己発見・ライフワーク」なのに「Kindle出版」「Amazon SEO」を入れない（読者がガッカリして離脱する）。
+            8. 戻り時フィードバックがある場合、「読者が実際に検索している言葉」「未カバーの切り口」を必ず反映する。同じ語を繰り返さない。
+
+            ■ セルフチェック（出力前に必ず行う）
+
+            - 10個ちょうどか？
+            - すべて2語か？（3語以上禁止・1語禁止）
+            - 読者目線の語か？（書き手目線・抽象語禁止）
+            - 主題／隣接／差別化の3類型を網羅しているか？
+            - 本書のテーマと矛盾する語はないか？
+
+            ■ 出力フォーマット（厳守）
+
+            出力は **JSON配列のみ**。前置き・解説・コードフェンス禁止。改行・装飾も不要。
+
+            例：
+            ["天職 見つけ方","キャリア 棚卸し","やりたいこと 仕事","自分軸 仕事","ライフワーク 見つけ方","強み 仕事","自己理解 仕事","30代 キャリア","言語化 仕事","本を書く 副業"]
+
+            **重要**：必ず10個ちょうど。配列以外の文字列を含めない。
+        - id: 2a00000000002-prompt-002
+          role: user
+          text: 上記の入力情報に基づき、Amazon Kindle で実際に検索される可能性が高いキーワード候補を **ちょうど10個** 生成し、JSON配列のみで出力してください。
+        selected: false
+        title: キーワード10個生成
+        type: llm
+        vision:
+          enabled: false
+      height: 88
+      id: '2a00000000002'
+      position:
+        x: 561
+        y: 303
+      positionAbsolute:
+        x: 561
+        y: 303
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        outputs:
+        - value_selector:
+          - '2a00000000002'
+          - text
+          value_type: string
+          variable: text
+        selected: false
+        title: 出力
+        type: end
+      height: 88
+      id: '2a00000000003'
+      position:
+        x: 864
+        y: 303
+      positionAbsolute:
+        x: 864
+        y: 303
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    viewport:
+      x: 0
+      y: 0
+      zoom: 1
+  rag_pipeline_variables: []
