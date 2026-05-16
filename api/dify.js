@@ -1,78 +1,81 @@
 // Vercel Serverless Function - Dify API Proxy
 const DIFY_API_BASE = "https://api.dify.ai/v1";
 
-// STEP3 廃止 + STEP4-10 を STEP3-9 に番号繰り上げ後の対応表
-//   旧STEP4 (エピソードインタビュー)   → 新STEP3
-//   旧STEP5 (タイトル・サブタイトル)   → 新STEP4
-//   旧STEP6 (目次作成)                 → 新STEP5
-//   旧STEP7 (章構成作成)               → 新STEP6
-//   旧STEP8 (詳細プロット作成)         → 新STEP7
-//   旧STEP9 (本文作成)                 → 新STEP8
-//   旧STEP10 (Amazon説明文作成)        → 新STEP9
-// 環境変数 DIFY_API_KEY_STEP03〜09 には新STEPに対応する API Key を設定してください。
+// v4改修(2026-05): 番号繰り上げ後の対応表
+//   旧STEP3 (エピソードインタビュー)   → 新STEP4
+//   旧STEP4 (タイトル・サブタイトル)   → 新STEP5
+//   旧STEP5 (目次作成)                 → 新STEP6
+//   旧STEP6 (章構成作成)               → 新STEP7
+//   旧STEP7 (詳細プロット作成)         → 新STEP8
+//   旧STEP8 (本文作成)                 → 新STEP9
+//   旧STEP9 (Amazon説明文作成)         → 新STEP10
+// 新STEP2 (キーワード絞り込み) と 新STEP3 (競合レビュー評価) は本ファイルを通らず
+// api/step2.js / api/step3.js (実装は優先度3後半) でそれぞれ専用フローを呼ぶ。
+//
+// 既存の DIFY_API_KEY_STEP03〜09 はそのまま流用する設計（中身のDify workflowは変更不要）。
+// 新STEP4のリクエストが来たら DIFY_API_KEY_STEP03 を使う、というシフトを resolveApiKey で吸収する。
 const API_KEYS = {
-  0: process.env.DIFY_API_KEY_STEP00_A,
-  1: process.env.DIFY_API_KEY_STEP01,
-  2: process.env.DIFY_API_KEY_STEP02,
-  3: process.env.DIFY_API_KEY_STEP03,
-  4: process.env.DIFY_API_KEY_STEP04,
-  5: process.env.DIFY_API_KEY_STEP05,
-  6: process.env.DIFY_API_KEY_STEP06,
-  7: process.env.DIFY_API_KEY_STEP07,
-  8: process.env.DIFY_API_KEY_STEP08,
-  9: process.env.DIFY_API_KEY_STEP09,
+  0:  process.env.DIFY_API_KEY_STEP00_A,
+  1:  process.env.DIFY_API_KEY_STEP01,
+  2:  process.env.DIFY_API_KEY_STEP02,   // 旧STEP2(廃止)・新STEP2はapi/step2.js経由なので未使用
+  3:  process.env.DIFY_API_KEY_STEP03,   // 旧STEP3 エピソード - 新STEP4 用に流用
+  4:  process.env.DIFY_API_KEY_STEP04,   // 旧STEP4 タイトル - 新STEP5 用に流用
+  5:  process.env.DIFY_API_KEY_STEP05,   // 旧STEP5 目次 - 新STEP6 用に流用
+  6:  process.env.DIFY_API_KEY_STEP06,   // 旧STEP6 章構成 - 新STEP7 用に流用
+  7:  process.env.DIFY_API_KEY_STEP07,   // 旧STEP7 プロット - 新STEP8 用に流用
+  8:  process.env.DIFY_API_KEY_STEP08,   // 旧STEP8 本文 - 新STEP9 用に流用
+  9:  process.env.DIFY_API_KEY_STEP09,   // 旧STEP9 Amazon説明文 - 新STEP10 用に流用
 };
+
+// 新stepNum → 使用する API Key を解決する
+// 新STEP4〜10 のリクエストは旧キー3〜9 にルーティング
+function resolveApiKey(newStepNum) {
+  if (newStepNum <= 3) return API_KEYS[newStepNum];
+  return API_KEYS[newStepNum - 1];
+}
 
 function mapInputs(stepNum, inputs) {
   const m = { ...inputs };
 
   // STEP1: theme をそのまま渡す（変換不要）
+  // STEP2: api/step2.js 経由のため本関数は通らない
+  // STEP3: api/step3.js (実装予定) 経由のため本関数は通らない
+  // STEP4 (エピソードインタビュー): チャット型のため dify-chat.js 側、本関数は通らない
 
-  if (stepNum === 2) {
-    if (m.amazon_html !== undefined) { m.HTML = m.amazon_html; delete m.amazon_html; }
-  }
-
-  // STEP3 (旧STEP4 エピソードインタビュー): チャット型のため API_KEYS のみ使用、入力変換は dify-chat.js 側
-
-  if (stepNum === 4) {
-    // 旧STEP5 タイトル・サブタイトル作成。theme_output 入力は廃止
+  // 新STEP5 (旧STEP4 タイトル・サブタイトル作成)。theme_output 入力は廃止
+  if (stepNum === 5) {
     if (m.keyword1 !== undefined)       { m.kw1 = m.keyword1; delete m.keyword1; }
     if (m.keyword2 !== undefined)       { m.kw2 = m.keyword2; delete m.keyword2; }
     if (m.interview_text !== undefined) { m.diff_elements = m.interview_text; delete m.interview_text; }
   }
 
-  if (stepNum === 5) {
-    // 旧STEP6 目次作成。blueprint 入力は廃止
-    // title / subtitle は getAutoInjectedProfiles から自動注入（STEP4で確定された値）
+  // 新STEP6 (旧STEP5 目次作成)。blueprint 入力は廃止
+  // title / subtitle は getAutoInjectedProfiles から自動注入（STEP5で確定された値）
+  if (stepNum === 6) {
     if (m.interview_text !== undefined) { m.interview_notes = m.interview_text; delete m.interview_text; }
   }
 
-  if (stepNum === 6) {
-    // 旧STEP7 章構成作成。blueprint 入力は廃止
-    // title / subtitle は getAutoInjectedProfiles から自動注入（STEP4で確定された値）
+  // 新STEP7 (旧STEP6 章構成作成)。blueprint 入力は廃止
+  if (stepNum === 7) {
     if (m.toc_text !== undefined)       { m.refined_toc = m.toc_text; delete m.toc_text; }
     if (m.interview_text !== undefined) { m.interview_notes = m.interview_text; delete m.interview_text; }
   }
 
-  if (stepNum === 7) {
-    // 旧STEP8 詳細プロット作成
-    // title / subtitle は getAutoInjectedProfiles から自動注入（STEP4で確定された値）
+  // 新STEP8 (旧STEP7 詳細プロット作成)
+  if (stepNum === 8) {
     if (m.chapter_outline_text !== undefined) { m.plot_instruction = m.chapter_outline_text; delete m.chapter_outline_text; }
     if (m.added_episode_text !== undefined)   { m.added_episodes = m.added_episode_text; delete m.added_episode_text; }
   }
 
-  if (stepNum === 8) {
-    // 旧STEP9 本文作成
-    // title / subtitle は getAutoInjectedProfiles から自動注入（STEP4で確定された値）
+  // 新STEP9 (旧STEP8 本文作成)
+  if (stepNum === 9) {
     if (m.past_writing_text !== undefined) { m.past_writing_data = m.past_writing_text; delete m.past_writing_text; }
   }
 
-  if (stepNum === 9) {
-    // 旧STEP10 Amazon説明文作成。reader_value_design 入力は廃止
-    // title / subtitle は getAutoInjectedProfiles から自動注入（STEP4で確定された値）
+  // 新STEP10 (旧STEP9 Amazon説明文作成)。reader_value_design 入力は廃止
+  if (stepNum === 10) {
     if (m.interview_text !== undefined)      { m.author_episode = m.interview_text; delete m.interview_text; }
     if (m.outline_text !== undefined)        { m.toc_text = m.outline_text; delete m.outline_text; }
-    // author_profile は getAutoInjectedProfiles で自動注入されるので変換不要
   }
 
   return m;
@@ -89,7 +92,7 @@ export default async function handler(req, res) {
   const { stepNum, inputs } = req.body;
   if (stepNum === undefined || stepNum === null || !inputs) return res.status(400).json({ error: "stepNum and inputs are required" });
 
-  const apiKey = API_KEYS[stepNum];
+  const apiKey = resolveApiKey(stepNum);
   if (!apiKey) return res.status(400).json({ error: `No API key configured for STEP${stepNum}` });
 
   const difyInputs = mapInputs(stepNum, inputs);

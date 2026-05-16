@@ -62,7 +62,21 @@ const STEPS = [
     ]
   },
   {
-    id: "step_03", num: 3, title: "エピソードインタビュー",
+    id: "step_03", num: 3, title: "競合レビュー評価",
+    description: "STEP2で選定したキーワードの上位本3冊のAmazonレビューを分析し、読者の共通不満点・既存本がカバーできていない切り口・本企画の差別化ポイント・注意すべき落とし穴を抽出します。AI判定で「差別化ポイントが2個以下」と出た場合は、STEP1に戻ってコンセプトを調整することを推奨します。",
+    category: "企画設計", type: "custom",
+    url: "",
+    inputs: [],
+    outputTitle: "競合レビュー評価結果",
+    help: [
+      "STEP2で選定したキーワードの上位本3冊のAmazonレビューを取得・分析します（1〜2分かかります）",
+      "出力：読者の共通不満点／既存本がカバーできていない切り口／本企画の差別化ポイント／注意すべき落とし穴",
+      "差別化ポイントが3個以上明確なら確定アクションへ、2個以下ならSTEP1に戻ってコンセプトを調整しましょう",
+      "STEP3には外部AI相談機能はありません（客観データ分析のためAI判定アシストが代替機能になります）"
+    ]
+  },
+  {
+    id: "step_04", num: 4, title: "エピソードインタビュー",
     description: "AIがあなたに質問しながら、本の素材となる体験談やエピソードを引き出します。書籍プロファイルから読者像は把握済みなので、すぐに質問が始まります。他の本にはない差別化ポイントが、ここで集まる素材から生まれます。",
     category: "企画設計", type: "chat",
     url: "https://udify.app/chat/qbB9SNU5UG3gryYp",
@@ -72,18 +86,18 @@ const STEPS = [
       "「開始」「準備できました」など、内容は何でも送信するとAIが質問1から始めます",
       "AIは1回に1つだけ質問します。焦らず具体的に答えてください",
       "「数字は出せない」場合は「体感では◯◯くらい」でOKです",
-      "質問が終わったら、AIが要約を出してくれます。その要約を保存してSTEP4以降で使います"
+      "質問が終わったら、AIが要約を出してくれます。その要約を保存してSTEP5以降で使います"
     ]
   },
   {
-    id: "step_04", num: 4, title: "タイトル・サブタイトル作成",
-    description: "Amazonで検索されやすく、かつ読者がクリックしたくなるタイトル案を複数作ります。2語キーワードは必ずタイトルかサブタイトルに含まれます。",
+    id: "step_05", num: 5, title: "タイトル・サブタイトル作成",
+    description: "Amazonで検索されやすく、かつ読者がクリックしたくなるタイトル案を複数作ります。STEP2で選定したキーワードは必ずタイトルかサブタイトルに含まれます。",
     category: "企画設計", type: "workflow",
     url: "https://udify.app/workflow/z7djuT4RLqfAbEqY",
     inputs: [
-      { name: "keyword1", label: "検索キーワード1", desc: "確定した1語目", source: "STEP2", required: true, type: "text", autoFill: false, maxChars: 256 },
-      { name: "keyword2", label: "検索キーワード2", desc: "確定した2語目", source: "STEP2", required: true, type: "text", autoFill: false, maxChars: 256 },
-      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "STEP3のインタビュー要約を貼り付け（「自動振り分け」ボタンで自動入力できます）", source: "STEP3", required: true, type: "textarea", autoFill: true, maxChars: 5000 }
+      { name: "keyword1", label: "検索キーワード1", desc: "STEP2で選定した1語目", source: "STEP2", required: true, type: "text", autoFill: false, maxChars: 256 },
+      { name: "keyword2", label: "検索キーワード2", desc: "STEP2で選定した2語目", source: "STEP2", required: true, type: "text", autoFill: false, maxChars: 256 },
+      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "STEP4のインタビュー要約を貼り付け（「自動振り分け」ボタンで自動入力できます）", source: "STEP4", required: true, type: "textarea", autoFill: true, maxChars: 5000 }
     ],
     outputTitle: "タイトル案",
     help: [
@@ -93,60 +107,60 @@ const STEPS = [
     ]
   },
   {
-    id: "step_05", num: 5, title: "目次作成",
+    id: "step_06", num: 6, title: "目次作成",
     description: "本全体の章構成（章タイトル）と目次（節見出し）を一気に作ります。書籍プロファイルから章構造を設計し、エピソードから節見出しの具体性を出します。デフォルトは7章構成。",
     category: "執筆設計", type: "workflow",
     url: "https://udify.app/workflow/tcqNIyr8wpCBAJhb",
     inputs: [
-      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "STEP3のインタビュー要約を貼り付け（「自動振り分け」で自動入力）", source: "STEP3", required: true, type: "textarea", autoFill: true, maxChars: 5000 }
+      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "STEP4のインタビュー要約を貼り付け（「自動振り分け」で自動入力）", source: "STEP4", required: true, type: "textarea", autoFill: true, maxChars: 5000 }
     ],
     outputTitle: "完成目次（章構造＋節見出し）",
     help: [
       "「はじめに」と「おわりに」は自動で付きます",
       "デフォルトは7章構成（章タイトル＋各章4〜5節）",
       "特定の章だけ修正したい場合は、出力をAIチャットに貼り付けて指示してください",
-      "目次が気に入らない場合は、書籍プロファイル確定版（STEP2）を見直すと改善することがあります"
+      "目次が気に入らない場合は、書籍プロファイル確定版（確定アクション）を見直すと改善することがあります"
     ]
   },
   {
-    id: "step_06", num: 6, title: "章構成作成",
+    id: "step_07", num: 7, title: "章構成作成",
     description: "目次の各節に「この節で何を書くか」の要約を付けます。本文執筆前の最後の設計図になります。",
     category: "執筆設計", type: "workflow",
     url: "https://udify.app/workflow/4KDXsPKSlgk5qMu8",
     inputs: [
-      { name: "toc_text", label: "目次作成のアウトプット", desc: "STEP5の目次を貼り付け（「自動振り分け」で自動入力）", source: "STEP5", required: true, type: "textarea", autoFill: true, maxChars: 5000 },
-      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "STEP3のインタビュー要約を貼り付け（「自動振り分け」で自動入力）", source: "STEP3", required: true, type: "textarea", autoFill: true, maxChars: 5000 }
+      { name: "toc_text", label: "目次作成のアウトプット", desc: "STEP6の目次を貼り付け（「自動振り分け」で自動入力）", source: "STEP6", required: true, type: "textarea", autoFill: true, maxChars: 5000 },
+      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "STEP4のインタビュー要約を貼り付け（「自動振り分け」で自動入力）", source: "STEP4", required: true, type: "textarea", autoFill: true, maxChars: 5000 }
     ],
     outputTitle: "章構成",
     help: [
       "全ての章の構成を1回で作ります",
       "特定の節だけ修正したい場合は、出力をAIチャットに貼り付けて指示してください",
-      "次のSTEP7では、ここで作った章構成を1章ずつ細かく分解していきます"
+      "次のSTEP8では、ここで作った章構成を1章ずつ細かく分解していきます"
     ]
   },
   {
-    id: "step_07", num: 7, title: "詳細プロット作成",
+    id: "step_08", num: 8, title: "詳細プロット作成",
     description: "1章分の節を、本文執筆に必要な細かさ（項）まで分解します。節の中をさらに①②③の項に分けて、各項で何を書くかの要約を作ります。本文作成の直前の工程です。",
     category: "執筆設計", type: "workflow",
     url: "https://udify.app/workflow/Ka9gpeDvAnkPV9hW",
     inputs: [
-      { name: "chapter_outline_text", label: "1章分のアウトライン", desc: "STEP6の出力から、今回分解したい1章分だけをコピーして貼り付けてください。", source: "STEP6", required: true, type: "textarea", autoFill: false, maxChars: 2048 }
+      { name: "chapter_outline_text", label: "1章分のアウトライン", desc: "STEP7の出力から、今回分解したい1章分だけをコピーして貼り付けてください。", source: "STEP7", required: true, type: "textarea", autoFill: false, maxChars: 2048 }
     ],
     outputTitle: "詳細プロット",
     help: [
-      "1章ずつ処理します。「参照」ボタンでSTEP6の出力を開き、該当の章だけをコピーして貼り付けましょう",
+      "1章ずつ処理します。「参照」ボタンでSTEP7の出力を開き、該当の章だけをコピーして貼り付けましょう",
       "出力の形式：(1)(2)(3)...が節、①②③...が項になります",
-      "次のSTEP8で、この詳細プロットをもとに本文を作ります"
+      "次のSTEP9で、この詳細プロットをもとに本文を作ります"
     ]
   },
   {
-    id: "step_08", num: 8, title: "本文作成",
+    id: "step_09", num: 9, title: "本文作成",
     description: "詳細プロットから節を選ぶと、その節の中の項（①②③...）の本文を連続で生成します。1節ずつ着実に本文を積み上げていくSTEPです。",
     category: "執筆設計", type: "workflow",
     url: "https://udify.app/workflow/lRAWtZGuVL4bqHM9",
     inputs: [
-      { name: "detailed_plot_text", label: "詳細プロット作成のアウトプット（1章分）", desc: "STEP7の詳細プロットから1章分だけを選択してください。", source: "STEP7", required: true, type: "textarea", autoFill: false, maxChars: 5000 },
-      { name: "target_section", label: "執筆対象の節（1節分）", desc: "今回書きたい節を1つ選びます。下の「STEP7から節を抽出」ボタンを押すと、節の候補が一覧表示されます。", source: "STEP7", required: true, type: "text", autoFill: false, maxChars: 256 }
+      { name: "detailed_plot_text", label: "詳細プロット作成のアウトプット（1章分）", desc: "STEP8の詳細プロットから1章分だけを選択してください。", source: "STEP8", required: true, type: "textarea", autoFill: false, maxChars: 5000 },
+      { name: "target_section", label: "執筆対象の節（1節分）", desc: "今回書きたい節を1つ選びます。下の「STEP8から節を抽出」ボタンを押すと、節の候補が一覧表示されます。", source: "STEP8", required: true, type: "text", autoFill: false, maxChars: 256 }
     ],
     outputTitle: "生成された本文",
     help: [
@@ -156,13 +170,13 @@ const STEPS = [
     ]
   },
   {
-    id: "step_09", num: 9, title: "Amazon説明文作成",
+    id: "step_10", num: 10, title: "Amazon説明文作成",
     description: "Amazonの商品ページに載せる本の紹介文を作ります。読者が「買いたい」と思う文章に仕上げます。",
     category: "販売準備", type: "workflow",
     url: "https://udify.app/workflow/6yWZfOGGU76ciJBI",
     inputs: [
-      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "STEP3のインタビュー要約を貼り付け（「自動振り分け」で自動入力）", source: "STEP3", required: true, type: "textarea", autoFill: true, maxChars: 5000 },
-      { name: "outline_text", label: "章構成作成のアウトプット", desc: "STEP6の章構成を貼り付け（「自動振り分け」で自動入力）", source: "STEP6", required: true, type: "textarea", autoFill: true, maxChars: 20000 }
+      { name: "interview_text", label: "エピソードインタビューのアウトプット", desc: "STEP4のインタビュー要約を貼り付け（「自動振り分け」で自動入力）", source: "STEP4", required: true, type: "textarea", autoFill: true, maxChars: 5000 },
+      { name: "outline_text", label: "章構成作成のアウトプット", desc: "STEP7の章構成を貼り付け（「自動振り分け」で自動入力）", source: "STEP7", required: true, type: "textarea", autoFill: true, maxChars: 20000 }
     ],
     outputTitle: "Amazon説明文",
     help: [
@@ -173,9 +187,9 @@ const STEPS = [
 ];
 
 const CATEGORIES = [
-  { label: "企画設計", steps: [1, 2, 3, 4] },
-  { label: "執筆設計", steps: [5, 6, 7, 8] },
-  { label: "販売準備", steps: [9] }
+  { label: "企画設計", steps: [1, 2, 3, 4, 5] },
+  { label: "執筆設計", steps: [6, 7, 8, 9] },
+  { label: "販売準備", steps: [10] }
 ];
 
 const STATUS_LABELS = { not_started: "未着手", in_progress: "進行中", completed: "完了" };
@@ -300,6 +314,64 @@ function migrateLocalStorageV1() {
 }
 if (typeof window !== "undefined") migrateLocalStorageV1();
 
+// v4 番号繰り上げ用のlocalStorageマイグレーション（冪等）。
+// 旧STEP3〜9 (v1適用後の状態) を 新STEP4〜10 にずらす。
+// 既存ユーザーが作業中のSTEPデータを保持したまま、新しいSTEP番号体系に移行する。
+// 既に migration_v4_done フラグが立っていれば何もしない。
+const MIGRATION_V4_KEY = "aipub:migration:v4";
+function migrateLocalStorageV4() {
+  try {
+    if (typeof window === "undefined") return;
+    if (localStorage.getItem(MIGRATION_V4_KEY) === "done") return;
+
+    // 旧key:9 → 新key:10、旧key:8 → 新key:9、... 旧key:3 → 新key:4 の順で移動
+    // （上から下へ移動して、移動前のkeyが上書きされないよう逆順で処理）
+    for (let oldN = 9; oldN >= 3; oldN--) {
+      const newN = oldN + 1;
+      const oldKey = STEPS_KEY_PREFIX + oldN;
+      const newKey = STEPS_KEY_PREFIX + newN;
+      const oldVal = localStorage.getItem(oldKey);
+      if (oldVal === null) continue; // データなしならスキップ
+      const newVal = localStorage.getItem(newKey);
+      if (newVal !== null) {
+        // 既に新keyにデータがある（先行マイグレーション実行orユーザーが先に新STEPを使い始めた）
+        // 安全側に倒し、旧keyのデータを失わないようスキップする
+        continue;
+      }
+      // 旧 → 新 に移動して旧を削除
+      localStorage.setItem(newKey, oldVal);
+      localStorage.removeItem(oldKey);
+    }
+
+    // currentStep / lastUpdatedStep もシフトする
+    // 旧STEP3〜9 のいずれかにいた場合は +1 する。旧STEP2 にいた場合は新STEP2 (キーワード絞り込み・新規) なので未着手化を兼ねて STEP1 に戻す。
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const proj = JSON.parse(raw);
+        if (typeof proj.currentStep === "number" && proj.currentStep >= 3 && proj.currentStep <= 9) {
+          proj.currentStep = proj.currentStep + 1;
+        } else if (proj.currentStep === 2) {
+          // 旧STEP2(市場検証→確定)は廃止。新STEP2はキーワード絞り込みなのでSTEP1に戻す（任意で実行可能）
+          proj.currentStep = 1;
+        }
+        if (typeof proj.lastUpdatedStep === "number" && proj.lastUpdatedStep >= 3 && proj.lastUpdatedStep <= 9) {
+          proj.lastUpdatedStep = proj.lastUpdatedStep + 1;
+        } else if (proj.lastUpdatedStep === 2) {
+          proj.lastUpdatedStep = null;
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(proj));
+      }
+    } catch (e) { console.error("migration v4: project parse failed", e); }
+
+    localStorage.setItem(MIGRATION_V4_KEY, "done");
+    console.log("[MIGRATION] v4 localStorage migration completed");
+  } catch (e) {
+    console.error("migrateLocalStorageV4 failed:", e);
+  }
+}
+if (typeof window !== "undefined") migrateLocalStorageV4();
+
 async function loadProject() {
   try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
 }
@@ -352,15 +424,16 @@ async function saveStepData(num, data) {
 }
 async function loadAllSteps() {
   const all = {};
-  for (let i = 1; i <= 9; i++) { all[i] = (await loadStepData(i)) || defaultStepData(i); }
+  for (let i = 1; i <= 10; i++) { all[i] = (await loadStepData(i)) || defaultStepData(i); }
   return all;
 }
+
 async function resetAllData() {
   try {
     localStorage.removeItem(STORAGE_KEY);
-    for (let i = 1; i <= 9; i++) { localStorage.removeItem(STEPS_KEY_PREFIX + i); }
-    // 旧STEP10データもクリア（マイグレーション後の残骸対策）
-    localStorage.removeItem(STEPS_KEY_PREFIX + 10);
+    for (let i = 1; i <= 10; i++) { localStorage.removeItem(STEPS_KEY_PREFIX + i); }
+    // マイグレーションフラグもリセット（次回 mount 時に旧データがあれば再マイグレーション可能）
+    localStorage.removeItem(MIGRATION_V4_KEY);
     localStorage.removeItem(AUTHOR_PROFILE_KEY);
     localStorage.removeItem(WORK_PROFILE_KEY);
     localStorage.removeItem(WORK_PROFILE_CONFIRMED_KEY);
@@ -2379,14 +2452,84 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
   );
 };
 
-// STEP4専用：「タイトル・サブタイトルを確定する」UI。
+// v4新規：新STEP3「競合レビュー評価」のページコンポーネント（スタブ）
+// 優先度3 ステージ2 で完全実装予定。現状はSTEP2 → STEP4（旧STEP3 エピソードインタビュー）への
+// ナビゲーションが機能するための placeholder として配置。
+// 実装後は api/step3.js を呼び、STEP2 で選定したキーワードの上位本3冊の Top Product Reviews を
+// 取得して LLM 分析（不満点・差別化ポイント・落とし穴）を行う。
+// 相談機能（DiscussionPanel）は無し（v4 §9-2 のとおり、客観データ分析のためAI判定アシストで代替）。
+const Step3Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, project }) => {
+  // STEP2 の選定キーワードを取得（無ければ STEP2 へ戻す）
+  const selectedKeywords = (() => {
+    try {
+      const raw = (typeof window !== "undefined") ? localStorage.getItem(STEP2_SELECTED_KEYWORDS_KEY) : null;
+      return raw ? (JSON.parse(raw) || []) : [];
+    } catch { return []; }
+  })();
+  const hasDraft = !!(savedWorkProfileDraft || "").trim();
+  const hasSelectedKeywords = Array.isArray(selectedKeywords) && selectedKeywords.length > 0;
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.gold, marginBottom: 4, letterSpacing: "0.08em" }}>STEP 3</div>
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: C.navy, margin: "0 0 6px", letterSpacing: "-0.01em" }}>競合レビュー評価</h1>
+          <p style={{ fontSize: 13.5, color: C.textSub, margin: 0, lineHeight: 1.7 }}>STEP2で選定したキーワードの上位本3冊のAmazonレビューを取得・分析し、読者の共通不満点・差別化ポイント・落とし穴を抽出します。</p>
+        </div>
+      </div>
+      <div style={{ height: 1, background: `linear-gradient(to right, ${C.gold}, ${C.goldLight}, transparent)`, width: "100%", opacity: 0.9, marginBottom: 20 }} />
+
+      <Card style={{ marginBottom: 16, background: hasDraft ? "#eef7ee" : "#fff7e6", border: `1px solid ${hasDraft ? "#c8d4c8" : "#e0c8a0"}` }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.navy, marginBottom: 6 }}>
+          📋 書籍プロファイル草案（STEP1）：{hasDraft ? "✓ 設定済み" : "⚠ 未設定"}
+        </div>
+        {!hasDraft && (
+          <BtnPrimary onClick={() => onNavigate("step_1")}>STEP1で書籍プロファイル草案を生成する →</BtnPrimary>
+        )}
+      </Card>
+
+      <Card style={{ marginBottom: 24, background: hasSelectedKeywords ? "#eef7ee" : "#fff7e6", border: `1px solid ${hasSelectedKeywords ? "#c8d4c8" : "#e0c8a0"}` }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.navy, marginBottom: 6 }}>
+          🔑 STEP2で選定したキーワード：{hasSelectedKeywords ? `✓ ${selectedKeywords.length}個` : "⚠ 未選定"}
+        </div>
+        {hasSelectedKeywords ? (
+          <div style={{ fontSize: 12.5, color: C.textSub, lineHeight: 1.7 }}>
+            {selectedKeywords.map((k) => <span key={k} style={{ display: "inline-block", padding: "2px 8px", margin: "2px 4px 2px 0", background: C.white, border: `1px solid ${C.border}`, borderRadius: 3, fontFamily: "monospace" }}>{k}</span>)}
+          </div>
+        ) : (
+          <BtnPrimary onClick={() => onNavigate("step_2")}>STEP2でキーワードを絞り込む →</BtnPrimary>
+        )}
+      </Card>
+
+      <Card style={{ marginBottom: 24, background: "#fff8e1", border: `1px solid ${C.gold}` }}>
+        <div style={{ fontSize: 13.5, fontWeight: 700, color: C.navy, marginBottom: 6 }}>
+          🚧 STEP3「競合レビュー評価」は実装中です（v4 Phase 1A 優先度3 後半）
+        </div>
+        <div style={{ fontSize: 12.5, color: C.textSub, lineHeight: 1.8 }}>
+          このSTEPでは Real-Time Amazon Data API の Top Product Reviews エンドポイントで上位本3冊のレビューを取得し、AIが「読者の共通不満点／既存本がカバーできていない切り口／本企画の差別化ポイント／注意すべき落とし穴」を抽出します。<br /><br />
+          実装完了次第、ここに「深掘り分析実行」ボタンが表示されます。実装ロードマップは <code>AI出版プロデューサー_Step1-3改修_実装指示書_v4.md</code> §5 を参照。
+        </div>
+      </Card>
+
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <BtnSecondary onClick={() => onNavigate("step_2")}>← STEP2に戻る</BtnSecondary>
+        <BtnSecondary onClick={() => onNavigate("step_1")}>← STEP1に戻る</BtnSecondary>
+      </div>
+    </div>
+  );
+};
+
+// STEP5専用（v4で「STEP4」から番号繰り上げ）：「タイトル・サブタイトルを確定する」UI。
 // 想定する2つのワークフロー：
 //   A. 3案出す → 外部AIで相談 → 1案に決める → 出力欄に貼り付け（1案構造）
 //      → 出力全体からタイトル/サブタイトルを直接抽出してプレフィル
 //   B. 3案出す → そのまま採用案を選ぶ（3案構造）
 //      → 案ボタンで選択
 // どちらのフォーマットでも対応。完全手動入力もできる。
-// 確定後はSTEP5以降の入力欄（title_text / subtitle_text）に自動転記される。
+// 確定後はSTEP6以降の入力欄（title_text / subtitle_text）に自動転記される。
+// 注：コンポーネント名は Step4ConfirmPanel のままにしている（履歴との混乱を避けるため）。
+// 機能は STEP5 タイトル・サブタイトル作成の確定 UI。
 const Step4ConfirmPanel = ({ outputText }) => {
   // 3案構造としてパースを試みる（成功すれば案ボタン表示）
   const parsed = useMemo(() => parseStep4CaseStructure(outputText), [outputText]);
@@ -3586,6 +3729,7 @@ export default function App() {
 
   useEffect(() => {
     (async () => {
+      // 注: v1/v4 のlocalStorageマイグレーションはモジュール読込時に既に実行済み（上のmigrateLocalStorageV1/V4参照）。
       const p = await loadProject();
       if (p) setProject(p); else await saveProject(defaultProject());
       const steps = await loadAllSteps();
@@ -3719,6 +3863,7 @@ export default function App() {
     if (page === "step_0") return <Step0Page savedProfile={authorProfile} onSaveProfile={handleSaveAuthorProfile} onNavigate={nav} />;
     if (page === "step_1") return <Step1Page savedAuthorProfile={authorProfile} savedWorkProfile={workProfile} onSaveWorkProfile={handleSaveWorkProfile} onNavigate={nav} pendingApply={step1PendingApply} project={project} />;
     if (page === "step_2") return <Step2Page savedAuthorProfile={authorProfile} savedWorkProfileDraft={workProfile} onNavigate={nav} project={project} />;
+    if (page === "step_3") return <Step3Page savedAuthorProfile={authorProfile} savedWorkProfileDraft={workProfile} onNavigate={nav} project={project} />;
     if (page.startsWith("step_")) {
       const num = parseInt(page.replace("step_", ""), 10);
       const step = STEPS[num - 1];
