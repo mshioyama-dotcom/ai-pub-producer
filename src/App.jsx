@@ -513,7 +513,7 @@ function getAutoInjectedProfiles() {
     const out = {};
     if (authorProfile) out.author_profile = authorProfile;
     if (workProfile) out.work_profile = workProfile;
-    // STEP4で確定したタイトル・サブタイトルはSTEP5以降の全STEPで参照される
+    // STEP5で確定したタイトル・サブタイトルはSTEP6以降の全STEPで参照される
     if (titleConfirmed) out.title = titleConfirmed;
     if (subtitleConfirmed) out.subtitle = subtitleConfirmed;
     return out;
@@ -1143,7 +1143,7 @@ const AutoInjectedProfilesPanel = ({ onNavigate, stepNum }) => {
             )}
           </div>
 
-          {/* タイトル・サブタイトル（STEP4で確定）。STEP5以降は必須 */}
+          {/* タイトル・サブタイトル（STEP5で確定）。STEP5以降は必須 */}
           {(stepNum && stepNum >= 4) && (
             <div style={{ marginTop: 14 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
@@ -3259,12 +3259,12 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     setExpandedFields({});
   }, [step.num]);
 
-  // STEP6/STEP7 専用: ページを開いた瞬間に前STEP出力から章を自動抽出してプレビュー表示する。
+  // STEP7/STEP8 専用: ページを開いた瞬間に前STEP出力から章を自動抽出してプレビュー表示する。
   // STEP6 は STEP5（目次）から章を抽出して章ごとに章構成を生成、
   // STEP7 は STEP6（章構成）から章を抽出して章ごとに詳細プロットを生成。
   useEffect(() => {
-    if (step.num !== 6 && step.num !== 7) return;
-    const srcNum = step.num === 6 ? 5 : 6;
+    if (step.num !== 7 && step.num !== 8) return;
+    const srcNum = step.num === 7 ? 6 : 7;
     const srcOutput = allSteps?.[srcNum]?.outputText;
     if (!srcOutput) { setChapterOptions([]); return; }
     const extracted = extractChapters(srcOutput);
@@ -3303,7 +3303,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   }, [step.num, allSteps, stepData]);
 
   const prevStep = step.num > 1 ? STEPS[step.num - 2] : null;
-  const nextStep = step.num < 9 ? STEPS[step.num] : null;
+  const nextStep = step.num < 10 ? STEPS[step.num] : null;
 
   const handleInputChange = (name, value) => {
     setInputs((prev) => { const updated = { ...prev, [name]: value }; onInputChange?.(step.num, updated); return updated; });
@@ -3337,10 +3337,10 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   const handleRunDify = async () => {
     if (validateInputs().length > 0) return;
     setIsRunning(true); setRunError("");
-    if (step.num === 8) {
+    if (step.num === 9) {
       const sectionToRun = selectedSection !== null ? sectionOptions[selectedSection] : null;
       if (!sectionToRun || !sectionToRun.items || sectionToRun.items.length === 0) {
-        setRunError("執筆する節が選ばれていません。\n\n上の「📋 STEP7から節を抽出」ボタンを押して、書きたい節を1つ選んでください。");
+        setRunError("執筆する節が選ばれていません。\n\n上の「📋 STEP8から節を抽出」ボタンを押して、書きたい節を1つ選んでください。");
         setIsRunning(false); return;
       }
       const items = sectionToRun.items; const total = items.length; const results = [];
@@ -3348,7 +3348,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         for (let i = 0; i < total; i++) {
           const currentItem = items[i];
           setSectionProgress({ total, current: i + 1, currentItemName: currentItem });
-          const response = await fetch("/api/dify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stepNum: 8, inputs: { ...getAutoInjectedProfiles(), detailed_plot_text: inputs.detailed_plot_text || "", target_heading: currentItem } }) });
+          const response = await fetch("/api/dify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stepNum: 9, inputs: { ...getAutoInjectedProfiles(), detailed_plot_text: inputs.detailed_plot_text || "", target_heading: currentItem } }) });
           const data = await response.json();
           if (!response.ok) {
             setRunError(`節の生成中にエラーが発生しました。\n\n${total}項目中、${i + 1}項目目（${currentItem}）の生成で失敗しました。途中までの生成結果は破棄されます。\n\n少し時間をおいてから、もう一度「実行する」を押してください。\n\n（エラー詳細：${data.error || "不明なエラー"}）`);
@@ -3442,7 +3442,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         const response = await fetch("/api/dify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ stepNum: 6, inputs: execInputs }),
+          body: JSON.stringify({ stepNum: 7, inputs: execInputs }),
         });
         const data = await response.json();
         if (!response.ok) {
@@ -3471,7 +3471,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   // STEP7 専用: 抽出された全章を順次 Dify に投げて、結果を outputText に蓄積する。
   // 章間に短いウェイトを入れてレートリミット対策（Anthropic 30K input tokens/min）。
   const handleRunAllChaptersForStep7 = async () => {
-    if (step.num !== 7) return;
+    if (step.num !== 8) return;
     if (!chapterOptions || chapterOptions.length === 0) {
       alert("先に「📋 STEP6から章を抽出」を押して章を抽出してください。");
       return;
@@ -3496,7 +3496,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         const response = await fetch("/api/dify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ stepNum: 7, inputs: execInputs }),
+          body: JSON.stringify({ stepNum: 8, inputs: execInputs }),
         });
         const data = await response.json();
         if (!response.ok) {
@@ -3572,12 +3572,12 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         {validationErrors.length > 0 && (
           <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginBottom: 12, fontSize: 13, color: C.red, fontWeight: 500 }}>必須の項目がまだ空欄です。赤くなっている欄を入力してから、もう一度お試しください。</div>
         )}
-        {step.num === 4 && (
+        {step.num === 5 && (
           <div style={{ fontSize: 12.5, color: C.textSub, marginBottom: 12, padding: "10px 14px", background: C.goldPale, border: `1px solid ${C.goldLight}`, borderRadius: 4, lineHeight: 1.8 }}>
-            💡 「検索キーワード1・2」の欄にある<span style={{ fontWeight: 700, color: C.gold }}>「自動振り分け」</span>ボタンを押すと、書籍プロファイル確定版（STEP2）の主題軸キーワードを自動で入力してくれます。
+            💡 「検索キーワード1・2」の欄にある<span style={{ fontWeight: 700, color: C.gold }}>「自動振り分け」</span>ボタンを押すと、書籍プロファイル確定版（確定アクションで保存済み）の主要検索キーワードを自動で入力してくれます。
           </div>
         )}
-        {step.num !== 4 && step.inputs.some((f) => f.source) && (
+        {step.num !== 5 && step.inputs.some((f) => f.source) && (
           <div style={{ fontSize: 12.5, color: C.textSub, marginBottom: 12, padding: "8px 12px", background: C.blueLight, border: `1px solid rgba(42,68,104,0.12)`, borderRadius: 4, lineHeight: 1.7 }}>左メニューの「保存データ」から前のステップの出力をコピーし、各欄に貼り付けてください。</div>
         )}
 
@@ -3585,7 +3585,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           const hasError = validationErrors.includes(field.name);
           const currentLen = (inputs[field.name] || "").length;
           const isOverLimit = field.maxChars && currentLen > field.maxChars;
-          const isKeywordParsedField = step.num === 4 && (field.name === "keyword1" || field.name === "keyword2");
+          const isKeywordParsedField = step.num === 5 && (field.name === "keyword1" || field.name === "keyword2");
           const handleAutoFillParsed = isKeywordParsedField ? () => {
             // 書籍プロファイル確定版／草案／STEP2全文 から主題軸キーワードを抽出
             const wp = (typeof window !== "undefined")
@@ -3606,8 +3606,8 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           } : undefined;
 
           // STEP8「詳細プロット（1章分）」専用UI:
-          // STEP7 の全章プロット（=== 第N章 === 区切り）から1章を選択して詳細プロットtextarea に転記する。
-          // STEP7 と同じ extractChapters + ChapterSelector を流用。
+          // STEP8 の全章プロット（=== 第N章 === 区切り）から1章を選択して詳細プロットtextarea に転記する。
+          // STEP8 と同じ extractChapters + ChapterSelector を流用。
           if (field.name === "detailed_plot_text") {
             const hasErr = validationErrors.includes(field.name);
             const currentLen = (inputs[field.name] || "").length;
@@ -3618,21 +3618,21 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                   <label style={{ fontSize: 13.5, fontWeight: 600, color: hasErr ? C.red : C.navy }}>{field.label}</label>
                   {field.required && <RequiredMark />}
                   <SourceLabel source={field.source} autoFill={false} onAutoFill={() => {}}
-                    onRef={() => { const s = allSteps?.[7]?.outputText; if (s) onRefPanel({ stepNum: 7, text: s, targetField: "detailed_plot_text" }); else alert("STEP7の出力データがまだ保存されていません。"); }} />
+                    onRef={() => { const s = allSteps?.[8]?.outputText; if (s) onRefPanel({ stepNum: 8, text: s, targetField: "detailed_plot_text" }); else alert("STEP8の出力データがまだ保存されていません。"); }} />
                   {hasErr && <span style={{ fontSize: 12, color: C.red, fontWeight: 500 }}>← 章を選んでください</span>}
                 </div>
                 <div style={{ fontSize: 13, color: "#444444", marginBottom: 8 }}>{field.desc}</div>
                 <div style={{ marginBottom: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                   <button onClick={() => {
                     const srcOutput = allSteps?.[7]?.outputText;
-                    if (!srcOutput) { alert("STEP7の出力データがまだ保存されていません。\n\nSTEP7を完了して「出力データを保存」ボタンを押してから、もう一度お試しください。"); return; }
+                    if (!srcOutput) { alert("STEP8の出力データがまだ保存されていません。\n\nSTEP8を完了して「出力データを保存」ボタンを押してから、もう一度お試しください。"); return; }
                     const extracted = extractChapters(srcOutput);
-                    if (extracted.length === 0) { alert("STEP7の出力から「第N章: xxx」「はじめに」「おわりに」形式の章を検出できませんでした。STEP7の出力をもう一度確認してください。"); return; }
+                    if (extracted.length === 0) { alert("STEP8の出力から「第N章: xxx」「はじめに」「おわりに」形式の章を検出できませんでした。STEP8の出力をもう一度確認してください。"); return; }
                     setChapterOptions(extracted); setSelectedChapter(null); handleInputChange("detailed_plot_text", "");
                     // 章を変えたら節も選び直し
                     setSectionOptions([]); setSelectedSection(null); handleInputChange("target_section", "");
                   }} style={{ fontSize: 12.5, fontWeight: 600, color: C.white, background: C.gold, border: "none", borderRadius: 3, padding: "7px 14px", cursor: "pointer" }}>
-                    📋 STEP7から章を抽出
+                    📋 STEP8から章を抽出
                   </button>
                   {chapterOptions.length > 0 && (
                     <button onClick={() => { setChapterOptions([]); setSelectedChapter(null); handleInputChange("detailed_plot_text", ""); }}
@@ -3671,24 +3671,24 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           // STEP7「1章分のアウトライン」専用UI:
           // 入力データセクションには「STEP6から自動取得」の案内バナーのみ表示し、
           // 章プレビュー／全章生成ボタン／進捗バーは「②AIで実行する」セクション側に集約する
-          // （STEP6 と統一。入力データを保存ボタンとの操作順を自然に保つため）。
+          // （STEP7 と統一。入力データを保存ボタンとの操作順を自然に保つため）。
           if (field.name === "chapter_outline_text") {
             return (
               <div key={field.name} style={{ marginBottom: 16 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
-                  <label style={{ fontSize: 13.5, fontWeight: 600, color: C.navy }}>STEP6の章構成（自動取得）</label>
+                  <label style={{ fontSize: 13.5, fontWeight: 600, color: C.navy }}>STEP7の章構成（自動取得）</label>
                   <SourceLabel source={field.source} autoFill={false} onAutoFill={() => {}}
-                    onRef={() => { const s = allSteps?.[6]?.outputText; if (s) onRefPanel({ stepNum: 6, text: s, targetField: "chapter_outline_text" }); else alert("STEP6の出力データがまだ保存されていません。"); }} />
+                    onRef={() => { const s = allSteps?.[7]?.outputText; if (s) onRefPanel({ stepNum: 7, text: s, targetField: "chapter_outline_text" }); else alert("STEP7の出力データがまだ保存されていません。"); }} />
                 </div>
                 <div style={{ fontSize: 13, color: "#444444", marginBottom: 4, lineHeight: 1.7 }}>
-                  STEP6 の章構成から章を自動で抽出します。全章の詳細プロットは「②AIで実行する」セクションの「🚀 全章を順次生成」ボタンで一括処理してください。
+                  STEP7 の章構成から章を自動で抽出します。全章の詳細プロットは「②AIで実行する」セクションの「🚀 全章を順次生成」ボタンで一括処理してください。
                 </div>
-                {!allSteps?.[6]?.outputText && (
+                {!allSteps?.[7]?.outputText && (
                   <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginTop: 8, fontSize: 13, color: C.red }}>
-                    ⚠ STEP6 の出力データがまだ保存されていません。STEP6 で「出力データを保存」を押してから戻ってきてください。
+                    ⚠ STEP7 の出力データがまだ保存されていません。STEP7 で「出力データを保存」を押してから戻ってきてください。
                   </div>
                 )}
-                {allSteps?.[6]?.outputText && chapterOptions.length > 0 && (
+                {allSteps?.[7]?.outputText && chapterOptions.length > 0 && (
                   <div style={{ marginTop: 8, padding: "8px 12px", background: C.greenLight, border: `1px solid rgba(45,122,79,0.25)`, borderRadius: 3, fontSize: 12.5, color: C.green, fontWeight: 600 }}>
                     ✓ {chapterOptions.length}章を自動抽出しました
                   </div>
@@ -3705,7 +3705,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                   <label style={{ fontSize: 13.5, fontWeight: 600, color: hasSectionErr ? C.red : C.navy }}>{field.label}</label>
                   {field.required && <RequiredMark />}
                   <SourceLabel source={field.source} autoFill={false} onAutoFill={() => {}}
-                    onRef={() => { const s = allSteps?.[7]?.outputText; if (s) onRefPanel({ stepNum: 7, text: s, targetField: "target_section" }); else alert("STEP7の出力データがまだ保存されていません。"); }} />
+                    onRef={() => { const s = allSteps?.[8]?.outputText; if (s) onRefPanel({ stepNum: 8, text: s, targetField: "target_section" }); else alert("STEP7の出力データがまだ保存されていません。"); }} />
                   {hasSectionErr && <span style={{ fontSize: 12, color: C.red, fontWeight: 500 }}>← 節を選んでください</span>}
                 </div>
                 <div style={{ fontSize: 13, color: "#444444", marginBottom: 8 }}>{field.desc}</div>
@@ -3911,7 +3911,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                 </div>
               </div>
             </div>
-          ) : step.num === 6 ? (
+          ) : step.num === 7 ? (
             // STEP6 は STEP5（目次）から章を抽出し、章ごとに章構成を生成して結果を結合する。
             // Dify Cloud の iteration ノードが Flask app_context エラーで動かないため、
             // フロント側でループ実行する（STEP7 と同じパターン）。
@@ -3969,7 +3969,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                 </>
               )}
             </div>
-          ) : step.num === 7 ? (
+          ) : step.num === 8 ? (
             // STEP7 は STEP6（章構成）から章を抽出し、章ごとに詳細プロットを生成して結合する。
             // STEP6 と同じ「②AIで実行する」セクション集約パターンに統一。
             <div>
@@ -4030,7 +4030,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
             <div>
               <div style={{ fontSize: 13, color: C.textSub, lineHeight: 1.8, marginBottom: 12 }}>入力データが揃ったら「実行する」ボタンを押してください。AIが処理して、結果が下の出力欄に自動で表示されます。</div>
               {runError && <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginBottom: 12, fontSize: 13, color: C.red }}>{runError}</div>}
-              {step.num === 8 && sectionProgress && (
+              {step.num === 9 && sectionProgress && (
                 <div style={{ marginBottom: 12, padding: "12px 14px", background: C.navyLight, border: `1px solid rgba(42,68,104,0.2)`, borderRadius: 4 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, fontSize: 12.5, color: C.navyMid, fontWeight: 600 }}>
                     <span>節の一括生成中：{sectionProgress.current} / {sectionProgress.total} 項</span>
@@ -4044,7 +4044,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
               )}
               <button onClick={handleRunDify} disabled={isRunning}
                 style={{ padding: "12px 36px", background: isRunning ? "#93c5fd" : C.navy, color: C.white, border: "none", borderRadius: 3, fontWeight: 700, fontSize: 14, cursor: isRunning ? "default" : "pointer", letterSpacing: "0.04em" }}>
-                {isRunning ? (step.num === 8 ? "節を生成中..." : "実行中...") : "▶ 実行する"}
+                {isRunning ? (step.num === 9 ? "節を生成中..." : "実行中...") : "▶ 実行する"}
               </button>
               {isRunning && step.num !== 8 && <span style={{ fontSize: 13, color: C.navyMid, marginLeft: 12 }}>AIが処理しています。少々お待ちください...</span>}
             </div>
@@ -4087,7 +4087,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
       </div>
 
       {/* STEP4 専用：採用案を確定する UI */}
-      {step.num === 4 && <Step4ConfirmPanel outputText={outputText} />}
+      {step.num === 5 && <Step4ConfirmPanel outputText={outputText} />}
 
       {/* 外部AIで相談するためのプロンプト生成パネル（全STEP共通） */}
       {/* workProfile は軽量化版を渡す：STEP2の出力60KBから市場分析データを除き、相談に必要な核情報のみに圧縮 */}
