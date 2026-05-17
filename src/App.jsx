@@ -204,7 +204,9 @@ const STEPS = [
     category: "販売準備", type: "workflow",
     url: "",
     inputs: [
-      { name: "amazon_description_text", label: "Amazon説明文（STEP10のアウトプット）", desc: "STEP10のAmazon説明文を貼り付け（「自動振り分け」で自動入力）", source: "STEP10", required: true, type: "textarea", autoFill: true, maxChars: 4000 },
+      // amazon_description_text は UI 非表示・実行時に allSteps[10].outputText から自動転記。
+      // ユーザーが触る必要がないので required: false、type は維持するが render side で hidden 扱い。
+      { name: "amazon_description_text", label: "Amazon説明文（STEP10から自動転記）", desc: "STEP10 のAmazon説明文が実行時に自動転記されます。手動入力は不要です。", source: "STEP10", required: false, type: "textarea", autoFill: true, maxChars: 4000 },
       { name: "tweet_length", label: "投稿の文字数設定", desc: "短文140字 / 標準280字 / 長文Premium向け（〜3000字）から選択", source: null, required: true, type: "select", options: [
         { value: "short_140", label: "短文（140字以内）" },
         { value: "standard_280", label: "標準（280字以内・推奨）" },
@@ -4080,6 +4082,18 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
       let execInputs = { ...inputs };
       if (step.num === 2 && execInputs.amazon_html) { const cleaned = cleanHtmlMinimal(execInputs.amazon_html); if (cleaned) execInputs.amazon_html = cleaned; }
       if (step.num >= 3) { execInputs = { ...getAutoInjectedProfiles(), ...execInputs }; }
+      // 防御的な実行時 autoFill: autoFill: true / source: "STEPN" のフィールドで値が空なら、
+      // allSteps[N].outputText から直接注入する。これにより useEffect 経由の autoFill タイミングずれ
+      // （ナビゲーション直後 等）でも、API 呼び出し時点では必ず正しい値が入る。
+      for (const field of step.inputs) {
+        if (field.autoFill !== true || !field.source) continue;
+        if ((execInputs[field.name] || "").trim()) continue;
+        const srcMatch = field.source.match(/^STEP(\d+)$/);
+        if (!srcMatch) continue;
+        const srcNum = parseInt(srcMatch[1], 10);
+        const srcOutput = allSteps?.[srcNum]?.outputText || "";
+        if (srcOutput) execInputs[field.name] = srcOutput;
+      }
       const response = await fetch("/api/dify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stepNum: step.num, inputs: execInputs }) });
       const data = await response.json();
       sendDebugLog(`RECV STEP${step.num}`, { length: (data.output || "").length, tail: (data.output || "").slice(-30) });
@@ -4509,6 +4523,33 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           // detailed_plot_text のバナーが「STEP8から章自動抽出」を案内するので、ここは何も描画しない。
           if (field.name === "target_section") {
             return null;
+          }
+
+          // STEP11（X投稿生成）の amazon_description_text は UI 非表示・実行時に自動転記。
+          // ユーザーが触る必要がないため textarea は描画せず、状態表示バナーのみを出す。
+          if (field.name === "amazon_description_text") {
+            const hasSource = !!(allSteps?.[10]?.outputText || "").trim();
+            return (
+              <div key={field.name} style={{ marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
+                  <label style={{ fontSize: 13.5, fontWeight: 600, color: C.navy }}>Amazon説明文（STEP10から自動転記）</label>
+                  <SourceLabel source={field.source} autoFill={false} onAutoFill={() => {}}
+                    onRef={() => { const s = allSteps?.[10]?.outputText; if (s) onRefPanel({ stepNum: 10, text: s, targetField: "amazon_description_text" }); else alert("STEP10の出力データがまだ保存されていません。"); }} />
+                </div>
+                <div style={{ fontSize: 13, color: "#444444", marginBottom: 4, lineHeight: 1.7 }}>
+                  STEP10 のAmazon説明文が「▶ 実行する」ボタン押下時に自動で取り込まれます。手動入力は不要です。
+                </div>
+                {!hasSource ? (
+                  <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginTop: 8, fontSize: 13, color: C.red }}>
+                    ⚠ STEP10 の出力データがまだ保存されていません。STEP10 で「出力データを保存」を押してから戻ってきてください。
+                  </div>
+                ) : (
+                  <div style={{ marginTop: 8, padding: "8px 12px", background: C.greenLight, border: `1px solid rgba(45,122,79,0.25)`, borderRadius: 3, fontSize: 12.5, color: C.green, fontWeight: 600 }}>
+                    ✓ STEP10 のAmazon説明文を取り込みます（{(allSteps[10].outputText || "").length.toLocaleString()}文字）
+                  </div>
+                )}
+              </div>
+            );
           }
 
           // 自動投入済みかどうか（autoFill: true で値が入っていれば折りたたみ対象とみなす）。
