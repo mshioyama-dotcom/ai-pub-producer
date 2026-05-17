@@ -1,4 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+// 注: src/lib/textUtils.js に同じ関数の独立コピーを置いてテスト対象としている。
+//     App.jsx 側の inline 定義と二重実装になっているが、両者は手作業で同期する。
+//     将来的に App.jsx を import に切り替えてシングルソース化したい（ただし大型ファイルのため段階的に実施）。
 import { extractTextFromFile, buildSourceText, ACCEPTED_EXTENSIONS } from "./utils/extractText";
 import { extractBookEssence, formatEssenceAsText } from "./utils/extractEssence";
 import DiscussionPanel from "./DiscussionPanel";
