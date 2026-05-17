@@ -144,11 +144,16 @@ const STEPS = [
     category: "執筆設計", type: "workflow",
     url: "https://udify.app/workflow/Ka9gpeDvAnkPV9hW",
     inputs: [
-      { name: "chapter_outline_text", label: "1章分のアウトライン", desc: "STEP7の出力から、今回分解したい1章分だけをコピーして貼り付けてください。", source: "STEP7", required: true, type: "textarea", autoFill: false, maxChars: 2048 }
+      // v4: chapter_outline_text は UI 上テキストエリアではなく「STEP7から章を自動抽出」UIに
+      // 置き換わっており、ユーザーが直接値を入れる手段は無い（全章一括処理のみサポート）。
+      // そのため required: false にして、必須チェックが偽陽性で発火しないようにする。
+      // 実際の章本文は handleRunAllChaptersForStep7 が chapterOptions から直接取り出して /api/dify に渡す。
+      { name: "chapter_outline_text", label: "1章分のアウトライン（自動取得）", desc: "STEP7の章構成から章を自動抽出します。「全章を順次生成」ボタンで全章まとめて処理します。", source: "STEP7", required: false, type: "textarea", autoFill: false, maxChars: 2048 }
     ],
     outputTitle: "詳細プロット",
     help: [
-      "1章ずつ処理します。「参照」ボタンでSTEP7の出力を開き、該当の章だけをコピーして貼り付けましょう",
+      "STEP7の章構成から章を自動抽出します。「②AIで実行する」の「全章を順次生成」ボタンで全章まとめて処理してください",
+      "章間に3秒のウェイトを挟むため、章数 × 約30秒〜1分程度かかります",
       "出力の形式：(1)(2)(3)...が節、①②③...が項になります",
       "次のSTEP9で、この詳細プロットをもとに本文を作ります"
     ]
