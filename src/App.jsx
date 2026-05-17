@@ -200,7 +200,7 @@ const STEPS = [
     // v4 拡張: 出版後プロモーション。設計書では STEP13 だが、STEP11/12 が計画削除のため
     // 番号飛びを避けて STEP11 として実装。X (旧Twitter) の販促投稿20〜30本を一括生成する。
     id: "step_11", num: 11, title: "X投稿生成",
-    description: "Kindle出版に伴うX（旧Twitter）の販促投稿を、出版前→出版直後→出版後の3フェーズで20〜30本まとめて生成します。著者プロファイルの文体・発信スタンスを反映し、各投稿に「推奨投稿日（出版1週間前 等）」「タイミング区分」「用途タグ」を付けます。URLやプレゼント情報は含めず、テキスト本文のみ。",
+    description: "Kindle出版前後の販促用「短文記事」を毎日投稿前提でまとめて生成します。15本なら「出版7日前〜前日」「出版当日」「出版翌日〜1週間後」の計15日分。著者の固有実績（出版数・印税・経歴）と本書の固有概念を反映した240〜280字の短文記事を、推奨投稿日（出版3日前 等）・用途タグ付きで出力。URLは含めません。",
     category: "販売準備", type: "workflow",
     url: "",
     inputs: [
@@ -217,11 +217,12 @@ const STEPS = [
         { value: "20", label: "20本" }
       ], default: "15", maxChars: 8 }
     ],
-    outputTitle: "X投稿リスト",
+    outputTitle: "短文記事リスト（X / Note / Threads 用）",
     help: [
-      "出版前→出版直後→出版後の3フェーズに自然な配分で投稿が振り分けられます",
-      "各投稿に「推奨投稿日」（出版1週間前 / 出版翌日 等の日本語表記）が付くので、そのまま予約投稿の参考に使えます",
+      "毎日投稿前提で配分されます。15本なら「出版前1週間 + 出版当日 + 出版後1週間」の計15日分",
+      "各投稿に「推奨投稿日」（出版3日前 / 出版翌日 等の日本語表記）が付くので、そのまま予約投稿の参考に使えます",
       "URLや「リンクはプロフィールに」等の表現は含まれません。実際に投稿するときに、必要に応じてAmazonリンクを別途追加してください",
+      "「ツイート」ではなく「240〜280字の短文記事」として生成します。X 以外（Note / Threads 等）にも転用できます",
       "著者プロファイルの文体・発信スタンスから乖離した投稿が出た場合は、出力をAIチャットに貼り付けて修正を指示してください"
     ]
   }
@@ -4292,43 +4293,54 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   // 各回で target_timing / target_phase / target_purpose を変えて多様性を確保し、
   // existing_summary に既出投稿の冒頭を渡して重複を防止する。
   const buildPostPlan = (totalCount) => {
-    // 出版前 / 出版直後 / 出版後 のフェーズ別配分（15本/20本/10本に対応）
-    // 比率は概ね 出版前33% / 直後20% / 後47%
+    // 毎日投稿前提：出版日を中心に対称に分配する。
+    // 15本なら 出版7日前〜前日（7本）+ 出版当日（1本）+ 出版翌日〜1週間後（7本） = 15本
+    // 10本なら 出版4日前〜前日（4本）+ 出版当日（1本）+ 出版翌日〜5日後（5本）= 10本
+    // 20本なら 出版9日前〜前日（9本）+ 出版当日（1本）+ 出版翌日〜10日後（10本）= 20本
     const total = parseInt(String(totalCount || "15"), 10);
-    const preCount = Math.max(2, Math.round(total * 0.33));
-    const justCount = Math.max(2, Math.round(total * 0.20));
-    const postCount = total - preCount - justCount;
+    const preCount = Math.floor((total - 1) / 2);
+    const postCount = total - preCount - 1;
     const plan = [];
-    const preTimings = [
-      "出版1ヶ月前", "出版3週間前", "出版2週間前", "出版10日前",
-      "出版1週間前", "出版5日前", "出版3日前", "出版前日",
-    ];
-    const justTimings = ["出版当日", "出版翌日", "出版2日後", "出版3日後", "出版4日後"];
-    const postTimings = [
-      "出版1週間後", "出版10日後", "出版2週間後", "出版3週間後",
-      "出版1ヶ月後", "出版5週間後", "出版6週間後", "出版2ヶ月後",
-      "出版10週間後", "出版3ヶ月後",
-    ];
+
+    // 出版前のタイミング：古い→新しい順（出版N日前 → 出版前日）
+    const preTimings = [];
+    for (let i = preCount; i >= 1; i--) {
+      preTimings.push(i === 1 ? "出版前日" : `出版${i}日前`);
+    }
+
+    // 出版当日 1本
+    const justTimings = ["出版当日"];
+
+    // 出版後のタイミング：出版翌日 → 出版N日後（毎日）
+    const postTimings = [];
+    for (let i = 1; i <= postCount; i++) {
+      if (i === 1) postTimings.push("出版翌日");
+      else if (i === 7) postTimings.push("出版1週間後");
+      else postTimings.push(`出版${i}日後`);
+    }
+
+    // 用途タグの配分（ループで循環使用）
     const prePurposes = ["予告", "著者ストーリー", "期待感醸成", "本書のテーマ予告"];
-    const justPurposes = ["告知", "核メッセージ宣言", "読者参加呼びかけ"];
-    const postPurposes = ["章ごとの引用", "著者の発信", "内容紹介", "読者反応の紹介", "継続露出"];
-    for (let i = 0; i < preCount; i++) {
+    const justPurposes = ["告知"];
+    const postPurposes = ["核メッセージ宣言", "読者参加呼びかけ", "章ごとの引用", "著者の発信", "内容紹介", "読者反応の紹介"];
+
+    for (let i = 0; i < preTimings.length; i++) {
       plan.push({
-        target_timing: preTimings[i % preTimings.length],
+        target_timing: preTimings[i],
         target_phase: "出版前",
         target_purpose: prePurposes[i % prePurposes.length],
       });
     }
-    for (let i = 0; i < justCount; i++) {
+    for (let i = 0; i < justTimings.length; i++) {
       plan.push({
-        target_timing: justTimings[i % justTimings.length],
+        target_timing: justTimings[i],
         target_phase: "出版直後",
         target_purpose: justPurposes[i % justPurposes.length],
       });
     }
-    for (let i = 0; i < postCount; i++) {
+    for (let i = 0; i < postTimings.length; i++) {
       plan.push({
-        target_timing: postTimings[i % postTimings.length],
+        target_timing: postTimings[i],
         target_phase: "出版後",
         target_purpose: postPurposes[i % postPurposes.length],
       });
@@ -5083,9 +5095,11 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
               ) : (
                 <>
                   <div style={{ fontSize: 13, color: C.textSub, lineHeight: 1.8, marginBottom: 12 }}>
-                    STEP10 のAmazon説明文から、X 投稿を <strong>1 本ずつ順次生成</strong>します（イテレーション設計）。
-                    1 投稿あたり 5〜10 秒、合計で <strong>{inputs.total_count || "15"} 本 × 約8秒 ＝ 約2〜3分</strong>かかります。
-                    各回で著者の文体・固有実績（20冊・印税300万 等）・禁止表現リスト・文字数規律を守らせるため、品質が安定します。
+                    STEP10 のAmazon説明文から、SNS用「短文記事」を <strong>1 本ずつ順次生成</strong>します（イテレーション設計）。
+                    1 本あたり 5〜10 秒、合計で <strong>{inputs.total_count || "15"} 本 × 約8秒 ＝ 約2〜3分</strong>かかります。
+                    <br /><br />
+                    📅 <strong>毎日投稿前提</strong>で配分：15本なら「出版7日前〜前日」「出版当日」「出版翌日〜1週間後」の計15日分。
+                    240〜280字の濃密な短文記事として生成し、X / Note / Threads どこにでも転用可能です。
                   </div>
                   {!allSteps?.[10]?.outputText && (
                     <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginBottom: 12, fontSize: 13, color: C.red }}>
