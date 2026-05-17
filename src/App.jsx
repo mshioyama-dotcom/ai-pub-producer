@@ -4152,10 +4152,10 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         </div>
       </div>
 
-      {/* STEP4 専用：採用案を確定する UI */}
-      {step.num === 5 && <Step4ConfirmPanel outputText={outputText} />}
-
       {/* 外部AIで相談するためのプロンプト生成パネル（全STEP共通） */}
+      {/* STEP5（タイトル）では「採用案を確定する」UI より先に相談機能を置くことで、
+          「出力 → 相談で練る → 確定」の自然な流れを作る。
+          他STEPは相談機能を出力欄の直下に1つだけ表示する。 */}
       {/* workProfile は軽量化版を渡す：STEP2の出力60KBから市場分析データを除き、相談に必要な核情報のみに圧縮 */}
       <DiscussionPanel
         stepNum={step.num}
@@ -4164,6 +4164,9 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         authorProfile={getAutoInjectedProfiles().author_profile || ""}
         workProfile={extractDiscussionContext(getAutoInjectedProfiles().work_profile || "")}
       />
+
+      {/* STEP5（タイトル・サブタイトル）専用：採用案を確定する UI（相談機能の後に配置） */}
+      {step.num === 5 && <Step4ConfirmPanel outputText={outputText} />}
 
       {step.help && step.help.length > 0 && (
         <div style={{ marginBottom: 16 }}>
