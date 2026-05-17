@@ -467,14 +467,17 @@ async function saveStepData(num, data) {
 }
 async function loadAllSteps() {
   const all = {};
-  for (let i = 1; i <= 10; i++) { all[i] = (await loadStepData(i)) || defaultStepData(i); }
+  // 動的に STEPS 配列から step 番号を取得（ハードコード 1〜10 をやめる）。
+  // STEP11 を追加した時に既存ユーザーの localStorage に entry が無く、stepStatuses[11] が
+  // undefined になって Badge が "bg" 参照でクラッシュする事故を防ぐ。
+  for (const s of STEPS) { all[s.num] = (await loadStepData(s.num)) || defaultStepData(s.num); }
   return all;
 }
 
 async function resetAllData() {
   try {
     localStorage.removeItem(STORAGE_KEY);
-    for (let i = 1; i <= 10; i++) { localStorage.removeItem(STEPS_KEY_PREFIX + i); }
+    for (const s of STEPS) { localStorage.removeItem(STEPS_KEY_PREFIX + s.num); }
     // マイグレーションフラグもリセット（次回 mount 時に旧データがあれば再マイグレーション可能）
     localStorage.removeItem(MIGRATION_V4_KEY);
     localStorage.removeItem(AUTHOR_PROFILE_KEY);
@@ -1164,11 +1167,19 @@ function stripChapterSection(output, isFirst) {
   return result.join("\n").replace(/^\n+/, "");
 }
 
-const Badge = ({ status }) => (
-  <span style={{ display: "inline-block", fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 3, background: STATUS_COLORS[status].bg, color: STATUS_COLORS[status].text, letterSpacing: "0.03em", whiteSpace: "nowrap" }}>
-    {STATUS_LABELS[status]}
-  </span>
-);
+const Badge = ({ status }) => {
+  // status が undefined / 不明な値の場合は "not_started" にフォールバック。
+  // 新しい STEP を追加した直後など、既存ユーザーの localStorage に当該 step の status が
+  // 保存されていないケースで Badge がクラッシュするのを防ぐ（再発防止：STEP11 追加時の白画面事故）。
+  const safe = STATUS_COLORS[status] ? status : "not_started";
+  const colors = STATUS_COLORS[safe];
+  const label = STATUS_LABELS[safe];
+  return (
+    <span style={{ display: "inline-block", fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 3, background: colors.bg, color: colors.text, letterSpacing: "0.03em", whiteSpace: "nowrap" }}>
+      {label}
+    </span>
+  );
+};
 
 const MarketReportSelector = ({ options, selected, onSelect, onReselect, value, onChange }) => {
   if (!options || options.length === 0) return null;
