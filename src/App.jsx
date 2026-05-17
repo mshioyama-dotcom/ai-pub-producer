@@ -3057,7 +3057,7 @@ const ConfirmActionPage = ({ savedAuthorProfile, savedWorkProfileDraft, onSaveWo
 // 注：コンポーネント名は Step4ConfirmPanel のままにしている（履歴との混乱を避けるため）。
 // 機能は STEP5 タイトル・サブタイトル作成の確定 UI。
 const Step4ConfirmPanel = ({ outputText }) => {
-  // 3案構造としてパースを試みる（成功すれば案ボタン表示）
+  // 3案構造としてパースを試みる（成功すれば推し案＋代替案2案 UI を表示）
   const parsed = useMemo(() => parseStep4CaseStructure(outputText), [outputText]);
   // 1案構造（AI議論後の結果）として直接抽出を試みる（パース失敗時のフォールバック）
   const singleExtracted = useMemo(() => {
@@ -3066,6 +3066,34 @@ const Step4ConfirmPanel = ({ outputText }) => {
     const r = extractTitleSubtitleFromStep4Case(outputText);
     return (r.title || r.subtitle) ? r : null;
   }, [outputText, parsed]);
+
+  // 推し案フッターから推し案の案番号（"1"|"2"|"3"）を抽出。例：「案2を推し案とします」など。
+  const oshiCaseNum = useMemo(() => {
+    if (!parsed || !parsed.footer) return null;
+    const m = parsed.footer.match(/【?\s*案\s*(\d)\s*】?/);
+    if (!m) return null;
+    const n = m[1];
+    return (n === "1" || n === "2" || n === "3") && parsed.cases[n] ? n : null;
+  }, [parsed]);
+
+  // 各案のメイン/サブを事前抽出（プレビュー表示用）
+  const caseTitles = useMemo(() => {
+    if (!parsed) return null;
+    const out = {};
+    for (const n of ["1", "2", "3"]) {
+      if (parsed.cases[n]) out[n] = extractTitleSubtitleFromStep4Case(parsed.cases[n]);
+    }
+    return out;
+  }, [parsed]);
+
+  // 推し案の理由（footer のうち「案N」言及行以降の本文）を抽出
+  const oshiReason = useMemo(() => {
+    if (!parsed || !parsed.footer) return "";
+    // 「【推し案】」見出しと「案N」言及を除いた残りの本文をざっくり取得
+    return parsed.footer
+      .replace(/^[#*\s]*【?推し案】?[\s\S]*?(?:\n|$)/, "")
+      .trim();
+  }, [parsed]);
 
   // 既に確定済みの内容を初期表示
   const initialTitle = (typeof window !== "undefined") ? (localStorage.getItem(TITLE_CONFIRMED_KEY) || "") : "";
@@ -3076,6 +3104,18 @@ const Step4ConfirmPanel = ({ outputText }) => {
   const [subtitleInput, setSubtitleInput] = useState(initialSubtitle);
   const [savedMsg, setSavedMsg] = useState(false);
   const [autoFilledFromSingle, setAutoFilledFromSingle] = useState(false);
+  const [showAlternatives, setShowAlternatives] = useState(false);
+
+  // 推し案がある場合は、初回マウント時に推し案のメイン/サブを自動プレフィル（既存値が空のときのみ）
+  useEffect(() => {
+    if (!oshiCaseNum || !caseTitles) return;
+    const oshi = caseTitles[oshiCaseNum];
+    if (!oshi) return;
+    if (oshi.title && !titleInput) setTitleInput(oshi.title);
+    if (oshi.subtitle && !subtitleInput) setSubtitleInput(oshi.subtitle);
+    if (oshi.title || oshi.subtitle) setSelectedCase(oshiCaseNum);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [oshiCaseNum, caseTitles]);
 
   // 1案構造でタイトル/サブタイトルが抽出できた場合、入力欄が空ならプレフィル。
   // 既に手動入力された値は上書きしない。
@@ -3128,11 +3168,37 @@ const Step4ConfirmPanel = ({ outputText }) => {
         3案から1つ選ぶか、自分で書いた内容を直接入力してください。
       </div>
 
-      {/* パターンB: 3案構造を検出 → 案ボタン表示 */}
-      {parsed && (
+      {/* パターンB: 3案構造を検出 → 推し案中心 UI（代替案2つは折りたたみ） */}
+      {parsed && oshiCaseNum && caseTitles && caseTitles[oshiCaseNum] && (
+        <div style={{ marginBottom: 14, padding: "14px 16px", background: C.white, border: `2px solid ${C.gold}`, borderRadius: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: C.gold }}>★ AI推し案（案{oshiCaseNum}）— ブラッシュアップ対象</span>
+            {selectedCase === oshiCaseNum && <span style={{ fontSize: 11, color: C.green, fontWeight: 700 }}>✓ 採用中</span>}
+          </div>
+          <div style={{ fontSize: 12, color: C.textSub, marginBottom: 8 }}>メインタイトル</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 8, padding: "8px 10px", background: C.goldPale, borderRadius: 3 }}>
+            {caseTitles[oshiCaseNum].title || "(タイトルなし)"}
+          </div>
+          <div style={{ fontSize: 12, color: C.textSub, marginBottom: 8 }}>サブタイトル</div>
+          <div style={{ fontSize: 14, color: C.text, padding: "8px 10px", background: C.goldPale, borderRadius: 3, marginBottom: 8 }}>
+            {caseTitles[oshiCaseNum].subtitle || "(サブタイトルなし)"}
+          </div>
+          {oshiReason && (
+            <div style={{ fontSize: 11.5, color: C.textSub, lineHeight: 1.7, marginTop: 8, padding: "8px 10px", background: "#fafafa", borderLeft: `2px solid ${C.gold}`, borderRadius: 2 }}>
+              <strong>推した理由：</strong>{oshiReason.slice(0, 280)}{oshiReason.length > 280 ? "..." : ""}
+            </div>
+          )}
+          <div style={{ marginTop: 10, fontSize: 11.5, color: C.textLight, lineHeight: 1.7 }}>
+            ※ 下のメイン／サブ欄にはこの推し案が自動入力されています。下にある「📋 外部AIで相談する用プロンプトを取得」でブラッシュアップ → メイン／サブ欄を編集 → 「⭐ 確定する」で保存してください。
+          </div>
+        </div>
+      )}
+
+      {/* 推し案が無い、または検出できない3案構造 → 案ボタン表示 */}
+      {parsed && !oshiCaseNum && (
         <>
           <div style={{ fontSize: 12.5, color: C.textSub, marginBottom: 8 }}>
-            ✓ 3案構造を検出しました。下のボタンで採用する案を選んでください。
+            ✓ 3案構造を検出しました（推し案が指定されていません）。下のボタンで採用する案を選んでください。
           </div>
           <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
             {["1", "2", "3"].map((n) => (
@@ -3149,6 +3215,37 @@ const Step4ConfirmPanel = ({ outputText }) => {
             ))}
           </div>
         </>
+      )}
+
+      {/* 推し案表示時：代替案2つを折りたたみで表示 */}
+      {parsed && oshiCaseNum && caseTitles && (
+        <div style={{ marginBottom: 14 }}>
+          <button onClick={() => setShowAlternatives((p) => !p)}
+            style={{ fontSize: 12, color: C.navyMid, cursor: "pointer", background: "transparent", border: `1px solid ${C.border}`, padding: "5px 12px", borderRadius: 3, fontWeight: 500 }}>
+            {showAlternatives ? "▼ 代替案を隠す" : "▶ 代替案を見る（推し案以外の2案）"}
+          </button>
+          {showAlternatives && (
+            <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+              {["1", "2", "3"].filter((n) => n !== oshiCaseNum).map((n) => (
+                <div key={n} style={{ padding: "10px 12px", background: "#fafafa", border: `1px solid ${C.border}`, borderRadius: 3 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: C.navyMid }}>代替案（案{n}）</span>
+                    <button onClick={() => handleSelectCase(n)}
+                      style={{ marginLeft: "auto", fontSize: 11.5, fontWeight: 600, color: selectedCase === n ? C.white : C.navyMid, background: selectedCase === n ? C.navy : C.white, border: `1px solid ${C.navyMid}`, borderRadius: 3, padding: "4px 10px", cursor: "pointer" }}>
+                      {selectedCase === n ? "✓ 切替中" : "この案に切替"}
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>
+                    メイン：{caseTitles[n]?.title || "(なし)"}
+                  </div>
+                  <div style={{ fontSize: 12, color: C.textSub, marginTop: 2 }}>
+                    サブ：{caseTitles[n]?.subtitle || "(なし)"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {/* パターンA: 1案構造（AI議論後の貼り付け）→ 自動抽出済みのお知らせ */}
