@@ -3302,9 +3302,10 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step.num, allSteps, stepData]);
 
-  // STEP5（タイトル・サブタイトル作成）専用: 主題軸キーワード（kw1/kw2）を書籍プロファイル確定版から自動取得。
-  // 旧仕様ではユーザーが手動で「自動振り分け」ボタンを押して入力していたが、STEP2 で確定済みのキーワードを
-  // 無条件で使うのが自然なため、UI から入力欄を隠して裏で自動投入する設計に変更。
+  // STEP5（タイトル・サブタイトル作成）専用: 主題軸キーワード（kw1/kw2）を書籍プロファイル確定版から
+  // 「常に同期」する。書籍プロファイル確定版が真実のソース。
+  // 過去の inputs.keyword1/keyword2 が残っていても、書籍プロファイル確定版の最新値で上書きする
+  // （UI上の入力欄は廃止しているので、ユーザーが手動編集する余地はない＝書籍プロファイル確定版が常に正）。
   useEffect(() => {
     if (step.num !== 5) return;
     const wp = (typeof window !== "undefined")
@@ -3313,26 +3314,15 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     if (!wp) return;
     const parsed = parseWorkProfileKeywords(wp);
     if (!parsed.keyword1 && !parsed.keyword2) return;
-    const baseInputs = stepData?.inputData || {};
     setInputs((prev) => {
-      const merged = { ...prev };
-      let changed = false;
-      if (parsed.keyword1 && !(baseInputs.keyword1 || "").trim() && !(prev.keyword1 || "").trim()) {
-        merged.keyword1 = parsed.keyword1;
-        changed = true;
-      }
-      if (parsed.keyword2 && !(baseInputs.keyword2 || "").trim() && !(prev.keyword2 || "").trim()) {
-        merged.keyword2 = parsed.keyword2;
-        changed = true;
-      }
-      if (changed) {
-        onInputChange?.(step.num, merged);
-        return merged;
-      }
-      return prev;
+      // 現在値が既に書籍プロファイル確定版と一致していれば何もしない
+      if (prev.keyword1 === parsed.keyword1 && prev.keyword2 === parsed.keyword2) return prev;
+      const merged = { ...prev, keyword1: parsed.keyword1, keyword2: parsed.keyword2 };
+      onInputChange?.(step.num, merged);
+      return merged;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step.num, stepData]);
+  }, [step.num, stepData, allSteps]);
 
   const prevStep = step.num > 1 ? STEPS[step.num - 2] : null;
   const nextStep = step.num < 10 ? STEPS[step.num] : null;
@@ -3801,13 +3791,14 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
             );
           }
 
-          // 自動投入済みかどうか（現在のフィールド値が前STEP outputText と一致するか）
+          // 自動投入済みかどうか（autoFill: true で値が入っていれば折りたたみ対象とみなす）。
+          // 旧仕様では「現在値が前STEP outputText と完全一致」を要求していたが、
+          // 先頭の「---」や末尾の改行差分など微妙な違いで false になり、textarea が
+          // 展開されたまま画面を埋めてしまう問題が頻発したため、判定を緩めた。
+          // ユーザーが意図的に展開したい場合は折りたたみバナーをクリック。
           const isFieldAutoFilled = (() => {
             if (field.autoFill !== true || !field.source) return false;
-            const m = field.source.match(/^STEP(\d+)$/);
-            if (!m) return false;
-            const srcOutput = allSteps?.[parseInt(m[1], 10)]?.outputText;
-            return !!(srcOutput && inputs[field.name] === srcOutput);
+            return !!((inputs[field.name] || "").trim());
           })();
 
           // 自動投入済み & 未展開 → 折りたたみバナーだけ表示（編集する時だけ展開）
