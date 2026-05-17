@@ -3781,13 +3781,15 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     finally { setChatLoading(false); }
   };
 
-  // STEP6 専用: 抽出された全章を順次 Dify に投げて、各章の章構成（節リスト＋要約）を生成し
+  // STEP7（章構成作成）専用: 抽出された全章を順次 Dify に投げて、各章の章構成（節リスト＋要約）を生成し
   // outputText に結合して蓄積する。Dify Cloud の iteration ノードが Flask app_context エラーで
-  // 動かないため、フロント側でループする STEP7 と同じパターンを採用。
+  // 動かないため、フロント側でループする。
+  // 関数名は handleRunAllChaptersForStep6 のままだが、v4 renumbering で章構成作成が STEP7 に
+  // 移動したため、内部の step.num チェックは 7 を見る（v3 の旧STEP6 と同じ役割）。
   const handleRunAllChaptersForStep6 = async () => {
-    if (step.num !== 6) return;
+    if (step.num !== 7) return;
     if (!chapterOptions || chapterOptions.length === 0) {
-      alert("STEP5（目次）の出力から章を検出できませんでした。STEP5の出力をご確認ください。");
+      alert("STEP6（目次）の出力から章を検出できませんでした。STEP6の出力をご確認ください。");
       return;
     }
     const interviewText = (inputs.interview_text || "").trim();
@@ -4340,17 +4342,17 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
               ) : (
                 <>
                   <div style={{ fontSize: 13, color: C.textSub, lineHeight: 1.8, marginBottom: 12 }}>
-                    STEP5 の目次から章を自動抽出し、章ごとに Dify を呼び出して全章分の章構成を一括生成します。
+                    STEP6 の目次から章を自動抽出し、章ごとに Dify を呼び出して全章分の章構成を一括生成します。
                     章間に3秒のウェイトを挟むため、章数 × 約30秒〜1分程度かかります。
                   </div>
-                  {!allSteps?.[5]?.outputText && (
+                  {!allSteps?.[6]?.outputText && (
                     <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginBottom: 12, fontSize: 13, color: C.red }}>
-                      ⚠ STEP5 の出力データがまだ保存されていません。STEP5 で「出力データを保存」を押してから戻ってきてください。
+                      ⚠ STEP6 の出力データがまだ保存されていません。STEP6 で「出力データを保存」を押してから戻ってきてください。
                     </div>
                   )}
-                  {allSteps?.[5]?.outputText && chapterOptions.length === 0 && (
+                  {allSteps?.[6]?.outputText && chapterOptions.length === 0 && (
                     <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginBottom: 12, fontSize: 13, color: C.red, lineHeight: 1.7 }}>
-                      ⚠ STEP5 の出力から章を検出できませんでした。「はじめに」「第N章: xxx」「おわりに」のような章見出しが含まれているか、STEP5 の出力を確認してください。
+                      ⚠ STEP6 の出力から章を検出できませんでした。「はじめに」「第N章: xxx」「おわりに」のような章見出しが含まれているか、STEP6 の出力を確認してください。
                     </div>
                   )}
                   {chapterOptions.length > 0 && (
@@ -4397,17 +4399,17 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
               ) : (
                 <>
                   <div style={{ fontSize: 13, color: C.textSub, lineHeight: 1.8, marginBottom: 12 }}>
-                    STEP6 の章構成から章を自動抽出し、章ごとに Dify を呼び出して全章分の詳細プロットを一括生成します。
+                    STEP7 の章構成から章を自動抽出し、章ごとに Dify を呼び出して全章分の詳細プロットを一括生成します。
                     章間に3秒のウェイトを挟むため、章数 × 約30秒〜1分程度かかります。
                   </div>
-                  {!allSteps?.[6]?.outputText && (
+                  {!allSteps?.[7]?.outputText && (
                     <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginBottom: 12, fontSize: 13, color: C.red }}>
-                      ⚠ STEP6 の出力データがまだ保存されていません。STEP6 で「出力データを保存」を押してから戻ってきてください。
+                      ⚠ STEP7 の出力データがまだ保存されていません。STEP7 で「出力データを保存」を押してから戻ってきてください。
                     </div>
                   )}
-                  {allSteps?.[6]?.outputText && chapterOptions.length === 0 && (
+                  {allSteps?.[7]?.outputText && chapterOptions.length === 0 && (
                     <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginBottom: 12, fontSize: 13, color: C.red, lineHeight: 1.7 }}>
-                      ⚠ STEP6 の出力から章を検出できませんでした。「はじめに」「第N章: xxx」「おわりに」のような章見出しが含まれているか、STEP6 の出力を確認してください。
+                      ⚠ STEP7 の出力から章を検出できませんでした。「はじめに」「第N章: xxx」「おわりに」のような章見出しが含まれているか、STEP7 の出力を確認してください。
                     </div>
                   )}
                   {chapterOptions.length > 0 && (
