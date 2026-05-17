@@ -3302,6 +3302,38 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step.num, allSteps, stepData]);
 
+  // STEP5（タイトル・サブタイトル作成）専用: 主題軸キーワード（kw1/kw2）を書籍プロファイル確定版から自動取得。
+  // 旧仕様ではユーザーが手動で「自動振り分け」ボタンを押して入力していたが、STEP2 で確定済みのキーワードを
+  // 無条件で使うのが自然なため、UI から入力欄を隠して裏で自動投入する設計に変更。
+  useEffect(() => {
+    if (step.num !== 5) return;
+    const wp = (typeof window !== "undefined")
+      ? (localStorage.getItem(WORK_PROFILE_CONFIRMED_KEY) || localStorage.getItem(WORK_PROFILE_KEY) || "")
+      : "";
+    if (!wp) return;
+    const parsed = parseWorkProfileKeywords(wp);
+    if (!parsed.keyword1 && !parsed.keyword2) return;
+    const baseInputs = stepData?.inputData || {};
+    setInputs((prev) => {
+      const merged = { ...prev };
+      let changed = false;
+      if (parsed.keyword1 && !(baseInputs.keyword1 || "").trim() && !(prev.keyword1 || "").trim()) {
+        merged.keyword1 = parsed.keyword1;
+        changed = true;
+      }
+      if (parsed.keyword2 && !(baseInputs.keyword2 || "").trim() && !(prev.keyword2 || "").trim()) {
+        merged.keyword2 = parsed.keyword2;
+        changed = true;
+      }
+      if (changed) {
+        onInputChange?.(step.num, merged);
+        return merged;
+      }
+      return prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step.num, stepData]);
+
   const prevStep = step.num > 1 ? STEPS[step.num - 2] : null;
   const nextStep = step.num < 10 ? STEPS[step.num] : null;
 
@@ -3585,6 +3617,40 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           const hasError = validationErrors.includes(field.name);
           const currentLen = (inputs[field.name] || "").length;
           const isOverLimit = field.maxChars && currentLen > field.maxChars;
+
+          // STEP5（タイトル・サブタイトル作成）の主題軸キーワード入力欄は廃止：
+          // 書籍プロファイル確定版（STEP2）から useEffect で自動投入済み。
+          // UI 上は統合バナー1つだけ表示して、ユーザーが意識せずに使えるようにする。
+          if (step.num === 5 && (field.name === "keyword1" || field.name === "keyword2")) {
+            if (field.name === "keyword2") return null; // 統合バナーは keyword1 のときに1つだけ表示
+            const kw1Val = (inputs.keyword1 || "").trim();
+            const kw2Val = (inputs.keyword2 || "").trim();
+            const hasBoth = kw1Val && kw2Val;
+            return (
+              <div key="step5-keywords-banner" style={{ marginBottom: 16, padding: "10px 14px", background: hasBoth ? C.greenLight : C.goldPale, border: `1px solid ${hasBoth ? "rgba(45,122,79,0.25)" : C.goldLight}`, borderRadius: 4 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: hasBoth ? C.green : C.gold }}>
+                    {hasBoth ? "✓ 主題軸キーワード（自動取得）" : "⚠ 主題軸キーワードが未取得"}
+                  </span>
+                  {hasBoth && (
+                    <span style={{ fontSize: 14, color: C.text, fontWeight: 600 }}>
+                      {kw1Val} <span style={{ color: C.textLight, fontWeight: 400 }}>/</span> {kw2Val}
+                    </span>
+                  )}
+                  <span style={{ fontSize: 11.5, color: C.textLight, marginLeft: "auto" }}>
+                    {hasBoth ? "書籍プロファイル確定版から自動取得" : "STEP2 / 書籍プロファイル確定 で主題軸を確定してください"}
+                  </span>
+                </div>
+                {hasBoth && (
+                  <div style={{ fontSize: 11.5, color: C.textSub, marginTop: 6, lineHeight: 1.6 }}>
+                    ※ これらのキーワードは Amazon Kindle SEO のためタイトルまたはサブタイトルに必ず含まれます。
+                    変更したい場合は STEP2 に戻って書籍プロファイル確定版の主題軸を編集してください。
+                  </div>
+                )}
+              </div>
+            );
+          }
+
           const isKeywordParsedField = step.num === 5 && (field.name === "keyword1" || field.name === "keyword2");
           const handleAutoFillParsed = isKeywordParsedField ? () => {
             // 書籍プロファイル確定版／草案／STEP2全文 から主題軸キーワードを抽出
