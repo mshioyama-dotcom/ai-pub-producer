@@ -4174,9 +4174,12 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
       for (let i = 0; i < chapterOptions.length; i++) {
         const ch = chapterOptions[i];
         setChapterStockProgress({ total: chapterOptions.length, current: i + 1, currentItemName: ch.chapterTitle });
+        // STEP8 (詳細プロット作成) Dify YML が chapter_title をそのまま echo するようになったため、
+        // chapter_title を必ず渡す。これがないと「はじめに」が「第1章」に化けるなどの事故が起きる。
         const execInputs = {
           ...getAutoInjectedProfiles(),
           chapter_outline_text: ch.body.trim(),
+          chapter_title: ch.chapterTitle || "",
         };
         const response = await fetch("/api/dify", {
           method: "POST",
