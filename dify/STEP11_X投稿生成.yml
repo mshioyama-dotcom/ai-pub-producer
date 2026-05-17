@@ -150,11 +150,11 @@ workflow:
         model:
           completion_params:
             enable_stream: false
-            max_tokens: 8000
-            reasoning_effort: medium
-            verbosity: medium
+            max_tokens: 6000
+            reasoning_effort: low
+            verbosity: low
           mode: chat
-          name: gpt-5.2
+          name: gpt-5.2-mini
           provider: langgenius/openai/openai
         prompt_template:
         - id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
