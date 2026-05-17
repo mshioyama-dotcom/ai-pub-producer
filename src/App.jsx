@@ -2189,6 +2189,13 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
   const [authorPreviewOpen, setAuthorPreviewOpen] = useState(false);
   const [draftPreviewOpen, setDraftPreviewOpen] = useState(false);
 
+  // 追加キーワード評価 UI 用 state（v4 拡張）
+  // 1回の追加で 1〜3 個まで指定可能。半角/全角スペース区切りで入力。
+  const [addKeywordsInput, setAddKeywordsInput] = useState("");
+  const [isAddingKeywords, setIsAddingKeywords] = useState(false);
+  const [addError, setAddError] = useState("");
+  const [addStageMsg, setAddStageMsg] = useState("");
+
   const hasAuthorProfile = !!(savedAuthorProfile || "").trim();
   const hasDraft = !!(savedWorkProfileDraft || "").trim();
 
@@ -2297,6 +2304,90 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
   const recommendsReturn = analysis?.ai_recommendation === "return_to_step1";
   const recommendsProceed = analysis?.ai_recommendation === "proceed_to_step3";
   const generatedKeywords = Array.isArray(analysis?.keywords) ? analysis.keywords : [];
+  // ユーザー追加キーワード集合（バッジ表示用）
+  const userAddedSet = useMemo(() => {
+    const arr = Array.isArray(analysis?.user_added_keywords) ? analysis.user_added_keywords : [];
+    return new Set(arr.map((k) => String(k).trim()));
+  }, [analysis]);
+
+  // 追加キーワード評価ハンドラ：入力欄をパースして /api/step2-add を呼ぶ
+  // 「半角/全角スペース」「読点/カンマ」のいずれでも区切れる前提でパース
+  const handleAddKeywords = async () => {
+    setAddError("");
+    if (!analysis || !Array.isArray(analysis?.market_data)) {
+      setAddError("先にキーワード分析を実行してから追加評価を実行してください。");
+      return;
+    }
+    const raw = (addKeywordsInput || "").trim();
+    if (!raw) { setAddError("追加するキーワードを入力してください。"); return; }
+    // 1行に1キーワードのキーワード単位で分割（区切り：改行・読点・カンマのみ。半角スペースはキーワード内の語区切りなのでそのまま残す）
+    const newKws = raw.split(/[\n、,]+/).map((s) => s.trim()).filter(Boolean);
+    if (newKws.length === 0) { setAddError("追加するキーワードを入力してください。"); return; }
+    if (newKws.length > 3) {
+      setAddError(`1回の追加は最大3個までです（現在${newKws.length}個）。改行・読点・カンマで区切ってください。`);
+      return;
+    }
+    // 既存との重複は API 側でも弾くがフロントでも警告
+    const existing = Array.isArray(analysis?.keywords) ? analysis.keywords.map((k) => String(k).trim()) : [];
+    const dup = newKws.filter((k) => existing.includes(k));
+    if (dup.length === newKws.length) {
+      setAddError(`入力したキーワードはすべて既存リストに含まれています：${dup.join("、")}`);
+      return;
+    }
+
+    setIsAddingKeywords(true);
+    setAddStageMsg("追加キーワードのAmazonデータを取得中…");
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4 * 60 * 1000);
+    const stageTicker = setTimeout(() => setAddStageMsg("スコアを再計算してAI判定を再生成中…"), 8000);
+    try {
+      const response = await fetch("/api/step2-add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          work_profile_draft: savedWorkProfileDraft || "",
+          author_profile: savedAuthorProfile || "",
+          publishing_goal: savedPublishingGoal || "",
+          existing_market_data: analysis.market_data,
+          existing_keywords: analysis.keywords,
+          existing_user_added: Array.isArray(analysis.user_added_keywords) ? analysis.user_added_keywords : [],
+          new_keywords: newKws,
+        }),
+      });
+      const contentType = response.headers.get("content-type") || "";
+      let data;
+      if (contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        setAddError(`サーバから非JSON応答（${response.status}）：${text.slice(0, 300)}`);
+        return;
+      }
+      if (!response.ok) {
+        const missing = Array.isArray(data?.missingEnv) && data.missingEnv.length > 0
+          ? `\n\n未設定の環境変数：${data.missingEnv.join(", ")}\n→ Vercelの環境変数設定をご確認ください。`
+          : "";
+        setAddError((data?.error || `HTTP ${response.status} エラー`) + missing);
+        return;
+      }
+      // 既存 analysis を新しい統合結果で上書き
+      setAnalysis(data);
+      try { localStorage.setItem(STEP2_ANALYSIS_KEY, JSON.stringify(data)); } catch (e) {}
+      setAddKeywordsInput("");
+    } catch (e) {
+      if (e.name === "AbortError") {
+        setAddError("4分以上応答がなかったため処理を中断しました。もう一度お試しください。");
+      } else {
+        setAddError(`通信エラーが発生しました：${e.message}`);
+      }
+    } finally {
+      clearTimeout(timeoutId);
+      clearTimeout(stageTicker);
+      setAddStageMsg("");
+      setIsAddingKeywords(false);
+    }
+  };
 
   // 分析結果と選定キーワードを localStorage に再保存（手動）
   const [saveMsg, setSaveMsg] = useState(false);
@@ -2434,6 +2525,65 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
         </div>
       )}
 
+      {/* ③.5 追加キーワード評価 UI（v4 拡張） */}
+      {/* AIが生成した10件以外に、著者が自分で評価したいキーワードを 1〜3 個追加して同じ3軸評価にかける。 */}
+      {/* RapidAPI で追加検索→全件再ランキング→Dify B で意図合致判定を再生成する。 */}
+      {analysis && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <StepBadge num="③.5" />
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>追加で評価したいキーワードがあれば（任意）</h2>
+          </div>
+          <Card style={{ background: "#f7f5ee", border: `1px solid ${C.goldLight}` }}>
+            <div style={{ fontSize: 12.5, color: C.textSub, marginBottom: 10, lineHeight: 1.8 }}>
+              AIが生成した10件以外に、著者ご自身が「これも評価してみたい」というキーワードを 1〜3 個まで追加できます。同じ Amazon 検索＋3軸スコアリング＋AI意図合致判定を再実行し、全件まとめて再ランキングします。<br />
+              <span style={{ color: C.textLight, fontSize: 11.5 }}>※ 半角スペース区切りで2語のキーワード（例：「自己理解 適職」）。複数追加する場合は <b>改行・読点・カンマ</b> で区切ってください。</span>
+            </div>
+            <textarea
+              value={addKeywordsInput}
+              onChange={(e) => setAddKeywordsInput(e.target.value)}
+              placeholder="例：自己理解 適職&#10;ライフプラン 30代"
+              rows={3}
+              disabled={isAddingKeywords}
+              style={{
+                width: "100%",
+                fontFamily: "monospace",
+                fontSize: 13.5,
+                padding: "8px 10px",
+                border: `1px solid ${C.border}`,
+                borderRadius: 4,
+                resize: "vertical",
+                marginBottom: 10,
+                background: isAddingKeywords ? "#f5f5f5" : C.white,
+              }}
+            />
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <BtnPrimary onClick={handleAddKeywords} disabled={isAddingKeywords || !addKeywordsInput.trim()}>
+                {isAddingKeywords ? "評価中..." : "★ 追加キーワードを評価する"}
+              </BtnPrimary>
+              <span style={{ fontSize: 11.5, color: C.textLight }}>
+                ※ 1〜2分かかります（Amazon検索＋スコア再計算＋AI判定再生成）
+              </span>
+            </div>
+            {isAddingKeywords && addStageMsg && (
+              <div style={{ marginTop: 10, padding: "8px 12px", background: C.white, border: `1px solid ${C.border}`, borderRadius: 4, fontSize: 12.5, color: C.navy, fontWeight: 600 }}>
+                ⏳ {addStageMsg}
+              </div>
+            )}
+            {addError && (
+              <div style={{ marginTop: 10, padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, fontSize: 13, color: C.red, whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
+                {addError}
+              </div>
+            )}
+            {userAddedSet.size > 0 && (
+              <div style={{ marginTop: 10, padding: "8px 12px", background: "#eef7ee", border: `1px solid ${C.green}`, borderRadius: 4, fontSize: 12, color: C.navyMid, lineHeight: 1.7 }}>
+                <b>追加済み:</b> {Array.from(userAddedSet).map((k) => `★${k}`).join(" / ")}
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+
       {/* ④ キーワード選定 UI */}
       {analysis && generatedKeywords.length > 0 && (
         <div style={{ marginBottom: 28 }}>
@@ -2443,16 +2593,20 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
           </div>
           <Card style={{ background: C.white, border: `1px solid ${C.border}` }}>
             <div style={{ fontSize: 12.5, color: C.textSub, marginBottom: 10, lineHeight: 1.7 }}>
-              STEP3「競合レビュー評価」で深掘りするキーワードを最大2個まで選択してください。AIが「★AI推奨」マークを付けたものを優先的に選ぶのがおすすめです。
+              STEP3「競合レビュー評価」で深掘りするキーワードを最大2個まで選択してください。AIが「★AI推奨」マークを付けたものを優先的に選ぶのがおすすめです。<span style={{ color: C.gold, fontWeight: 700 }}>★ユーザー追加</span>マークはあなたが追加したキーワードです。
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {generatedKeywords.map((kw) => {
                 const isSelected = selectedKeywords.includes(kw);
                 const atMax = !isSelected && selectedKeywords.length >= 2;
+                const isUserAdded = userAddedSet.has(String(kw).trim());
                 return (
-                  <label key={kw} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: atMax ? C.textLight : C.text, cursor: atMax ? "not-allowed" : "pointer", padding: "6px 10px", borderRadius: 4, background: isSelected ? "rgba(184,146,42,0.08)" : "transparent", border: `1px solid ${isSelected ? C.gold : "transparent"}` }}>
+                  <label key={kw} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, color: atMax ? C.textLight : C.text, cursor: atMax ? "not-allowed" : "pointer", padding: "6px 10px", borderRadius: 4, background: isSelected ? "rgba(184,146,42,0.08)" : (isUserAdded ? "rgba(184,146,42,0.04)" : "transparent"), border: `1px solid ${isSelected ? C.gold : (isUserAdded ? C.goldLight : "transparent")}` }}>
                     <input type="checkbox" checked={isSelected} disabled={atMax} onChange={() => handleToggleKeyword(kw)} style={{ cursor: atMax ? "not-allowed" : "pointer", accentColor: C.gold }} />
                     <span style={{ fontFamily: "monospace", fontSize: 13.5 }}>{kw}</span>
+                    {isUserAdded && (
+                      <span style={{ fontSize: 10.5, color: C.gold, fontWeight: 700, padding: "2px 6px", border: `1px solid ${C.gold}`, borderRadius: 3, background: C.white }}>★ユーザー追加</span>
+                    )}
                   </label>
                 );
               })}
