@@ -1,0 +1,390 @@
+app:
+  description: ''
+  icon: ''
+  icon_background: ''
+  mode: workflow
+  name: STEP11 X投稿生成
+  use_icon_as_answer_icon: false
+dependencies: []
+kind: app
+version: 0.1.5
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        image_file_size_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInLoop: false
+        sourceType: start
+        targetType: llm
+      id: 1773600000001-source-1773600000002-target
+      source: '1773600000001'
+      sourceHandle: source
+      target: '1773600000002'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: end
+      id: 1773600000002-source-1773600000003-target
+      source: '1773600000002'
+      sourceHandle: source
+      target: '1773600000003'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: ユーザー入力
+        type: start
+        variables:
+        - default: ''
+          hint: ''
+          label: 著者プロファイル（自動転記）
+          max_length: 4000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: author_profile
+        - default: ''
+          hint: ''
+          label: 書籍プロファイル確定版（自動転記）
+          max_length: 8000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: work_profile
+        - default: ''
+          hint: ''
+          label: Amazon説明文（STEP10から自動転記）
+          max_length: 4000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: amazon_description_text
+        - default: 'standard_280'
+          hint: 'short_140 / standard_280 / premium_3000 のいずれか'
+          label: 投稿の文字数設定
+          max_length: 32
+          options: []
+          placeholder: 'standard_280'
+          required: false
+          type: text-input
+          variable: tweet_length
+        - default: '25'
+          hint: '20 / 25 / 30 のいずれか'
+          label: 生成本数
+          max_length: 8
+          options: []
+          placeholder: '25'
+          required: false
+          type: text-input
+          variable: total_count
+      height: 280
+      id: '1773600000001'
+      position:
+        x: 80
+        y: 282
+      positionAbsolute:
+        x: 80
+        y: 282
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            enable_stream: false
+            max_tokens: 8000
+            reasoning_effort: medium
+            verbosity: medium
+          mode: chat
+          name: gpt-5.2
+          provider: langgenius/openai/openai
+        prompt_template:
+        - id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+          role: system
+          text: 'あなたはKindle出版直前〜直後の著者向けに、X（旧Twitter）の販促投稿を設計する専門家です。
+
+
+            ━━━━━━━━━━━━━━━━━━
+
+            【役割と目的】
+
+            ━━━━━━━━━━━━━━━━━━
+
+
+            入力された著者プロファイル・書籍プロファイル確定版・Amazon説明文を読み込み、Kindle出版に伴うX投稿を total_count 本（20〜30本）一括生成する。
+
+
+            生成される投稿群は、出版前→出版直後→出版後の3フェーズに自然な配分で振り分けられ、各投稿には「推奨投稿日（日本語表記）」「タイミング区分」「用途タグ」を明示する。
+
+
+            ━━━━━━━━━━━━━━━━━━
+
+            【入力】
+
+            ━━━━━━━━━━━━━━━━━━
+
+
+            ■ 著者プロファイル
+
+            {{#1773600000001.author_profile#}}
+
+
+            ■ 書籍プロファイル確定版
+
+            {{#1773600000001.work_profile#}}
+
+
+            ■ Amazon説明文（STEP10）
+
+            {{#1773600000001.amazon_description_text#}}
+
+
+            ■ 投稿の文字数設定: {{#1773600000001.tweet_length#}}
+
+            （short_140 = 140字以内 / standard_280 = 280字以内 / premium_3000 = 〜3000字の長文投稿）
+
+
+            ■ 生成本数: {{#1773600000001.total_count#}}
+
+
+            ━━━━━━━━━━━━━━━━━━
+
+            【文字数ルール】
+
+            ━━━━━━━━━━━━━━━━━━
+
+
+            - short_140 の場合: 各投稿の本文は **140文字以内** に厳格に収める。URL等を含めない前提で、本文だけで完結する文字数として140文字以内。
+
+            - standard_280 の場合: 各投稿の本文は **280文字以内**（X Premium非加入アカウントの上限）。
+
+            - premium_3000 の場合: 各投稿の本文は **3000文字以内**（X Premium加入アカウントの長文投稿向け）。本書のテーマや章のエッセンスを段落構成で語る長文投稿を中心に。
+
+
+            **文字数を超過した投稿は致命的欠陥として扱い、絶対に出力しない。**生成時に毎回文字数をカウントして確認すること。
+
+
+            ━━━━━━━━━━━━━━━━━━
+
+            【タイミング配分のルール】
+
+            ━━━━━━━━━━━━━━━━━━
+
+
+            total_count = 25 を基準とした標準配分（その他の総数の場合は比率で調整）：
+
+
+            **出版前フェーズ（6〜8本）**
+
+            - 用途: 予告・期待感醸成・著者ストーリー・本書のテーマ予告
+
+            - 推奨投稿日: 「出版1ヶ月前」「出版3週間前」「出版2週間前」「出版1週間前」「出版3日前」「出版前日」など、出版日からの相対的な日本語表記
+
+            - 内容例: 「来月、こんな本を出します」「執筆中に気づいたこと」「読者像をどう想像したか」など
+
+
+            **出版直後フェーズ（4〜5本）**
+
+            - 用途: 告知・本書の核メッセージ宣言・読者参加呼びかけ
+
+            - 推奨投稿日: 「出版当日」「出版翌日」「出版2日後」「出版3日後」など
+
+            - 内容例: 「本日発売しました」「本書の中心メッセージはこれです」「読者の方からこんな声を頂きました」など
+
+
+            **出版後フェーズ（10〜15本）**
+
+            - 用途: 内容紹介・章ごとの引用・著者の発信・継続露出
+
+            - 推奨投稿日: 「出版1週間後」「出版10日後」「出版2週間後」「出版3週間後」「出版1ヶ月後」など
+
+            - 内容例: 各章のエッセンス引用、読者反応の紹介、本書テーマに関連する日常的な気づき
+
+
+            ━━━━━━━━━━━━━━━━━━
+
+            【投稿の品質ルール】
+
+            ━━━━━━━━━━━━━━━━━━
+
+
+            1. **著者プロファイルの文体・発信スタンスを必ず反映**する。砕けた口調が多い著者なら砕けた投稿、丁寧な文体が中心の著者なら丁寧な投稿にする。媒体（X）が変わっても語り口を変えないこと。
+
+            2. **書籍プロファイルの想定読者像に向けて語る**。読者が「自分のための投稿だ」と感じる粒度で書く。
+
+            3. **Amazon説明文の核メッセージ・差別化ポイントを投稿全体に散りばめる**。同じ表現を繰り返さず、章や角度を変えながら多様に紹介する。
+
+            4. **URLは入れない**（テキスト本文のみ）。Amazon リンクや外部リンクの記述・プレースホルダ・「リンクはプロフィールに」等の表現も含めない。
+
+            5. **ハッシュタグは自然に**。投稿1本につき1〜3個まで、過剰にならない範囲で。
+
+            6. **過度に煽らない**。「今すぐ買わないと損」「絶対読むべき」のような押しつけがましい表現は禁止。著者の発信スタンスから自然に伝わる紹介に留める。
+
+            7. **20〜30本すべてに固有のフックを持たせる**。同じ言い回しの繰り返し、定型文の量産は禁止。著者が実際に投稿しても恥ずかしくないオリジナリティを保つ。
+
+
+            ━━━━━━━━━━━━━━━━━━
+
+            【出力形式】
+
+            ━━━━━━━━━━━━━━━━━━
+
+
+            プレーンテキストで、以下の形式で各投稿を出力すること。マークダウン記法・コードブロック・余計な記号装飾は禁止。
+
+
+            ━━━ 投稿 1 ━━━
+
+            推奨投稿日: 出版1ヶ月前
+
+            タイミング区分: 出版前
+
+            用途タグ: 予告
+
+            文字数: [実際の文字数]
+
+
+            [投稿本文]
+
+
+            ━━━ 投稿 2 ━━━
+
+            推奨投稿日: 出版3週間前
+
+            タイミング区分: 出版前
+
+            用途タグ: 著者ストーリー
+
+            文字数: [実際の文字数]
+
+
+            [投稿本文]
+
+
+            （以下、total_count 本まで同じ形式で続ける）
+
+
+            ━━━━━━━━━━━━━━━━━━
+
+            【出力前の自己チェック（必須）】
+
+            ━━━━━━━━━━━━━━━━━━
+
+
+            出力前に必ず以下を全本に対して確認すること。1本でも該当した場合は、その投稿を修正してから出力する。
+
+
+            ・チェック1: 文字数が指定範囲内か（short_140 → 140字以内、standard_280 → 280字以内、premium_3000 → 3000字以内）
+
+            ・チェック2: URL・外部リンク表現（http、リンクは〜、プロフィールから等）が含まれていないか
+
+            ・チェック3: 「ベストセラー」「No.1」「1位」「殿堂入り」「無料」「セール」「割引」「期間限定」など、Amazon KDP規約に抵触しうるランキング/プロモーション語が含まれていないか
+
+            ・チェック4: 著者プロファイルの文体・発信スタンスから乖離していないか
+
+            ・チェック5: 20〜30本の中に重複・類似投稿がないか（同じ言い回し・同じハッシュタグ組み合わせの量産は禁止）
+
+            ・チェック6: 出版前/直後/後の配分が指定通りか'
+        selected: true
+        title: X投稿生成
+        type: llm
+        vision:
+          enabled: false
+      height: 88
+      id: '1773600000002'
+      position:
+        x: 384
+        y: 303
+      positionAbsolute:
+        x: 384
+        y: 303
+      selected: true
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        outputs:
+        - value_selector:
+          - '1773600000002'
+          - text
+          value_type: string
+          variable: text
+        selected: false
+        title: 出力
+        type: end
+      height: 88
+      id: '1773600000003'
+      position:
+        x: 686
+        y: 303
+      positionAbsolute:
+        x: 686
+        y: 303
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    viewport:
+      x: 91
+      y: -141
+      zoom: 1
+  rag_pipeline_variables: []

@@ -195,13 +195,41 @@ const STEPS = [
       "修正したい場合は、出力をAIチャットに貼り付けて修正を指示してください",
       "「冒頭の読者像をもっと絞って」「購読を促す文章を追加して」等と指示できます"
     ]
+  },
+  {
+    // v4 拡張: 出版後プロモーション。設計書では STEP13 だが、STEP11/12 が計画削除のため
+    // 番号飛びを避けて STEP11 として実装。X (旧Twitter) の販促投稿20〜30本を一括生成する。
+    id: "step_11", num: 11, title: "X投稿生成",
+    description: "Kindle出版に伴うX（旧Twitter）の販促投稿を、出版前→出版直後→出版後の3フェーズで20〜30本まとめて生成します。著者プロファイルの文体・発信スタンスを反映し、各投稿に「推奨投稿日（出版1週間前 等）」「タイミング区分」「用途タグ」を付けます。URLやプレゼント情報は含めず、テキスト本文のみ。",
+    category: "販売準備", type: "workflow",
+    url: "",
+    inputs: [
+      { name: "amazon_description_text", label: "Amazon説明文（STEP10のアウトプット）", desc: "STEP10のAmazon説明文を貼り付け（「自動振り分け」で自動入力）", source: "STEP10", required: true, type: "textarea", autoFill: true, maxChars: 4000 },
+      { name: "tweet_length", label: "投稿の文字数設定", desc: "短文140字 / 標準280字 / 長文Premium向け（〜3000字）から選択", source: null, required: true, type: "select", options: [
+        { value: "short_140", label: "短文（140字以内）" },
+        { value: "standard_280", label: "標準（280字以内・推奨）" },
+        { value: "premium_3000", label: "長文Premium向け（〜3000字）" }
+      ], default: "standard_280", maxChars: 32 },
+      { name: "total_count", label: "生成本数", desc: "20本 / 25本 / 30本 から選択", source: null, required: true, type: "select", options: [
+        { value: "20", label: "20本" },
+        { value: "25", label: "25本（推奨）" },
+        { value: "30", label: "30本" }
+      ], default: "25", maxChars: 8 }
+    ],
+    outputTitle: "X投稿リスト",
+    help: [
+      "出版前→出版直後→出版後の3フェーズに自然な配分で投稿が振り分けられます",
+      "各投稿に「推奨投稿日」（出版1週間前 / 出版翌日 等の日本語表記）が付くので、そのまま予約投稿の参考に使えます",
+      "URLや「リンクはプロフィールに」等の表現は含まれません。実際に投稿するときに、必要に応じてAmazonリンクを別途追加してください",
+      "著者プロファイルの文体・発信スタンスから乖離した投稿が出た場合は、出力をAIチャットに貼り付けて修正を指示してください"
+    ]
   }
 ];
 
 const CATEGORIES = [
   { label: "企画設計", steps: [1, 2, 3, 4, 5] },
   { label: "執筆設計", steps: [6, 7, 8, 9] },
-  { label: "販売準備", steps: [10] }
+  { label: "販売準備", steps: [10, 11] }
 ];
 
 const STATUS_LABELS = { not_started: "未着手", in_progress: "進行中", completed: "完了" };
@@ -3853,7 +3881,14 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   // 将来用途のためコード上は維持していますが、ここでは未使用です。
 
   useEffect(() => {
-    setInputs(stepData.inputData || {});
+    // select 型フィールドのデフォルト値を初期化（既存値があれば優先）
+    const initialInputs = { ...(stepData.inputData || {}) };
+    for (const field of step.inputs) {
+      if (field.type === "select" && field.default && !initialInputs[field.name]) {
+        initialInputs[field.name] = field.default;
+      }
+    }
+    setInputs(initialInputs);
     // STEP6/7/8/9 のバルク生成出力では「=== 同じ章 ===」の重複を mount 時に自動修復してから表示する。
     // 既に保存されている壊れた出力もユーザー操作なしで自動的に修復される。
     // STEP9 はさらに「章単位で章タイトル・節見出しの繰り返し」も自動除去する。
@@ -4529,7 +4564,14 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
               </div>
               <div style={{ fontSize: 13, color: "#444444", marginBottom: 6 }}>{field.desc}</div>
               {step.num === 2 && field.name === "amazon_html" && <Step2HtmlHelper inputs={inputs} currentHtml={inputs.amazon_html || ""} />}
-              {field.type === "text" ? (
+              {field.type === "select" ? (
+                <select id={`field-${field.name}`} value={inputs[field.name] || field.default || ""} onChange={(e) => handleInputChange(field.name, e.target.value)}
+                  style={{ width: "100%", padding: "10px 12px", fontSize: 14, border: hasError ? `2px solid ${C.red}` : `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", background: hasError ? "#fef2f2" : C.white, cursor: "pointer" }}>
+                  {(field.options || []).map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              ) : field.type === "text" ? (
                 <input id={`field-${field.name}`} type="text" value={inputs[field.name] || ""} onChange={(e) => handleInputChange(field.name, e.target.value)} placeholder={field.label}
                   style={{ width: "100%", padding: "10px 12px", fontSize: 14, border: hasError ? `2px solid ${C.red}` : isOverLimit ? `2px solid ${C.gold}` : `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", background: hasError ? "#fef2f2" : C.white }} />
               ) : (

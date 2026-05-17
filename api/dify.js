@@ -25,12 +25,14 @@ const API_KEYS = {
   7:  process.env.DIFY_API_KEY_STEP07,   // 旧STEP7 プロット - 新STEP8 用に流用
   8:  process.env.DIFY_API_KEY_STEP08,   // 旧STEP8 本文 - 新STEP9 用に流用
   9:  process.env.DIFY_API_KEY_STEP09,   // 旧STEP9 Amazon説明文 - 新STEP10 用に流用
+  11: process.env.DIFY_API_KEY_STEP11,   // 新STEP11 X投稿生成（新規ワークフロー）
 };
 
 // 新stepNum → 使用する API Key を解決する
-// 新STEP4〜10 のリクエストは旧キー3〜9 にルーティング
+// 新STEP4〜10 のリクエストは旧キー3〜9 にルーティング、新STEP11 以降は独自キー
 function resolveApiKey(newStepNum) {
   if (newStepNum <= 3) return API_KEYS[newStepNum];
+  if (newStepNum >= 11) return API_KEYS[newStepNum];
   return API_KEYS[newStepNum - 1];
 }
 
@@ -77,6 +79,13 @@ function mapInputs(stepNum, inputs) {
     if (m.interview_text !== undefined)      { m.author_episode = m.interview_text; delete m.interview_text; }
     if (m.outline_text !== undefined)        { m.toc_text = m.outline_text; delete m.outline_text; }
   }
+
+  // 新STEP11 X投稿生成。Dify YML 変数名がそのまま使えるため特別な remap は不要。
+  // - author_profile / work_profile は getAutoInjectedProfiles で自動注入
+  // - amazon_description_text は STEP10 出力から autoFill
+  // - tweet_length / total_count はユーザー選択
+  // ※ Dify YML の変数名と完全一致しているため、ここでは何もしない（明示的にコメントだけ残す）
+  // if (stepNum === 11) { /* no remap needed */ }
 
   return m;
 }
