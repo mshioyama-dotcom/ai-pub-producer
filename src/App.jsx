@@ -3335,30 +3335,59 @@ const Step4ConfirmPanel = ({ outputText }) => {
       </div>
 
       {/* パターンB: 3案構造を検出 → 推し案中心 UI（代替案2つは折りたたみ） */}
-      {parsed && oshiCaseNum && caseTitles && caseTitles[oshiCaseNum] && (
+      {parsed && oshiCaseNum && caseTitles && caseTitles[oshiCaseNum] && (() => {
+        const oshi = caseTitles[oshiCaseNum];
+        // 入力欄と推し案の同期状態を判定（前回確定済みの内容が残っている等で乖離していたら上書きボタンを出す）
+        const titleSynced = !oshi.title || oshi.title === titleInput;
+        const subtitleSynced = !oshi.subtitle || oshi.subtitle === subtitleInput;
+        const inputsInSync = titleSynced && subtitleSynced;
+        const handleCopyOshiToInputs = () => {
+          if (oshi.title) setTitleInput(oshi.title);
+          if (oshi.subtitle) setSubtitleInput(oshi.subtitle);
+          setSelectedCase(oshiCaseNum);
+        };
+        return (
         <div style={{ marginBottom: 14, padding: "14px 16px", background: C.white, border: `2px solid ${C.gold}`, borderRadius: 6 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: C.gold }}>★ AI推し案（案{oshiCaseNum}）— ブラッシュアップ対象</span>
-            {selectedCase === oshiCaseNum && <span style={{ fontSize: 11, color: C.green, fontWeight: 700 }}>✓ 採用中</span>}
+            {inputsInSync && selectedCase === oshiCaseNum && (
+              <span style={{ fontSize: 11, color: C.green, fontWeight: 700 }}>✓ 採用中（下の入力欄と同じ）</span>
+            )}
+            {!inputsInSync && (
+              <span style={{ fontSize: 11, color: C.red, fontWeight: 700 }}>⚠ 下の入力欄は前回の確定値です（推し案と異なります）</span>
+            )}
           </div>
           <div style={{ fontSize: 12, color: C.textSub, marginBottom: 8 }}>メインタイトル</div>
           <div style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 8, padding: "8px 10px", background: C.goldPale, borderRadius: 3 }}>
-            {caseTitles[oshiCaseNum].title || "(タイトルなし)"}
+            {oshi.title || "(タイトルなし)"}
           </div>
           <div style={{ fontSize: 12, color: C.textSub, marginBottom: 8 }}>サブタイトル</div>
           <div style={{ fontSize: 14, color: C.text, padding: "8px 10px", background: C.goldPale, borderRadius: 3, marginBottom: 8 }}>
-            {caseTitles[oshiCaseNum].subtitle || "(サブタイトルなし)"}
+            {oshi.subtitle || "(サブタイトルなし)"}
           </div>
+          {/* 入力欄と乖離していたら「推し案で上書き」ボタンを目立たせて出す */}
+          {!inputsInSync && (
+            <div style={{ marginTop: 10, padding: "10px 12px", background: "#fff8e1", border: `1px solid ${C.gold}`, borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+              <div style={{ fontSize: 12.5, color: C.navyMid, lineHeight: 1.7 }}>
+                下の編集欄には<b>前回確定したタイトル</b>が残っています。今回の推し案で上書きしますか？
+              </div>
+              <button onClick={handleCopyOshiToInputs}
+                style={{ fontSize: 13, fontWeight: 700, color: C.white, background: C.gold, border: "none", borderRadius: 3, padding: "8px 16px", cursor: "pointer", flexShrink: 0 }}>
+                📥 推し案で入力欄を上書き
+              </button>
+            </div>
+          )}
           {oshiReason && (
             <div style={{ fontSize: 11.5, color: C.textSub, lineHeight: 1.7, marginTop: 8, padding: "8px 10px", background: "#fafafa", borderLeft: `2px solid ${C.gold}`, borderRadius: 2 }}>
               <strong>推した理由：</strong>{oshiReason.slice(0, 280)}{oshiReason.length > 280 ? "..." : ""}
             </div>
           )}
           <div style={{ marginTop: 10, fontSize: 11.5, color: C.textLight, lineHeight: 1.7 }}>
-            ※ 下のメイン／サブ欄にはこの推し案が自動入力されています。下にある「📋 外部AIで相談する用プロンプトを取得」でブラッシュアップ → メイン／サブ欄を編集 → 「⭐ 確定する」で保存してください。
+            ※ 下のメイン／サブ欄を編集 →「⭐ 確定する」で保存してください。外部AIでブラッシュアップしたい場合は、下の「📋 外部AIで相談する用プロンプトを取得」を使ってください。
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* 推し案が無い、または検出できない3案構造 → 案ボタン表示 */}
       {parsed && !oshiCaseNum && (
