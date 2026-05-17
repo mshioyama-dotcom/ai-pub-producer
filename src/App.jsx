@@ -3719,7 +3719,14 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   // 将来用途のためコード上は維持していますが、ここでは未使用です。
 
   useEffect(() => {
-    setInputs(stepData.inputData || {}); setOutputText(stepData.outputText || "");
+    setInputs(stepData.inputData || {});
+    // STEP6/7/8 のバルク生成出力では「=== 同じ章 ===」の重複を mount 時に自動修復してから表示する。
+    // 既に保存されている壊れた出力もユーザー操作なしで自動的に修復される。
+    let loadedOutput = stepData.outputText || "";
+    if ((step.num === 6 || step.num === 7 || step.num === 8) && loadedOutput) {
+      loadedOutput = dedupeOutputSections(loadedOutput);
+    }
+    setOutputText(loadedOutput);
     setHelpOpen(false); setValidationErrors([]); setCharErrors({}); setRunError("");
     setMarketOptions([]); setSelectedMarket(null);
     setSectionOptions([]); setSelectedSection(null); setSectionProgress(null);
@@ -3820,7 +3827,12 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   };
 
   const handleSaveOutput = async () => {
-    const cleaned = cleanOutputText(outputText);
+    let cleaned = cleanOutputText(outputText);
+    // STEP6/7/8 のバルク生成出力では、章重複（=== おわりに === が2回など）を保存時点で必ず除去する。
+    // これにより既存の壊れた出力も「保存」を押すだけで自動修復される。
+    if (step.num === 6 || step.num === 7 || step.num === 8) {
+      cleaned = dedupeOutputSections(cleaned);
+    }
     if (cleaned !== outputText) setOutputText(cleaned);
     await onSaveOutput(step.num, cleaned);
     setSaveOutputMsg("saved"); setTimeout(() => setSaveOutputMsg(false), 2000);
@@ -3952,7 +3964,9 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         }
       }
       const combined = results.map((r) => `=== ${r.title} ===\n\n${r.content}`).join("\n\n---\n\n");
-      setOutputText(combined);
+      // 念のため最終的な outputText でも章重複を排除する（LLM出力に「=== おわりに ===」が
+      // 自分で書き込まれているケースなど、二重防御として）
+      setOutputText(dedupeOutputSections(combined));
       setChapterStockProgress(null);
     } catch (e) {
       setRunError(e.message + "\n\n途中までの結果は破棄されます。少し時間をおいてから「全章を順次生成」をもう一度お試しください。");
@@ -4008,7 +4022,9 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
       }
       // 全章を結合（章ごとに区切り目を挿入）
       const combined = results.map((r) => `=== ${r.title} ===\n\n${r.content}`).join("\n\n---\n\n");
-      setOutputText(combined);
+      // 念のため最終的な outputText でも章重複を排除する（LLM出力に「=== おわりに ===」が
+      // 自分で書き込まれているケースなど、二重防御として）
+      setOutputText(dedupeOutputSections(combined));
       setChapterStockProgress(null);
     } catch (e) {
       setRunError(e.message + "\n\n途中までの結果は破棄されます。少し時間をおいてから「全章を順次生成」をもう一度お試しください。");
@@ -4599,28 +4615,6 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
               <li>コピーした確定版を貼り付け</li>
               <li>「<strong>出力データを保存</strong>」ボタンを押す</li>
             </ol>
-          </div>
-        )}
-        {/* v4 緊急対策: STEP6/7/8 の章重複バグで「=== おわりに ===」等が複数出る場合の自動修復ボタン。
-            extractChapters 側の重複排除（commit ed86268）は次回再生成時にしか効かないため、
-            既に保存された壊れた出力をその場で修復できるよう設置。 */}
-        {(step.num === 6 || step.num === 7 || step.num === 8) && detectDuplicateSections(outputText) && (
-          <div style={{ padding: "12px 14px", background: "#fef2f2", border: `1px solid ${C.red}`, borderRadius: 4, marginBottom: 10, fontSize: 13, color: C.text, lineHeight: 1.7, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-            <div>
-              ⚠ <strong style={{ color: C.red }}>出力に重複した章セクション（例：「=== おわりに ===」が2回）</strong>を検出しました。<br />
-              <span style={{ fontSize: 12, color: C.textSub }}>再生成不要。ボタン1つで重複セクションを自動修復できます（本文が長い方を残します）。</span>
-            </div>
-            <button
-              onClick={async () => {
-                const fixed = dedupeOutputSections(outputText);
-                setOutputText(fixed);
-                await onSaveOutput(step.num, fixed);
-                setSaveOutputMsg("saved");
-                setTimeout(() => setSaveOutputMsg(false), 2500);
-              }}
-              style={{ flexShrink: 0, padding: "8px 18px", background: C.red, color: C.white, border: "none", borderRadius: 3, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-              🔧 重複を自動修復して保存
-            </button>
           </div>
         )}
         <textarea value={outputText} onChange={(e) => setOutputText(e.target.value)}
