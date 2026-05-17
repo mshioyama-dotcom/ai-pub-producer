@@ -89,15 +89,17 @@ function extractMainKeywordsSection(text) {
 
 // STEP2 で選定したキーワードが、Dify から返ってきた確定版で書き換えられていないか検証。
 // 書き換えられていれば、STEP2 選定値で強制的に上書きして warnings に明示する。
+//
 // 設計意図: STEP2 はAmazon検索のスコアデータに基づいてキーワードを確定する工程。
 // この結果を確定アクションのLLMが「コンセプト整合性」を理由に書き換えるのは、
 // 市場検証されていないキーワードで本書を設計することになり、本来の運用上の意図に反する。
 // もしキーワードを変えたい場合は STEP2 のキーワード分析からやり直すのが正しいフロー。
 //
-// 検出順序:
-//   ① 新形式「## 主要検索キーワード」セクションを探す → 全STEP2選定値が含まれていれば合格
-//   ② 旧形式「主題軸: XXX」を探す → 一致すれば合格、不一致なら置換
-//   ③ どちらも見つからなければ警告
+// 動作方針（堅牢化）:
+//   ① 新形式「## 主要検索キーワード」セクション → 含まれていれば合格、不一致なら置換
+//   ② 旧形式「主題軸: XXX」インライン → 一致すれば合格（読者軸/差分軸はLLM任せ）、不一致なら置換
+//   ③ どちらの形式も無い → 確定版末尾に「## 主要検索キーワード（STEP2選定・固定）」を追記
+//   ※ どんな出力形式でも、最終的に STEP2 選定値が確定版に必ず残ることを保証する
 function enforceSelectedKeywords(confirmedText, selectedKeywords) {
   const warnings = [];
   if (!Array.isArray(selectedKeywords) || selectedKeywords.length === 0) {
@@ -105,25 +107,23 @@ function enforceSelectedKeywords(confirmedText, selectedKeywords) {
   }
   // 選定キーワードを正規化（全角/半角スペースの違いを吸収）
   const normalize = (s) => String(s || "").replace(/[\s　]+/g, " ").trim();
-  const expectedKws = selectedKeywords.map(normalize).filter(Boolean);
-  if (expectedKws.length === 0) return { text: confirmedText, warnings };
+  const expectedRaw = selectedKeywords.map((s) => String(s).trim()).filter(Boolean);
+  const expectedNorm = expectedRaw.map(normalize);
+  if (expectedRaw.length === 0) return { text: confirmedText, warnings };
 
   // ① 新形式: 「## 主要検索キーワード」セクション
   const mainSectionKws = extractMainKeywordsSection(confirmedText).map(normalize);
   if (mainSectionKws.length > 0) {
-    // STEP2 選定値のすべてが含まれているか確認（スペース正規化後の完全一致）
-    const allIncluded = expectedKws.every((kw) => mainSectionKws.includes(kw));
+    const allIncluded = expectedNorm.every((kw) => mainSectionKws.includes(kw));
     if (allIncluded) {
-      // すべて反映済み → 警告なしで返す
-      return { text: confirmedText, warnings };
+      return { text: confirmedText, warnings }; // 既に反映済み → そのまま
     }
-    // 含まれていない選定値がある → セクション本文を STEP2 選定値で置換
+    // セクション本文を STEP2 選定値で置換
     const sectionRe = /((?:^|\n)#{2,3}\s*(?:主要)?検索キーワード[^\n]*\n)([\s\S]*?)(?=\n#{1,3}\s|\n*$)/;
-    const replacedSection = expectedKws.map((kw) => `- ${kw}`).join("\n") + "\n";
+    const replacedSection = expectedRaw.map((kw) => `- ${kw}`).join("\n") + "\n";
     const replaced = confirmedText.replace(sectionRe, `$1${replacedSection}`);
     warnings.push(
-      `⚠ Dify の確定アクション LLM が「主要検索キーワード」を STEP2 選定値（${expectedKws.join("、")}）と異なる値で出力していたため、STEP2 選定値に復元しました。`
-      + ` 元の値: ${mainSectionKws.join("、")}`
+      `⚠ Dify の確定アクション LLM が「主要検索キーワード」セクションを STEP2 選定値（${expectedRaw.join("、")}）と異なる値（${mainSectionKws.join("、")}）で出力していたため、STEP2 選定値に復元しました。`
       + ` 市場検証していないキーワードへの自動変更は無効化されます。`
       + ` 本当にキーワードを変えたい場合は、STEP2 のキーワード分析からやり直してください。`
     );
@@ -132,25 +132,32 @@ function enforceSelectedKeywords(confirmedText, selectedKeywords) {
 
   // ② 旧形式: 「主題軸: XXX」インライン
   const extracted = extractKeywords3Axes(confirmedText);
-  const expectedTheme = expectedKws[0];
-  if (normalize(extracted.theme) === expectedTheme) return { text: confirmedText, warnings };
-
-  let replaced = confirmedText;
-  const themeLineRe = /((?:^|\n)\s*[\-・*+]?\s*主題軸\s*[：:]\s*)([^\n]+)/;
-  if (themeLineRe.test(replaced)) {
-    replaced = replaced.replace(themeLineRe, `$1${expectedTheme}`);
-    warnings.push(
-      `⚠ Dify の確定アクション LLM が主題軸を「${expectedTheme}」→「${extracted.theme}」に書き換えていたため、STEP2 で選定したキーワードに復元しました。`
-      + ` 市場検証していないキーワードへの自動変更は無効化されます。`
-      + ` 本当にキーワードを変えたい場合は、STEP2 のキーワード分析からやり直してください。`
-    );
-    return { text: replaced, warnings };
+  const expectedTheme = expectedRaw[0];
+  const expectedThemeNorm = expectedNorm[0];
+  if (extracted.theme) {
+    if (normalize(extracted.theme) === expectedThemeNorm) {
+      return { text: confirmedText, warnings }; // 主題軸 = STEP2 選定値1個目 → 合格（読者軸/差分軸はLLM任せ）
+    }
+    // 主題軸を STEP2 選定値で置換
+    const themeLineRe = /((?:^|\n)\s*[\-・*+]?\s*主題軸\s*[：:]\s*)([^\n]+)/;
+    if (themeLineRe.test(confirmedText)) {
+      const replaced = confirmedText.replace(themeLineRe, `$1${expectedTheme}`);
+      warnings.push(
+        `⚠ Dify の確定アクション LLM が主題軸を STEP2 選定値「${expectedTheme}」ではなく「${extracted.theme}」で出力していたため、STEP2 選定値に復元しました。`
+        + ` 市場検証していないキーワードへの自動変更は無効化されます。`
+        + ` 本当にキーワードを変えたい場合は、STEP2 のキーワード分析からやり直してください。`
+      );
+      return { text: replaced, warnings };
+    }
   }
 
-  // ③ どちらの形式も見つからない → 警告
+  // ③ どちらの形式も認識できない → 末尾に強制追記して STEP2 選定値を必ず残す
+  const appendix = `\n\n---\n\n## 主要検索キーワード（STEP2選定・固定）\n${expectedRaw.map((kw) => `- ${kw}`).join("\n")}\n`;
+  const replaced = confirmedText.replace(/\s*$/, "") + appendix;
   warnings.push(
-    `⚠ 確定版に「## 主要検索キーワード」セクションも「主題軸：」行も見つからなかったため、STEP2 選定キーワード（${expectedKws.join("、")}）が反映されているか自動検証できませんでした。`
-    + ` 確定版プレビューで該当箇所を目視確認してください。問題なければそのまま次STEPへ進んでOKです。`
+    `⚠ Dify の確定アクション LLM 出力に「## 主要検索キーワード」セクションも「主題軸：」行も見つからなかったため、確定版の末尾に STEP2 選定値（${expectedRaw.join("、")}）を強制追記しました。`
+    + ` STEP5/STEP6 のキーワード自動転記に必要なため、このセクションは編集しないでください。`
+    + ` この警告が頻発する場合は、確定アクションの Dify YML プロンプトを見直してください。`
   );
   return { text: replaced, warnings };
 }
