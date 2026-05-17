@@ -1068,6 +1068,51 @@ function extractSections(text) {
   return sections.filter((s) => s.items.length > 0);
 }
 
+// STEP9 本文作成の章単位出力で、項ごとに重複して現れる章タイトル・節見出しを除去する。
+// 各Dify項出力には「章タイトル / 節見出し / 項見出し / 本文」が含まれるため、項を結合すると
+// 章タイトルが項ごとに、節見出しが節内項ごとに繰り返し出現する。これを最初の1回だけに整理し、
+// 「新しい章のときだけ章タイトル、新しい節のときだけ節見出し」が出る読みやすい出力にする。
+// stripChapterSection（はじめに/おわりに非対応・節間重複未対応）を置き換える後継関数。
+function dedupeBodyHeaders(text) {
+  if (!text || typeof text !== "string") return text;
+  const lines = text.split("\n");
+  const result = [];
+  const seenChapterKeys = new Set();
+  const seenSectionKeys = new Set();
+  const isChapterHeading = (line) => {
+    const t = line.trim();
+    if (!t || t.length > 80) return false;
+    if (/^はじめに\s*$/.test(t)) return true;
+    if (/^おわりに\s*$/.test(t)) return true;
+    if (/^第[0-9０-９零一二三四五六七八九十百]+章/.test(t)) return true;
+    return false;
+  };
+  const isSectionHeading = (line) => {
+    const t = line.trim();
+    if (!t || t.length > 100) return false;
+    // (1) / （1） / (1) 節タイトル
+    return /^[（(][0-9０-９]+[）)]/.test(t);
+  };
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (isChapterHeading(line)) {
+      if (seenChapterKeys.has(trimmed)) continue; // 重複スキップ
+      seenChapterKeys.add(trimmed);
+      result.push(line);
+      continue;
+    }
+    if (isSectionHeading(line)) {
+      if (seenSectionKeys.has(trimmed)) continue; // 重複スキップ
+      seenSectionKeys.add(trimmed);
+      result.push(line);
+      continue;
+    }
+    result.push(line);
+  }
+  // 連続する空白行を最大2行までに圧縮（節区切りの空行は維持）
+  return result.join("\n").replace(/\n{3,}/g, "\n\n");
+}
+
 function stripChapterSection(output, isFirst) {
   if (isFirst) return output;
   if (!output || typeof output !== "string") return output;
@@ -3806,11 +3851,24 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
 
   useEffect(() => {
     setInputs(stepData.inputData || {});
-    // STEP6/7/8 のバルク生成出力では「=== 同じ章 ===」の重複を mount 時に自動修復してから表示する。
+    // STEP6/7/8/9 のバルク生成出力では「=== 同じ章 ===」の重複を mount 時に自動修復してから表示する。
     // 既に保存されている壊れた出力もユーザー操作なしで自動的に修復される。
+    // STEP9 はさらに「章単位で章タイトル・節見出しの繰り返し」も自動除去する。
     let loadedOutput = stepData.outputText || "";
-    if ((step.num === 6 || step.num === 7 || step.num === 8) && loadedOutput) {
+    if ((step.num === 6 || step.num === 7 || step.num === 8 || step.num === 9) && loadedOutput) {
       loadedOutput = dedupeOutputSections(loadedOutput);
+    }
+    if (step.num === 9 && loadedOutput) {
+      // 章ごとに dedupeBodyHeaders を適用して、項ごとに繰り返される章タイトル・節見出しを整理する
+      const { preamble, sections } = parseOutputSections(loadedOutput);
+      if (sections.length > 0) {
+        const cleanedSections = sections.map((s) => ({
+          ...s,
+          body: dedupeBodyHeaders(s.body),
+        }));
+        const body = cleanedSections.map((s) => `${s.header}\n\n${s.body}`).join("\n\n---\n\n");
+        loadedOutput = (preamble ? preamble + "\n\n" : "") + body;
+      }
     }
     setOutputText(loadedOutput);
     setHelpOpen(false); setValidationErrors([]); setCharErrors({}); setRunError("");
@@ -3918,10 +3976,19 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
 
   const handleSaveOutput = async () => {
     let cleaned = cleanOutputText(outputText);
-    // STEP6/7/8 のバルク生成出力では、章重複（=== おわりに === が2回など）を保存時点で必ず除去する。
+    // STEP6/7/8/9 のバルク生成出力では、章重複（=== おわりに === が2回など）を保存時点で必ず除去する。
     // これにより既存の壊れた出力も「保存」を押すだけで自動修復される。
-    if (step.num === 6 || step.num === 7 || step.num === 8) {
+    if (step.num === 6 || step.num === 7 || step.num === 8 || step.num === 9) {
       cleaned = dedupeOutputSections(cleaned);
+    }
+    // STEP9 は章単位で章タイトル・節見出しの繰り返しも除去
+    if (step.num === 9 && cleaned) {
+      const { preamble, sections } = parseOutputSections(cleaned);
+      if (sections.length > 0) {
+        const cleanedSections = sections.map((s) => ({ ...s, body: dedupeBodyHeaders(s.body) }));
+        const body = cleanedSections.map((s) => `${s.header}\n\n${s.body}`).join("\n\n---\n\n");
+        cleaned = (preamble ? preamble + "\n\n" : "") + body;
+      }
     }
     if (cleaned !== outputText) setOutputText(cleaned);
     await onSaveOutput(step.num, cleaned);
@@ -4136,10 +4203,14 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           await new Promise((r) => setTimeout(r, 1500));
         }
         if (itemOutputs.length > 0) {
-          sectionOutputs.push(itemOutputs.map((out, idx) => stripChapterSection(out, idx === 0)).join("\n\n"));
+          // 項単位の出力をそのまま連結（章タイトル・節見出しの重複は後段の dedupeBodyHeaders で一括除去）
+          sectionOutputs.push(itemOutputs.join("\n\n"));
         }
       }
-      const chapterContent = sectionOutputs.join("\n\n");
+      // 章単位で章タイトル・節見出しの重複を除去
+      //   - 章タイトル（はじめに / 第N章 / おわりに）→ 最初の1回だけ
+      //   - 節見出し（(1) (2) (3) ...）→ 各節の最初の1回だけ
+      const chapterContent = dedupeBodyHeaders(sectionOutputs.join("\n\n"));
       // 既存 outputText に upsert（同じ章が既にあれば置換、無ければ chapterOptions 順で挿入）
       const orderTitles = chapterOptions.map((c) => c.chapterTitle);
       const newOutput = upsertChapterInOutput(outputText, ch.chapterTitle, chapterContent, orderTitles);
