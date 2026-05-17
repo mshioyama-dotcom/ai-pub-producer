@@ -2854,6 +2854,7 @@ const ConfirmActionPage = ({ savedAuthorProfile, savedWorkProfileDraft, onSaveWo
   const [isRunning, setIsRunning] = useState(false);
   const [runError, setRunError] = useState("");
   const [saveMsg, setSaveMsg] = useState(false);
+  const [warnings, setWarnings] = useState([]);
 
   const hasDraft = !!(savedWorkProfileDraft || "").trim();
   const hasSelectedKeywords = Array.isArray(selectedKeywords) && selectedKeywords.length > 0;
@@ -2900,6 +2901,7 @@ const ConfirmActionPage = ({ savedAuthorProfile, savedWorkProfileDraft, onSaveWo
         return;
       }
       setConfirmedText(data.work_profile_final || "");
+      setWarnings(Array.isArray(data.warnings) ? data.warnings : []);
     } catch (e) {
       if (e.name === "AbortError") {
         setRunError("4分以上応答がなかったため処理を中断しました。もう一度ボタンを押してみてください。");
@@ -2993,6 +2995,14 @@ const ConfirmActionPage = ({ savedAuthorProfile, savedWorkProfileDraft, onSaveWo
         <div style={{ fontSize: 12, color: C.textSub, marginBottom: 8, lineHeight: 1.7 }}>
           AIが生成した確定版を確認してください。受講生の判断で内容を編集できます。マークダウン構造（## 見出し）は崩さないでください（後段STEPが見出しで構造抽出するため）。
         </div>
+        {warnings.length > 0 && (
+          <div style={{ marginBottom: 12, padding: "10px 14px", background: "#fff8e1", border: `1px solid ${C.gold}`, borderRadius: 4, fontSize: 12.5, color: C.navy, lineHeight: 1.75 }}>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>⚠ 確定版生成時の警告</div>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {warnings.map((w, i) => <li key={i} style={{ marginBottom: 4 }}>{w}</li>)}
+            </ul>
+          </div>
+        )}
         <textarea value={confirmedText} onChange={(e) => setConfirmedText(e.target.value)}
           rows={24}
           placeholder="確定版生成後にここにマークダウンが表示されます。手動編集も可能です。"
