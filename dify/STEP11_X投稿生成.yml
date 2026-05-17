@@ -113,7 +113,7 @@ workflow:
           type: paragraph
           variable: amazon_description_text
         - default: 'standard_280'
-          hint: 'short_140 / standard_280 / premium_3000 のいずれか'
+          hint: 'short_140 / standard_280 のいずれか'
           label: 投稿の文字数設定
           max_length: 32
           options: []
@@ -149,12 +149,10 @@ workflow:
           variable_selector: []
         model:
           completion_params:
-            enable_stream: false
             max_tokens: 6000
-            reasoning_effort: low
-            verbosity: low
+            temperature: 0.7
           mode: chat
-          name: gpt-5.2-mini
+          name: gpt-4o
           provider: langgenius/openai/openai
         prompt_template:
         - id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
@@ -199,7 +197,7 @@ workflow:
 
             ■ 投稿の文字数設定: {{#1773600000001.tweet_length#}}
 
-            （short_140 = 140字以内 / standard_280 = 280字以内 / premium_3000 = 〜3000字の長文投稿）
+            （short_140 = 140字以内 / standard_280 = 280字以内）
 
 
             ■ 生成本数: {{#1773600000001.total_count#}}
@@ -215,8 +213,6 @@ workflow:
             - short_140 の場合: 各投稿の本文は **140文字以内** に厳格に収める。URL等を含めない前提で、本文だけで完結する文字数として140文字以内。
 
             - standard_280 の場合: 各投稿の本文は **280文字以内**（X Premium非加入アカウントの上限）。
-
-            - premium_3000 の場合: 各投稿の本文は **3000文字以内**（X Premium加入アカウントの長文投稿向け）。本書のテーマや章のエッセンスを段落構成で語る長文投稿を中心に。
 
 
             **文字数を超過した投稿は致命的欠陥として扱い、絶対に出力しない。**生成時に毎回文字数をカウントして確認すること。

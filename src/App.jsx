@@ -207,10 +207,9 @@ const STEPS = [
       // amazon_description_text は UI 非表示・実行時に allSteps[10].outputText から自動転記。
       // ユーザーが触る必要がないので required: false、type は維持するが render side で hidden 扱い。
       { name: "amazon_description_text", label: "Amazon説明文（STEP10から自動転記）", desc: "STEP10 のAmazon説明文が実行時に自動転記されます。手動入力は不要です。", source: "STEP10", required: false, type: "textarea", autoFill: true, maxChars: 4000 },
-      { name: "tweet_length", label: "投稿の文字数設定", desc: "短文140字 / 標準280字 / 長文Premium向け（〜3000字）から選択", source: null, required: true, type: "select", options: [
+      { name: "tweet_length", label: "投稿の文字数設定", desc: "短文140字 / 標準280字 から選択", source: null, required: true, type: "select", options: [
         { value: "short_140", label: "短文（140字以内）" },
-        { value: "standard_280", label: "標準（280字以内・推奨）" },
-        { value: "premium_3000", label: "長文Premium向け（〜3000字）" }
+        { value: "standard_280", label: "標準（280字以内・推奨）" }
       ], default: "standard_280", maxChars: 32 },
       { name: "total_count", label: "生成本数", desc: "20本 / 25本 / 30本 から選択", source: null, required: true, type: "select", options: [
         { value: "20", label: "20本" },
