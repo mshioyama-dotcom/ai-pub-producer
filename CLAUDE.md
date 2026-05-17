@@ -126,6 +126,40 @@ npm run build        # TypeScript型チェック＋Vite本番ビルド（push前
 - **push 前に必ず `npm run test && npm run build` で両方緑を確認**（🧪 セクション参照）
 - API キーは絶対に画面・チャット・commit メッセージに貼らない
 
+## 🔢 STEPS 配列を拡張するときのチェックリスト（必須）
+
+新しい STEP を `src/App.jsx` の `STEPS` 配列に追加するとき、これ全部やらないと**本番で白画面が出る**（コミット `e39969c` の事故・STEP11追加で実際に発生）。
+
+### コード側で対応すること
+
+- [ ] `STEPS` 配列に新規 entry 追加（id / num / title / description / category / type / url / inputs / outputTitle / help）
+- [ ] `CATEGORIES` 配列の該当 category の `steps` 配列に番号追加
+- [ ] `api/dify.js` の `API_KEYS` map に `[新stepNum]: process.env.DIFY_API_KEY_STEP<NN>` を追加
+- [ ] `api/dify.js` の `resolveApiKey` がその step を正しい環境変数にルーティングするか確認（新規 step では分岐追加が必要なことが多い）
+- [ ] `api/dify.js` の `mapInputs` で必要なキーリマップを追加（YML 入力変数名と front 側変数名が違う場合）
+- [ ] 入力フィールドに **新しい type（select 等）を使う場合**は、`StepPage` の field renderer に分岐を追加
+- [ ] **`loadAllSteps` / `resetAllData` は `STEPS` 配列を動的に走査しているか確認**（ハードコード `1〜10` などにしないこと）
+- [ ] **`Badge` コンポーネントは undefined-safe か**（`STATUS_COLORS[status]` の null チェック必須）
+
+### Dify 側で対応すること
+
+- [ ] `dify/STEP<NN>_<機能名>.yml` を新規作成（既存ワークフロー YML を参考に）
+- [ ] Dify Cloud に DSL インポート → ワークフローを **公開**
+- [ ] 公開後の API キー を取得
+
+### Vercel 側で対応すること
+
+- [ ] Vercel 環境変数に `DIFY_API_KEY_STEP<NN>` を追加（Production / Preview / Development 全部チェック）
+- [ ] **環境変数追加だけでは反映されないため、必ず Redeploy する**（Build Cache のチェックを外す）
+
+### 動作確認
+
+- [ ] サイドメニューに新 STEP が「未着手」で表示される
+- [ ] 新 STEP をクリックしてページが開く
+- [ ] **既存ユーザーの localStorage を持つ状態**でも白画面にならない（ハードリフレッシュ Ctrl+Shift+R で確認）
+- [ ] 入力フィールドが正常に表示される
+- [ ] `▶ 実行する` を押して Dify が応答する
+
 ## 📚 主要ドキュメント
 
 - `docs/SESSION_HANDOFF.md`：直近セッションの作業状況・進行中リファクタ宣言・残タスク
