@@ -211,11 +211,11 @@ const STEPS = [
         { value: "short_140", label: "短文（140字以内）" },
         { value: "standard_280", label: "標準（280字以内・推奨）" }
       ], default: "standard_280", maxChars: 32 },
-      { name: "total_count", label: "生成本数", desc: "20本 / 25本 / 30本 から選択", source: null, required: true, type: "select", options: [
-        { value: "20", label: "20本" },
-        { value: "25", label: "25本（推奨）" },
-        { value: "30", label: "30本" }
-      ], default: "25", maxChars: 8 }
+      { name: "total_count", label: "生成本数", desc: "10本 / 15本 / 20本 から選択。少なめにした方が1本ずつの品質が上がります。", source: null, required: true, type: "select", options: [
+        { value: "10", label: "10本" },
+        { value: "15", label: "15本（推奨）" },
+        { value: "20", label: "20本" }
+      ], default: "15", maxChars: 8 }
     ],
     outputTitle: "X投稿リスト",
     help: [
@@ -4286,6 +4286,128 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     }
   };
 
+  // STEP11（X投稿生成）専用: 1投稿ずつイテレーションして全投稿を生成する。
+  // 1回の Dify 呼び出しで複数投稿を作ると、文字数指示が無視されたり禁止表現が漏れたりするため、
+  // 1投稿/回のイテレーション設計に変更（STEP6/7/8/9 と同じパターン）。
+  // 各回で target_timing / target_phase / target_purpose を変えて多様性を確保し、
+  // existing_summary に既出投稿の冒頭を渡して重複を防止する。
+  const buildPostPlan = (totalCount) => {
+    // 出版前 / 出版直後 / 出版後 のフェーズ別配分（15本/20本/10本に対応）
+    // 比率は概ね 出版前33% / 直後20% / 後47%
+    const total = parseInt(String(totalCount || "15"), 10);
+    const preCount = Math.max(2, Math.round(total * 0.33));
+    const justCount = Math.max(2, Math.round(total * 0.20));
+    const postCount = total - preCount - justCount;
+    const plan = [];
+    const preTimings = [
+      "出版1ヶ月前", "出版3週間前", "出版2週間前", "出版10日前",
+      "出版1週間前", "出版5日前", "出版3日前", "出版前日",
+    ];
+    const justTimings = ["出版当日", "出版翌日", "出版2日後", "出版3日後", "出版4日後"];
+    const postTimings = [
+      "出版1週間後", "出版10日後", "出版2週間後", "出版3週間後",
+      "出版1ヶ月後", "出版5週間後", "出版6週間後", "出版2ヶ月後",
+      "出版10週間後", "出版3ヶ月後",
+    ];
+    const prePurposes = ["予告", "著者ストーリー", "期待感醸成", "本書のテーマ予告"];
+    const justPurposes = ["告知", "核メッセージ宣言", "読者参加呼びかけ"];
+    const postPurposes = ["章ごとの引用", "著者の発信", "内容紹介", "読者反応の紹介", "継続露出"];
+    for (let i = 0; i < preCount; i++) {
+      plan.push({
+        target_timing: preTimings[i % preTimings.length],
+        target_phase: "出版前",
+        target_purpose: prePurposes[i % prePurposes.length],
+      });
+    }
+    for (let i = 0; i < justCount; i++) {
+      plan.push({
+        target_timing: justTimings[i % justTimings.length],
+        target_phase: "出版直後",
+        target_purpose: justPurposes[i % justPurposes.length],
+      });
+    }
+    for (let i = 0; i < postCount; i++) {
+      plan.push({
+        target_timing: postTimings[i % postTimings.length],
+        target_phase: "出版後",
+        target_purpose: postPurposes[i % postPurposes.length],
+      });
+    }
+    return plan;
+  };
+
+  const handleRunAllPostsForStep11 = async () => {
+    if (step.num !== 11) return;
+    if ((outputText || "").trim()) {
+      const ok = window.confirm("現在の出力データは上書きされます。続行しますか？");
+      if (!ok) return;
+    }
+    // 入力チェック（amazon_description_text は実行時に allSteps[10].outputText から自動転記）
+    const amazonText = allSteps?.[10]?.outputText || "";
+    if (!amazonText.trim()) {
+      setRunError("STEP10 の出力データがまだ保存されていません。STEP10 で「出力データを保存」を押してから戻ってきてください。");
+      return;
+    }
+    const totalCount = parseInt(String(inputs.total_count || "15"), 10);
+    const tweetLength = String(inputs.tweet_length || "standard_280");
+    const plan = buildPostPlan(totalCount);
+    setIsRunning(true);
+    setRunError("");
+    setChapterStockProgress({ total: plan.length, current: 0, currentItemName: "" });
+    const results = [];
+    try {
+      for (let i = 0; i < plan.length; i++) {
+        const slot = plan[i];
+        setChapterStockProgress({
+          total: plan.length,
+          current: i + 1,
+          currentItemName: `${slot.target_timing} ／ ${slot.target_purpose}`,
+        });
+        // 既出投稿の冒頭サマリを5件まで渡す（重複防止）
+        const existingSummary = results.slice(-5).map((r, idx) => `[${idx + 1}] ${(r.content || "").slice(0, 50)}`).join("\n");
+        const profiles = getAutoInjectedProfiles();
+        const execInputs = {
+          author_profile: profiles.author_profile || "",
+          work_profile: profiles.work_profile || "",
+          amazon_description_text: amazonText,
+          tweet_length: tweetLength,
+          target_timing: slot.target_timing,
+          target_phase: slot.target_phase,
+          target_purpose: slot.target_purpose,
+          existing_summary: existingSummary,
+        };
+        const response = await fetch("/api/dify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ stepNum: 11, inputs: execInputs }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(`投稿 ${i + 1}（${slot.target_timing}・${slot.target_purpose}）の生成で失敗：${data.error || "不明なエラー"}`);
+        }
+        const content = (data.output || "").trim();
+        if (!content) {
+          throw new Error(`投稿 ${i + 1}（${slot.target_timing}・${slot.target_purpose}）の生成結果が空でした。`);
+        }
+        results.push({ ...slot, content });
+        // レート制御: 投稿ごとに 800ms ウェイト
+        if (i < plan.length - 1) await new Promise((r) => setTimeout(r, 800));
+      }
+      // 全投稿を整形して outputText にセット
+      const combined = results.map((r, i) => {
+        const charCount = (r.content || "").length;
+        return `━━━ 投稿 ${i + 1} ━━━\n推奨投稿日: ${r.target_timing}\nタイミング区分: ${r.target_phase}\n用途タグ: ${r.target_purpose}\n文字数: ${charCount}\n\n${r.content}`;
+      }).join("\n\n");
+      setOutputText(combined);
+      setChapterStockProgress(null);
+    } catch (e) {
+      setRunError(e.message + "\n\n途中までの結果は破棄されます。少し時間をおいてから再度お試しください。");
+      setChapterStockProgress(null);
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
   // STEP7 専用: 抽出された全章を順次 Dify に投げて、結果を outputText に蓄積する。
   // 章間に短いウェイトを入れてレートリミット対策（Anthropic 30K input tokens/min）。
   const handleRunAllChaptersForStep7 = async () => {
@@ -4919,6 +5041,45 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                       </div>
                     );
                   })()}
+                </>
+              )}
+            </div>
+          ) : step.num === 11 ? (
+            // STEP11（X投稿生成）は 1 投稿/回イテレーションで全投稿を順次生成。
+            // 1回の Dify 呼び出しで複数投稿を作ると文字数指示が無視されたり禁止表現が漏れたりするため、
+            // STEP6/7/8/9 と同じパターンで 1 投稿ずつ生成する設計に統一。
+            <div>
+              {runError && <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginBottom: 12, fontSize: 13, color: C.red, whiteSpace: "pre-wrap", lineHeight: 1.7 }}>{runError}</div>}
+              {chapterStockProgress ? (
+                <div style={{ padding: "12px 14px", background: C.navyLight, border: `1px solid rgba(42,68,104,0.2)`, borderRadius: 4 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, fontSize: 12.5, color: C.navyMid, fontWeight: 600 }}>
+                    <span>X投稿を順次生成中：{chapterStockProgress.current} / {chapterStockProgress.total} 本</span>
+                    <span>{Math.round((chapterStockProgress.current / chapterStockProgress.total) * 100)}%</span>
+                  </div>
+                  <div style={{ height: 8, background: "rgba(0,0,0,0.08)", borderRadius: 4, overflow: "hidden" }}>
+                    <div style={{ width: `${(chapterStockProgress.current / chapterStockProgress.total) * 100}%`, height: "100%", background: C.navy, transition: "width 0.3s ease" }} />
+                  </div>
+                  <div style={{ marginTop: 8, fontSize: 12, color: C.textSub, lineHeight: 1.6 }}>⏳ 生成中：<span style={{ color: C.text, fontWeight: 600 }}>{chapterStockProgress.currentItemName}</span></div>
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 13, color: C.textSub, lineHeight: 1.8, marginBottom: 12 }}>
+                    STEP10 のAmazon説明文から、X 投稿を <strong>1 本ずつ順次生成</strong>します（イテレーション設計）。
+                    1 投稿あたり 5〜10 秒、合計で <strong>{inputs.total_count || "15"} 本 × 約8秒 ＝ 約2〜3分</strong>かかります。
+                    各回で著者の文体・固有実績（20冊・印税300万 等）・禁止表現リスト・文字数規律を守らせるため、品質が安定します。
+                  </div>
+                  {!allSteps?.[10]?.outputText && (
+                    <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginBottom: 12, fontSize: 13, color: C.red }}>
+                      ⚠ STEP10 の出力データがまだ保存されていません。STEP10 で「出力データを保存」を押してから戻ってきてください。
+                    </div>
+                  )}
+                  {allSteps?.[10]?.outputText && (
+                    <button onClick={handleRunAllPostsForStep11} disabled={isRunning}
+                      title="X投稿を 1 本ずつ順次生成します"
+                      style={{ padding: "12px 36px", background: isRunning ? "#93c5fd" : C.navy, color: C.white, border: "none", borderRadius: 3, fontWeight: 700, fontSize: 14, cursor: isRunning ? "default" : "pointer", letterSpacing: "0.04em" }}>
+                      🚀 全投稿を順次生成（{inputs.total_count || "15"}本）
+                    </button>
+                  )}
                 </>
               )}
             </div>
