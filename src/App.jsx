@@ -3450,22 +3450,73 @@ const Step4ConfirmPanel = ({ outputText }) => {
         </div>
       )}
 
+      {/* メインタイトル個別の文字数フィードバック
+         推奨レンジ: 〜25字（Amazon検索結果のサムネ下表示で読み切れるライン）
+         警告レンジ: 26〜32字（サムネ表示で末尾が「…」省略される可能性）
+         NGレンジ:   33字以上（サムネで「核ワード」が見えなくなりやすい） */}
       <div style={{ marginBottom: 10 }}>
-        <label style={{ fontSize: 12.5, fontWeight: 600, color: C.navy, display: "block", marginBottom: 4 }}>メインタイトル</label>
+        <label style={{ fontSize: 12.5, fontWeight: 600, color: C.navy, display: "block", marginBottom: 4 }}>
+          メインタイトル
+          <span style={{ marginLeft: 8, fontWeight: 400, fontSize: 11.5, color: C.textLight }}>
+            （Amazon検索結果のサムネ下では <b>約20〜22字</b> で「…」省略されます）
+          </span>
+        </label>
         <input type="text" value={titleInput} onChange={(e) => setTitleInput(e.target.value)}
           placeholder="案ボタンで自動入力、または手動で入力"
-          style={{ width: "100%", padding: "9px 12px", fontSize: 14, border: `1px solid ${C.border}`, borderRadius: 3, outline: "none", boxSizing: "border-box", background: C.white }} />
+          style={{ width: "100%", padding: "9px 12px", fontSize: 14, border: `1px solid ${titleInput.length > 32 ? C.red : (titleInput.length > 25 ? C.gold : C.border)}`, borderRadius: 3, outline: "none", boxSizing: "border-box", background: C.white }} />
+        <div style={{ marginTop: 4, fontSize: 11.5, color: titleInput.length > 32 ? C.red : (titleInput.length > 25 ? C.gold : C.textLight), lineHeight: 1.6 }}>
+          {titleInput.length === 0 ? (
+            <span>　</span>
+          ) : titleInput.length > 32 ? (
+            <span>⚠ {titleInput.length}字 — <b>長すぎ</b>です。サムネ下では「{titleInput.slice(0, 20)}…」と省略されます。25字以内に短縮し、後半の情報はサブタイトルへ移すことを推奨します。</span>
+          ) : titleInput.length > 25 ? (
+            <span>△ {titleInput.length}字 — やや長め。サムネ下では「{titleInput.slice(0, 20)}…」と省略される可能性があります。検索結果での視認性を最優先するなら25字以内が理想です。</span>
+          ) : (
+            <span>✓ {titleInput.length}字 — サムネ下でも読み切れる長さです。</span>
+          )}
+        </div>
       </div>
       <div style={{ marginBottom: 10 }}>
-        <label style={{ fontSize: 12.5, fontWeight: 600, color: C.navy, display: "block", marginBottom: 4 }}>サブタイトル</label>
+        <label style={{ fontSize: 12.5, fontWeight: 600, color: C.navy, display: "block", marginBottom: 4 }}>
+          サブタイトル
+          <span style={{ marginLeft: 8, fontWeight: 400, fontSize: 11.5, color: C.textLight }}>
+            （商品ページではメインの下に全長表示されます）
+          </span>
+        </label>
         <input type="text" value={subtitleInput} onChange={(e) => setSubtitleInput(e.target.value)}
           placeholder="案ボタンで自動入力、または手動で入力"
-          style={{ width: "100%", padding: "9px 12px", fontSize: 14, border: `1px solid ${C.border}`, borderRadius: 3, outline: "none", boxSizing: "border-box", background: C.white }} />
+          style={{ width: "100%", padding: "9px 12px", fontSize: 14, border: `1px solid ${subtitleInput.length > 80 ? C.red : (subtitleInput.length > 60 ? C.gold : C.border)}`, borderRadius: 3, outline: "none", boxSizing: "border-box", background: C.white }} />
+        <div style={{ marginTop: 4, fontSize: 11.5, color: subtitleInput.length > 80 ? C.red : (subtitleInput.length > 60 ? C.gold : C.textLight), lineHeight: 1.6 }}>
+          {subtitleInput.length === 0 ? (
+            <span>　</span>
+          ) : subtitleInput.length > 80 ? (
+            <span>⚠ {subtitleInput.length}字 — 長すぎです。60字以内を推奨します。</span>
+          ) : subtitleInput.length > 60 ? (
+            <span>△ {subtitleInput.length}字 — やや長め。読者像や具体ベネフィットを残しつつ、修飾語を削れないか検討してください。</span>
+          ) : (
+            <span>✓ {subtitleInput.length}字 — 適切な長さです。</span>
+          )}
+        </div>
       </div>
 
       <div style={{ fontSize: 12, color: isOverLimit ? C.red : C.textLight, marginBottom: 10 }}>
         合計文字数: {totalLen} / 200（Amazon KDP制限）{isOverLimit && " ← 超過しています"}
       </div>
+
+      {/* タイトル長すぎを直すヒント（メインタイトル > 25 のときだけ表示） */}
+      {titleInput.length > 25 && (
+        <div style={{ marginBottom: 12, padding: "10px 12px", background: "#fff8e1", border: `1px solid ${C.gold}`, borderRadius: 4, fontSize: 12, color: C.navyMid, lineHeight: 1.75 }}>
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>💡 メインタイトルを短くするには</div>
+          <div>
+            メインタイトルは「Kindleストア検索結果のサムネ下」で読まれるため、<b>20〜25字</b>が理想です。長すぎる場合は次の手順で短縮できます：
+          </div>
+          <ol style={{ margin: "6px 0 0 18px", padding: 0, lineHeight: 1.85 }}>
+            <li><b>核となる対比・順序を残す</b>（例：「やりたいことは、書いてから見えてくる」← この一文を残す）</li>
+            <li><b>追加の説明はサブタイトルへ移す</b>（例：「仕事の診断疲れを終わらせる自己理解」はサブへ）</li>
+            <li><b>下の「📋 外部AIで相談する用プロンプトを取得」を使って ChatGPT/Claude に短縮版を作ってもらう</b>のが最速です（メイン入力欄にコピペで反映）</li>
+          </ol>
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <button onClick={handleConfirm}
