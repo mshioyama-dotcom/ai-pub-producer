@@ -4376,18 +4376,37 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           target_purpose: slot.target_purpose,
           existing_summary: existingSummary,
         };
-        const response = await fetch("/api/dify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ stepNum: 11, inputs: execInputs }),
-        });
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(`投稿 ${i + 1}（${slot.target_timing}・${slot.target_purpose}）の生成で失敗：${data.error || "不明なエラー"}`);
-        }
-        const content = (data.output || "").trim();
-        if (!content) {
-          throw new Error(`投稿 ${i + 1}（${slot.target_timing}・${slot.target_purpose}）の生成結果が空でした。`);
+        // 文字数下限（standard_280 → 220字、short_140 → 100字）
+        // LLM が短く生成した場合、最大1回だけリトライ要求を出す
+        const minChars = tweetLength === "short_140" ? 100 : 220;
+        let content = "";
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const retryHint = attempt === 0
+            ? ""
+            : `※前回の生成結果が短すぎました（${content.length}字）。今回は **必ず ${minChars} 字以上** の本文を書いてください。具体例・固有体験・補足説明・問いかけを加えて膨らませてください。`;
+          const reqInputs = { ...execInputs };
+          if (retryHint) {
+            // existing_summary フィールドにリトライ指示を追記（プロンプト末尾に届く）
+            reqInputs.existing_summary = (reqInputs.existing_summary || "") + "\n\n" + retryHint;
+          }
+          const response = await fetch("/api/dify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ stepNum: 11, inputs: reqInputs }),
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(`投稿 ${i + 1}（${slot.target_timing}・${slot.target_purpose}）の生成で失敗：${data.error || "不明なエラー"}`);
+          }
+          content = (data.output || "").trim();
+          if (!content) {
+            throw new Error(`投稿 ${i + 1}（${slot.target_timing}・${slot.target_purpose}）の生成結果が空でした。`);
+          }
+          // 文字数が下限以上ならループ抜ける、未満かつまだリトライ可能なら再度生成
+          if (content.length >= minChars) break;
+          if (attempt === 1) break; // 2回目でも短ければ諦めて採用
+          // リトライ前のウェイト
+          await new Promise((r) => setTimeout(r, 500));
         }
         results.push({ ...slot, content });
         // レート制御: 投稿ごとに 800ms ウェイト
