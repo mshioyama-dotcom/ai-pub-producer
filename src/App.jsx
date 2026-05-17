@@ -888,6 +888,69 @@ function extractChapters(text) {
   return deduped;
 }
 
+// 出力テキスト内の「=== タイトル ===」セクション重複を検出・修復するユーティリティ。
+// 用途：STEP6/7/8 のバルク生成（全章順次生成）で同名章が複数出てしまった場合、
+// 既に保存された outputText を再実行なしで修復するため。
+// 正規化したタイトルで重複検出 → 本文が長い方を採用 → 順序保持で再構築。
+function normalizeChapterKey(title) {
+  return String(title || "")
+    .replace(/[\s　]/g, "")
+    .replace(/[：:]/g, "")
+    .replace(/[*#\[\]【】「」]/g, "")
+    .trim();
+}
+
+function detectDuplicateSections(text) {
+  if (!text || typeof text !== "string") return false;
+  const matches = [...text.matchAll(/^===\s*(.+?)\s*===$/gm)].map((m) => normalizeChapterKey(m[1]));
+  const seen = new Set();
+  for (const k of matches) {
+    if (!k) continue;
+    if (seen.has(k)) return true;
+    seen.add(k);
+  }
+  return false;
+}
+
+function dedupeOutputSections(text) {
+  if (!text || typeof text !== "string") return text;
+  // `=== title ===` 行をマーカーにして分割
+  const lines = text.split("\n");
+  const sections = [];
+  let current = null;
+  let preamble = ""; // 最初のセクション以前の本文（あれば保持）
+  for (const line of lines) {
+    const m = line.match(/^===\s*(.+?)\s*===$/);
+    if (m) {
+      if (current) sections.push(current);
+      current = { title: m[1].trim(), header: line, body: "" };
+    } else if (current) {
+      current.body += line + "\n";
+    } else {
+      preamble += line + "\n";
+    }
+  }
+  if (current) sections.push(current);
+
+  // 重複排除：正規化タイトルが同じセクションは本文が長い方を採用、順序は最初の出現位置を保持
+  const seen = new Map();
+  const deduped = [];
+  for (const s of sections) {
+    const key = normalizeChapterKey(s.title);
+    if (!key) { deduped.push(s); continue; }
+    if (seen.has(key)) {
+      const idx = seen.get(key);
+      if (s.body.length > deduped[idx].body.length) deduped[idx] = s;
+    } else {
+      seen.set(key, deduped.length);
+      deduped.push(s);
+    }
+  }
+
+  const body = deduped.map((s) => `${s.header}\n${s.body.trimEnd()}`).join("\n\n---\n\n");
+  return (preamble.trimEnd() ? preamble.trimEnd() + "\n\n" : "") + body;
+}
+
 // STEP7（詳細プロット）の出力から節 (1)(2)... と項①②③... を抽出する。
 // AI議論でフォーマットが揺れる前提で、装飾記号を除去してから判定。
 // サポートする節見出し: (1) / （1） / 1. / 1) / 1． / 1、 / **(1) xxx**
@@ -4536,6 +4599,28 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
               <li>コピーした確定版を貼り付け</li>
               <li>「<strong>出力データを保存</strong>」ボタンを押す</li>
             </ol>
+          </div>
+        )}
+        {/* v4 緊急対策: STEP6/7/8 の章重複バグで「=== おわりに ===」等が複数出る場合の自動修復ボタン。
+            extractChapters 側の重複排除（commit ed86268）は次回再生成時にしか効かないため、
+            既に保存された壊れた出力をその場で修復できるよう設置。 */}
+        {(step.num === 6 || step.num === 7 || step.num === 8) && detectDuplicateSections(outputText) && (
+          <div style={{ padding: "12px 14px", background: "#fef2f2", border: `1px solid ${C.red}`, borderRadius: 4, marginBottom: 10, fontSize: 13, color: C.text, lineHeight: 1.7, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+            <div>
+              ⚠ <strong style={{ color: C.red }}>出力に重複した章セクション（例：「=== おわりに ===」が2回）</strong>を検出しました。<br />
+              <span style={{ fontSize: 12, color: C.textSub }}>再生成不要。ボタン1つで重複セクションを自動修復できます（本文が長い方を残します）。</span>
+            </div>
+            <button
+              onClick={async () => {
+                const fixed = dedupeOutputSections(outputText);
+                setOutputText(fixed);
+                await onSaveOutput(step.num, fixed);
+                setSaveOutputMsg("saved");
+                setTimeout(() => setSaveOutputMsg(false), 2500);
+              }}
+              style={{ flexShrink: 0, padding: "8px 18px", background: C.red, color: C.white, border: "none", borderRadius: 3, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+              🔧 重複を自動修復して保存
+            </button>
           </div>
         )}
         <textarea value={outputText} onChange={(e) => setOutputText(e.target.value)}
