@@ -4069,6 +4069,13 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   // STEP9（本文作成）専用: 1章だけの本文を生成して既存 outputText に upsert する。
   // 本文作成は1章でも数千〜1万字になり、全章一気に走らせると失敗時のロスが大きい。
   // 章単位で生成 → 確認 → 次章へ進む、というインクリメンタルなフローに切り替えた。
+  //
+  // 試し読みフックゾーンの判定（is_opening_zone）:
+  //   - はじめに章のすべての項 → true
+  //   - 第1章の最初の節（section[0]）のすべての項 → true
+  //   - 上記以外 → false
+  // これによりDifyに「ここはAmazon試し読み範囲＝冒頭フック必須」を伝え、シーン描写・問いかけ・
+  // コア・ベネフィット予告を強制する。
   const handleRunOneChapterForStep9 = async (chapterIdx) => {
     if (step.num !== 9) return;
     const ch = chapterOptions?.[chapterIdx];
@@ -4079,20 +4086,32 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
       alert(`「${ch.chapterTitle}」の詳細プロットから節（1）(2)... や項①②③... を検出できませんでした。STEP8の出力をご確認ください。`);
       return;
     }
+    // 章タイトルから試し読み範囲か判定（正規化キー比較）
+    const chapterKey = normalizeChapterKey(ch.chapterTitle);
+    const isOpeningChapter = chapterKey === "はじめに";
+    const isFirstChapter = /^第1章/.test(chapterKey) || /^第１章/.test(chapterKey);
     setIsRunning(true);
     setRunError("");
     let itemsDone = 0;
     setChapterStockProgress({ total: totalItems, current: 0, currentItemName: ch.chapterTitle });
     try {
       const sectionOutputs = [];
-      for (const section of sections) {
+      for (let secIdx = 0; secIdx < sections.length; secIdx++) {
+        const section = sections[secIdx];
         const itemOutputs = [];
-        for (const item of (section.items || [])) {
+        const items = section.items || [];
+        for (let itemIdx = 0; itemIdx < items.length; itemIdx++) {
+          const item = items[itemIdx];
+          // 試し読みフックゾーン判定:
+          //   - はじめに → 全項 true
+          //   - 第1章の最初の節 → 全項 true
+          //   - それ以外 → false
+          const isOpeningZone = isOpeningChapter || (isFirstChapter && secIdx === 0);
           itemsDone++;
           setChapterStockProgress({
             total: totalItems,
             current: itemsDone,
-            currentItemName: `${ch.chapterTitle} ／ ${item}`,
+            currentItemName: `${ch.chapterTitle} ／ ${item}${isOpeningZone ? " [試し読みフック]" : ""}`,
           });
           const response = await fetch("/api/dify", {
             method: "POST",
@@ -4103,6 +4122,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                 ...getAutoInjectedProfiles(),
                 detailed_plot_text: ch.body.trim(),
                 target_heading: item,
+                is_opening_zone: isOpeningZone ? "true" : "false",
               },
             }),
           });
