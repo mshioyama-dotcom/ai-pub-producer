@@ -1092,19 +1092,29 @@ const AutoInjectedProfilesPanel = ({ onNavigate, stepNum }) => {
 
   return (
     <div style={{ marginBottom: 16, border: `1px solid ${C.border}`, borderRadius: 4, background: C.bg }}>
-      <button
-        onClick={() => setExpanded((v) => !v)}
-        style={{ width: "100%", textAlign: "left", padding: "10px 14px", background: "transparent", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}
-      >
-        <span style={{ fontSize: 12.5, fontWeight: 600, color: C.navyMid }}>
-          📎 自動転記される参照情報（AIに渡されます）
-          <span style={{ marginLeft: 8, fontSize: 11.5, color: C.textLight, fontWeight: 400 }}>
-            著者プロファイル: {hasAuthor ? "✓" : "未設定"} ／ 書籍プロファイル: {hasWork ? (workProfileSource === "confirmed" ? "✓ 確定版" : "△ 草案のみ") : "未設定"}
-            {needsTitle && <> ／ タイトル: <span style={{ color: hasTitle ? C.green : C.red, fontWeight: 600 }}>{hasTitle ? "✓ 確定済み" : "⚠ 未確定"}</span></>}
+      <div style={{ display: "flex", alignItems: "center", padding: "10px 14px", gap: 8 }}>
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          style={{ flex: 1, textAlign: "left", background: "transparent", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: 0 }}
+        >
+          <span style={{ fontSize: 12.5, fontWeight: 600, color: C.navyMid }}>
+            📎 自動転記される参照情報（AIに渡されます）
+            <span style={{ marginLeft: 8, fontSize: 11.5, color: C.textLight, fontWeight: 400 }}>
+              著者プロファイル: {hasAuthor ? "✓" : "未設定"} ／ 書籍プロファイル: {hasWork ? (workProfileSource === "confirmed" ? "✓ 確定版" : "△ 草案のみ") : "未設定"}
+              {needsTitle && <> ／ タイトル: <span style={{ color: hasTitle ? C.green : C.red, fontWeight: 600 }}>{hasTitle ? "✓ 確定済み" : "⚠ 未確定"}</span></>}
+            </span>
           </span>
-        </span>
-        <span style={{ fontSize: 13, color: C.textLight }}>{expanded ? "▲ 閉じる" : "▼ 展開"}</span>
-      </button>
+          <span style={{ fontSize: 13, color: C.textLight }}>{expanded ? "▲ 閉じる" : "▼ 展開"}</span>
+        </button>
+        {/* v4: 確定版がある場合、折りたたみ状態でも「見直す」ボタンを直接出す（ライブドキュメント運用） */}
+        {workProfileSource === "confirmed" && (
+          <button onClick={(e) => { e.stopPropagation(); onNavigate?.("step_confirm"); }}
+            title="書籍プロファイル確定版を編集・再保存できます。後段STEPの判断軸になるため、進めながら磨いていく運用です。"
+            style={{ fontSize: 11.5, color: C.white, background: C.gold, border: "none", borderRadius: 3, padding: "5px 12px", cursor: "pointer", fontWeight: 600, flexShrink: 0 }}>
+            📝 確定版を見直す
+          </button>
+        )}
+      </div>
       {expanded && (
         <div style={{ padding: "0 14px 14px 14px", borderTop: `1px solid ${C.border}` }}>
           <div style={{ fontSize: 12, color: C.textSub, marginTop: 12, marginBottom: 10, lineHeight: 1.7 }}>
@@ -1131,19 +1141,32 @@ const AutoInjectedProfilesPanel = ({ onNavigate, stepNum }) => {
             )}
           </div>
 
-          {/* 書籍プロファイル */}
+          {/* 書籍プロファイル（v4: 確定アクションで作成された確定版を参照。各STEPからいつでも見直し・編集可能） */}
           <div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6, flexWrap: "wrap", gap: 6 }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: C.navy }}>
-                【書籍プロファイル{workProfileSource === "confirmed" ? "確定版（STEP2）" : workProfileSource === "draft" ? "草案（STEP1）" : ""}】
+                【書籍プロファイル{workProfileSource === "confirmed" ? "確定版" : workProfileSource === "draft" ? "草案（STEP1）" : ""}】
               </span>
-              <button onClick={() => onNavigate?.(workProfileSource === "draft" ? "step_1" : "step_2")}
-                style={{ fontSize: 11.5, color: C.navyMid, background: "transparent", border: `1px solid ${C.border}`, borderRadius: 3, padding: "4px 10px", cursor: "pointer" }}>
-                {workProfileSource === "draft" ? "STEP1 で編集" : "STEP2 で編集"} ›
-              </button>
+              {/* v4: 確定版は「ライブドキュメント」。STEP4以降からいつでも見直して再保存できる */}
+              {workProfileSource === "confirmed" ? (
+                <button onClick={() => onNavigate?.("step_confirm")}
+                  style={{ fontSize: 11.5, color: C.white, background: C.gold, border: "none", borderRadius: 3, padding: "5px 12px", cursor: "pointer", fontWeight: 600 }}>
+                  📝 確定版を見直す ›
+                </button>
+              ) : (
+                <button onClick={() => onNavigate?.(workProfileSource === "draft" ? "step_1" : "step_1")}
+                  style={{ fontSize: 11.5, color: C.navyMid, background: "transparent", border: `1px solid ${C.border}`, borderRadius: 3, padding: "4px 10px", cursor: "pointer" }}>
+                  STEP1 で編集 ›
+                </button>
+              )}
             </div>
             {hasWork ? (
               <>
+                {workProfileSource === "confirmed" && (
+                  <div style={{ fontSize: 11.5, color: C.green, marginBottom: 6, padding: "6px 10px", background: "#eef7ee", border: `1px solid rgba(45,122,79,0.2)`, borderRadius: 3, lineHeight: 1.7 }}>
+                    💡 ここまで進めて気づいたこと（インタビュー素材／タイトルから見えた本当の核 等）があれば、「📝 確定版を見直す」から編集・保存できます。確定版は後段STEPの判断軸として機能するため、進めながら磨いていけます。
+                  </div>
+                )}
                 {workProfileSource === "draft" && (
                   <div style={{ fontSize: 11.5, color: C.gold, marginBottom: 6, padding: "6px 10px", background: C.goldPale, border: `1px solid ${C.goldLight}`, borderRadius: 3 }}>
                     ⚠ STEP2 を未実行のため、STEP1 草案が使われます。市場検証で精度を上げるため STEP2 を実行することを推奨します。
