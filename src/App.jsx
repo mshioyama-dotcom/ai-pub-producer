@@ -859,7 +859,33 @@ function extractChapters(text) {
     }
   }
   if (current && current.body.trim()) chapters.push(current);
-  return chapters;
+
+  // 重複排除：同じ章タイトルが複数検出された場合（例：STEP7 の LLM 出力で「おわりに」が2回登場する等）、
+  // 本文が長い方を採用して順序を保持する。これがないと STEP8 の章ループで同じタイトルの章が2回処理され、
+  // 出力に「=== おわりに ===」が2回出るなど構造が崩壊する。
+  // v4 で発生した実バグ: STEP7 出力に「おわりに」が複数行存在 → STEP8 で 9章のはずが 10章処理される
+  const seen = new Map(); // 正規化したタイトル → deduped 配列の index
+  const deduped = [];
+  for (const ch of chapters) {
+    // タイトル正規化（コロン・全角空白・装飾を吸収して比較）
+    const key = String(ch.chapterTitle || "")
+      .replace(/[\s　]/g, "")
+      .replace(/[：:]/g, "")
+      .replace(/[*#\[\]【】「」]/g, "")
+      .trim();
+    if (!key) continue;
+    if (seen.has(key)) {
+      const idx = seen.get(key);
+      // 本文が長い方を残す（短い方は誤検出の可能性が高い）
+      if ((ch.body || "").length > (deduped[idx].body || "").length) {
+        deduped[idx] = ch;
+      }
+    } else {
+      seen.set(key, deduped.length);
+      deduped.push(ch);
+    }
+  }
+  return deduped;
 }
 
 // STEP7（詳細プロット）の出力から節 (1)(2)... と項①②③... を抽出する。
