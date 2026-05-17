@@ -1335,7 +1335,7 @@ const SideMenu = ({ currentPage, onNavigate, stepStatuses, confirmStatus }) => {
           </div>
           <div style={{ width: 1.5, height: 42, background: C.gold, flexShrink: 0, opacity: 0.6 }} />
           <div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: "#ffffff", letterSpacing: "0.02em", lineHeight: 1.3, fontFamily: "'Noto Sans JP', sans-serif" }}>AI出版プロデューサー</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#ffffff", letterSpacing: "0.01em", lineHeight: 1.25, fontFamily: "'Noto Sans JP', sans-serif", whiteSpace: "nowrap" }}>AI出版プロデューサー</div>
             <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.65)", marginTop: 5, letterSpacing: "0.04em", fontFamily: "'Noto Sans JP', sans-serif" }}>Kindle出版を10ステップで進める</div>
           </div>
         </div>
@@ -3868,8 +3868,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                 {chatError && <div style={{ padding: "8px 14px", background: "#fef2f2", borderTop: `1px solid rgba(192,57,43,0.2)`, fontSize: 12.5, color: C.red }}>{chatError}</div>}
                 <div style={{ display: "flex", borderTop: `1px solid ${C.border}`, background: C.white }}>
                   <textarea value={chatInput} onChange={(e) => setChatInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleChatSend(); } }}
-                    placeholder="メッセージを入力（Enterで送信 / Shift+Enterで改行）" rows={3}
+                    placeholder="メッセージを入力（送信は右の「送信」ボタンを押してください）" rows={3}
                     style={{ flex: 1, padding: "12px 14px", fontSize: 13.5, border: "none", outline: "none", resize: "none", fontFamily: "inherit", lineHeight: 1.65, boxSizing: "border-box" }} />
                   <button onClick={handleChatSend} disabled={chatLoading || !chatInput.trim()}
                     style={{ width: 80, background: chatLoading || !chatInput.trim() ? "#ccc" : C.navy, color: C.white, border: "none", fontWeight: 700, fontSize: 13, cursor: chatLoading || !chatInput.trim() ? "default" : "pointer", flexShrink: 0 }}>送信</button>
@@ -4408,7 +4407,7 @@ export default function App() {
             <div style={{ width: 14, height: 2, background: `rgba(184,146,42,0.35)`, borderRadius: 1 }} />
           </div>
           <div style={{ width: 1.5, height: 28, background: C.gold, opacity: 0.6 }} />
-          <div style={{ fontSize: 15, fontWeight: 700, color: C.white, letterSpacing: "0.02em" }}>AI出版プロデューサー</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.white, letterSpacing: "0.01em", whiteSpace: "nowrap" }}>AI出版プロデューサー</div>
         </div>
       </div>
     </div>
