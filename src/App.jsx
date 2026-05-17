@@ -916,6 +916,61 @@ function detectDuplicateSections(text) {
   return false;
 }
 
+// 出力テキストから「=== タイトル ===」セクションをパースして配列で返す。
+// 各セクション: { title, header, body }
+function parseOutputSections(text) {
+  if (!text || typeof text !== "string") return { preamble: "", sections: [] };
+  const lines = text.split("\n");
+  const sections = [];
+  let current = null;
+  let preamble = "";
+  for (const line of lines) {
+    const m = line.match(/^===\s*(.+?)\s*===$/);
+    if (m) {
+      if (current) sections.push(current);
+      current = { title: m[1].trim(), header: line, body: "" };
+    } else if (current) {
+      current.body += line + "\n";
+    } else {
+      preamble += line + "\n";
+    }
+  }
+  if (current) sections.push(current);
+  // 各セクション末尾の余分な区切り（"---"のみの行）と空白を削る
+  for (const s of sections) {
+    s.body = s.body.replace(/\n+---\s*\n*$/, "").replace(/\s+$/, "");
+  }
+  return { preamble: preamble.replace(/\s+$/, ""), sections };
+}
+
+// 章単位の本文生成で使う：既存 outputText にこの章のセクションを upsert（既にあれば置換、無ければ末尾追加）
+// 章順序を保持しないと「はじめに」「第1章」「第2章」...が崩れるため、chapterOptions の順序を基準に並べ替える。
+function upsertChapterInOutput(outputText, chapterTitle, chapterContent, chapterOrderTitles) {
+  const { preamble, sections } = parseOutputSections(outputText);
+  const newSection = {
+    title: chapterTitle,
+    header: `=== ${chapterTitle} ===`,
+    body: chapterContent.trim(),
+  };
+  // 既存にあれば置換、なければ追加
+  const existingIdx = sections.findIndex((s) => normalizeChapterKey(s.title) === normalizeChapterKey(chapterTitle));
+  if (existingIdx >= 0) sections[existingIdx] = newSection;
+  else sections.push(newSection);
+
+  // chapterOrderTitles で正規順に並べ替える（chapterOptions 順を維持）
+  if (Array.isArray(chapterOrderTitles) && chapterOrderTitles.length > 0) {
+    const orderMap = new Map(chapterOrderTitles.map((t, i) => [normalizeChapterKey(t), i]));
+    sections.sort((a, b) => {
+      const ka = orderMap.has(normalizeChapterKey(a.title)) ? orderMap.get(normalizeChapterKey(a.title)) : 9999;
+      const kb = orderMap.has(normalizeChapterKey(b.title)) ? orderMap.get(normalizeChapterKey(b.title)) : 9999;
+      return ka - kb;
+    });
+  }
+
+  const body = sections.map((s) => `${s.header}\n\n${s.body}`).join("\n\n---\n\n");
+  return (preamble ? preamble + "\n\n" : "") + body;
+}
+
 function dedupeOutputSections(text) {
   if (!text || typeof text !== "string") return text;
   // `=== title ===` 行をマーカーにして分割
@@ -3984,86 +4039,67 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     }
   };
 
-  // STEP9（本文作成）専用: 抽出された全章を順次処理。各章について全節・全項をループし、
-  // Dify に target_heading を投げて本文を生成。STEP7/STEP8 と同じ「全章順次」パターンで揃える。
-  // 進捗バーには「現在章×現在項」を表示。長時間ジョブ（章×節×項×30秒）になる点をUIで案内する。
-  const handleRunAllChaptersForStep9 = async () => {
+  // STEP9（本文作成）専用: 1章だけの本文を生成して既存 outputText に upsert する。
+  // 本文作成は1章でも数千〜1万字になり、全章一気に走らせると失敗時のロスが大きい。
+  // 章単位で生成 → 確認 → 次章へ進む、というインクリメンタルなフローに切り替えた。
+  const handleRunOneChapterForStep9 = async (chapterIdx) => {
     if (step.num !== 9) return;
-    if (!chapterOptions || chapterOptions.length === 0) {
-      alert("STEP8（詳細プロット）の出力から章を検出できませんでした。STEP8の出力をご確認ください。");
+    const ch = chapterOptions?.[chapterIdx];
+    if (!ch) { alert("章が見つかりません。"); return; }
+    const sections = extractSections(ch.body);
+    const totalItems = sections.reduce((sum, s) => sum + (s.items?.length || 0), 0);
+    if (totalItems === 0) {
+      alert(`「${ch.chapterTitle}」の詳細プロットから節（1）(2)... や項①②③... を検出できませんでした。STEP8の出力をご確認ください。`);
       return;
-    }
-    if ((outputText || "").trim()) {
-      const ok = window.confirm("現在の出力データは上書きされます。続行しますか？");
-      if (!ok) return;
     }
     setIsRunning(true);
     setRunError("");
-    // 全章の合計項数を事前計算（進捗バーの分母用）
-    const chaptersWithSections = chapterOptions.map((ch) => {
-      const sections = extractSections(ch.body);
-      const itemCount = sections.reduce((sum, s) => sum + (s.items?.length || 0), 0);
-      return { ch, sections, itemCount };
-    });
-    const totalItems = chaptersWithSections.reduce((sum, c) => sum + c.itemCount, 0);
-    if (totalItems === 0) {
-      alert("STEP8の出力から節（1）(2)... や項①②③... を検出できませんでした。STEP8の詳細プロットの形式をご確認ください。");
-      setIsRunning(false);
-      return;
-    }
     let itemsDone = 0;
-    setChapterStockProgress({ total: totalItems, current: 0, currentItemName: "" });
-    const chapterResults = [];
+    setChapterStockProgress({ total: totalItems, current: 0, currentItemName: ch.chapterTitle });
     try {
-      for (let chIdx = 0; chIdx < chaptersWithSections.length; chIdx++) {
-        const { ch, sections } = chaptersWithSections[chIdx];
-        const sectionOutputs = [];
-        for (const section of sections) {
-          const itemOutputs = [];
-          for (const item of (section.items || [])) {
-            itemsDone++;
-            setChapterStockProgress({
-              total: totalItems,
-              current: itemsDone,
-              currentItemName: `${ch.chapterTitle} ／ ${item}`,
-            });
-            const response = await fetch("/api/dify", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                stepNum: 9,
-                inputs: {
-                  ...getAutoInjectedProfiles(),
-                  detailed_plot_text: ch.body.trim(),
-                  target_heading: item,
-                },
-              }),
-            });
-            const data = await response.json();
-            if (!response.ok) {
-              throw new Error(`「${ch.chapterTitle}」の項「${item}」の本文生成で失敗：${data.error || "不明なエラー"}`);
-            }
-            const out = (data.output || "").trim();
-            if (out) itemOutputs.push(out);
-            // レート制御: 項ごとに 1.5 秒ウェイト（Anthropic 30K tokens/min 対策）
-            await new Promise((r) => setTimeout(r, 1500));
+      const sectionOutputs = [];
+      for (const section of sections) {
+        const itemOutputs = [];
+        for (const item of (section.items || [])) {
+          itemsDone++;
+          setChapterStockProgress({
+            total: totalItems,
+            current: itemsDone,
+            currentItemName: `${ch.chapterTitle} ／ ${item}`,
+          });
+          const response = await fetch("/api/dify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              stepNum: 9,
+              inputs: {
+                ...getAutoInjectedProfiles(),
+                detailed_plot_text: ch.body.trim(),
+                target_heading: item,
+              },
+            }),
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(`「${ch.chapterTitle}」の項「${item}」の本文生成で失敗：${data.error || "不明なエラー"}`);
           }
-          if (itemOutputs.length > 0) {
-            // 1節分の本文（項を改行2つで結合）
-            sectionOutputs.push(itemOutputs.map((out, idx) => stripChapterSection(out, idx === 0)).join("\n\n"));
-          }
+          const out = (data.output || "").trim();
+          if (out) itemOutputs.push(out);
+          // レート制御: 項ごとに 1.5 秒ウェイト
+          await new Promise((r) => setTimeout(r, 1500));
         }
-        chapterResults.push({
-          title: ch.chapterTitle,
-          content: sectionOutputs.join("\n\n"),
-        });
+        if (itemOutputs.length > 0) {
+          sectionOutputs.push(itemOutputs.map((out, idx) => stripChapterSection(out, idx === 0)).join("\n\n"));
+        }
       }
-      // 全章を結合（章ごとに区切り目を挿入）
-      const combined = chapterResults.map((r) => `=== ${r.title} ===\n\n${r.content}`).join("\n\n---\n\n");
-      setOutputText(dedupeOutputSections(combined));
+      const chapterContent = sectionOutputs.join("\n\n");
+      // 既存 outputText に upsert（同じ章が既にあれば置換、無ければ chapterOptions 順で挿入）
+      const orderTitles = chapterOptions.map((c) => c.chapterTitle);
+      const newOutput = upsertChapterInOutput(outputText, ch.chapterTitle, chapterContent, orderTitles);
+      setOutputText(newOutput);
       setChapterStockProgress(null);
     } catch (e) {
-      setRunError(e.message + "\n\n途中までの結果は破棄されます。少し時間をおいてから「全章の本文を順次生成」をもう一度お試しください。");
+      setRunError(e.message + "\n\nこの章の途中までの結果は破棄されます（既に生成済みの他の章は残ります）。少し時間をおいてから再度お試しください。");
       setChapterStockProgress(null);
     } finally {
       setIsRunning(false);
@@ -4597,14 +4633,15 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
               )}
             </div>
           ) : step.num === 9 ? (
-            // STEP9（本文作成）は STEP8（詳細プロット）から章を抽出し、章ごとに全節・全項をループして本文を生成。
-            // STEP7/STEP8 と同じ「全章順次」パターンに統一。
+            // STEP9（本文作成）は STEP8（詳細プロット）から章を抽出し、「1章ずつ生成」する。
+            // 章単位の出力にすることで、章ごとに確認→次章へ進める安全なフローを実現。
+            // 既に生成済みの章は ✓ マーク表示。再クリックで再生成も可能。
             <div>
               {runError && <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginBottom: 12, fontSize: 13, color: C.red, whiteSpace: "pre-wrap", lineHeight: 1.7 }}>{runError}</div>}
               {chapterStockProgress ? (
                 <div style={{ padding: "12px 14px", background: C.navyLight, border: `1px solid rgba(42,68,104,0.2)`, borderRadius: 4 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, fontSize: 12.5, color: C.navyMid, fontWeight: 600 }}>
-                    <span>本文の一括生成中：{chapterStockProgress.current} / {chapterStockProgress.total} 項</span>
+                    <span>本文を生成中：{chapterStockProgress.current} / {chapterStockProgress.total} 項</span>
                     <span>{Math.round((chapterStockProgress.current / chapterStockProgress.total) * 100)}%</span>
                   </div>
                   <div style={{ height: 8, background: "rgba(0,0,0,0.08)", borderRadius: 4, overflow: "hidden" }}>
@@ -4615,8 +4652,9 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
               ) : (
                 <>
                   <div style={{ fontSize: 13, color: C.textSub, lineHeight: 1.8, marginBottom: 12 }}>
-                    STEP8 の詳細プロットから章を自動抽出し、各章の全節・全項を順次 Dify に投げて本文を生成します。
-                    項ごとに 1.5 秒のウェイトを挟むため、<strong>章数 × 節数 × 項数 × 約30秒</strong>かかります（7章×4節×3項なら約40〜50分）。
+                    STEP8 の詳細プロットから章を自動抽出します。<strong>1章ずつボタンを押して生成</strong>してください。
+                    各章の全節・全項を順次 Dify に投げます（節数 × 項数 × 約30秒 ／ 1章あたり5〜10分）。
+                    生成済みの章を再度押すと上書き再生成されます。
                   </div>
                   {!allSteps?.[8]?.outputText && (
                     <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginBottom: 12, fontSize: 13, color: C.red }}>
@@ -4628,28 +4666,42 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                       ⚠ STEP8 の出力から章を検出できませんでした。「はじめに」「第N章: xxx」「おわりに」のような章見出しが含まれているか、STEP8 の出力を確認してください。
                     </div>
                   )}
-                  {chapterOptions.length > 0 && (
-                    <>
-                      <button onClick={handleRunAllChaptersForStep9} disabled={isRunning}
-                        title="検出された全章の全節・全項を順番にDifyに投げて、全章分の本文を一気に生成します。"
-                        style={{ padding: "12px 36px", background: isRunning ? "#93c5fd" : C.navy, color: C.white, border: "none", borderRadius: 3, fontWeight: 700, fontSize: 14, cursor: isRunning ? "default" : "pointer", letterSpacing: "0.04em" }}>
-                        🚀 全章の本文を順次生成（{chapterOptions.length}章）
-                      </button>
-                      <div style={{ marginTop: 12, padding: "10px 14px", background: C.white, border: `1px solid ${C.border}`, borderRadius: 4 }}>
-                        <div style={{ fontSize: 12, color: C.textSub, marginBottom: 8, fontWeight: 600 }}>
-                          検出された章（{chapterOptions.length}章 — 各章の全節・全項を順次処理します）：
+                  {chapterOptions.length > 0 && (() => {
+                    // 既存 outputText からどの章が生成済みか判定
+                    const { sections: existingSections } = parseOutputSections(outputText);
+                    const generatedKeys = new Set(existingSections.map((s) => normalizeChapterKey(s.title)));
+                    return (
+                      <div style={{ padding: "12px 14px", background: C.white, border: `1px solid ${C.border}`, borderRadius: 4 }}>
+                        <div style={{ fontSize: 12.5, color: C.textSub, marginBottom: 10, fontWeight: 600 }}>
+                          検出された章（{chapterOptions.length}章）：1章ずつボタンを押して生成 → 確認 → 次章へ
                         </div>
-                        <ol style={{ margin: 0, paddingLeft: 22, fontSize: 13, color: C.text, lineHeight: 1.9 }}>
-                          {chapterOptions.map((ch, i) => (
-                            <li key={i} style={{ wordBreak: "break-word" }}>
-                              {ch.chapterTitle}
-                              <span style={{ fontSize: 11, color: C.textLight, marginLeft: 6 }}>（{ch.body.trim().length.toLocaleString()}文字）</span>
-                            </li>
-                          ))}
-                        </ol>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          {chapterOptions.map((ch, i) => {
+                            const isGenerated = generatedKeys.has(normalizeChapterKey(ch.chapterTitle));
+                            return (
+                              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: isGenerated ? C.greenLight : "#fafafa", border: `1px solid ${isGenerated ? "rgba(45,122,79,0.25)" : C.border}`, borderRadius: 4, flexWrap: "wrap" }}>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: C.text, flex: 1, minWidth: 0, wordBreak: "break-word" }}>
+                                  {isGenerated && <span style={{ color: C.green, marginRight: 6 }}>✓</span>}
+                                  {ch.chapterTitle}
+                                  <span style={{ fontSize: 11, color: C.textLight, marginLeft: 8, fontWeight: 400 }}>
+                                    （プロット {ch.body.trim().length.toLocaleString()}文字）
+                                  </span>
+                                </span>
+                                <button onClick={() => handleRunOneChapterForStep9(i)} disabled={isRunning}
+                                  title={isGenerated ? "この章の本文を上書き再生成します" : "この章の本文を生成します"}
+                                  style={{ flexShrink: 0, padding: "7px 16px", background: isRunning ? "#93c5fd" : (isGenerated ? C.gold : C.navy), color: C.white, border: "none", borderRadius: 3, fontWeight: 700, fontSize: 12.5, cursor: isRunning ? "default" : "pointer", letterSpacing: "0.04em" }}>
+                                  {isGenerated ? "🔄 再生成" : "🎯 この章を生成"}
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div style={{ marginTop: 10, fontSize: 11.5, color: C.textLight, lineHeight: 1.7 }}>
+                          ※ 既に生成済みの章は ✓ 緑色で表示されます。下の「出力データ」欄に章ごとに `=== 章タイトル ===` 区切りで蓄積されます。
+                        </div>
                       </div>
-                    </>
-                  )}
+                    );
+                  })()}
                 </>
               )}
             </div>
