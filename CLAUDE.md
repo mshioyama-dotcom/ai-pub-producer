@@ -63,12 +63,67 @@
 
 意図的に分岐させたい場合（backup ブランチからの復元など）は、Claude Code の外でターミナルから push するか、フックを一時的に無効化する。
 
+## 🧪 ユニットテスト運用ルール（必須）
+
+純関数のバグ（章抽出・キーワード抽出・本文ヘッダー重複など）が過去に何度も発生したため、回帰防止としてユニットテストを必須運用にしている。**push 前に必ずパスさせる。**
+
+### コマンド
+
+```bash
+npm run test         # 一回実行（push前に必須）
+npm run test:watch   # 開発中の watch モード
+npm run build        # TypeScript型チェック＋Vite本番ビルド（push前に必須）
+```
+
+### コード変更時の必須フロー
+
+1. **修正前**: `npm run test` で**現状のテストがパスしている**ことを確認
+2. **バグ修正の場合**: 先に再現テスト（失敗するテスト）を書く → 修正でテストが通る形にする（TDD）
+3. **新規純関数の追加**: `src/lib/textUtils.js` に export 追加 → `src/lib/__tests__/textUtils.test.js` に最低3件のテストを追加
+4. **push 前の最終確認**: `npm run test && npm run build` で**両方とも緑**を確認
+
+### App.jsx と textUtils.js の同期（重要）
+
+`src/App.jsx` には純関数の inline 定義があり、`src/lib/textUtils.js` には**同じ関数の独立コピー**がある（二重実装）。これは過渡的な状態で、リファクタの計画とリスクを切り分けるための意図的な選択。
+
+- **どちらか一方だけ更新すると挙動が乖離する**ため、純関数を修正するときは**両ファイル必ず同時更新**すること
+- 修正後は `npm run test` でテスト側の修正版を検証
+- ビルドは App.jsx 側を使うため、本番動作は App.jsx 側の修正で決まる
+
+### テスト失敗時の判断軸
+
+| 状況 | 対応 |
+|---|---|
+| 既存テストが赤い | **変更が既存仕様を壊している可能性大**。本当に仕様変更したいか／回帰バグか判断。仕様変更ならテスト側も更新 |
+| 新規テストを書いて赤い → 修正で緑にした | 期待通り（TDD） |
+| 新規追加した純関数にテストが無い | **NG**。最低3件は書く |
+
+### テストファイルの場所
+
+- `src/lib/textUtils.js` — テスト対象（純関数）
+- `src/lib/__tests__/textUtils.test.js` — 回帰テスト（過去バグごとに describe を分け、コメントで該当コミットを明記）
+
+### 既知の対象範囲
+
+| 対象 | 内容 |
+|---|---|
+| `extractChapters` | 章抽出（ラッパー優先＋inline fallback） |
+| `extractSections` | 節・項抽出 |
+| `dedupeBodyHeaders` | 本文ヘッダー重複除去（commit 4bb3316） |
+| `dedupeOutputSections` | 章重複除去（commit 5b9fe86） |
+| `normalizeChapterKey` | 章タイトル正規化 |
+| `parseOutputSections` | === title === パース |
+| `upsertChapterInOutput` | 章単位 upsert |
+| `extractKeywords3Axes` | キーワード3軸抽出（旧/新形式両対応・commit 3085f1f） |
+| `parseWorkProfileKeywords` | kw1/kw2 抽出 |
+
 ## 📂 リポジトリの基本ルール
 
 - **作業ブランチ**: `phase1`（Vercel 自動デプロイ対象、本番反映用）
 - main へのマージは行わない（モニター期間中）
 - すべての commit は phase1 に積む
 - **commit したら明示指示なしに `git push origin phase1` まで実行する**（feedback メモリーで指示済み）
+- **push 前に必ず `npm run test && npm run build` で両方緑を確認**（🧪 セクション参照）
 - API キーは絶対に画面・チャット・commit メッセージに貼らない
 
 ## 📚 主要ドキュメント
@@ -78,6 +133,8 @@
 - `dify/`：Dify Cloud のワークフロー YML（STEP0〜9 + 補助ワークフロー）
 - `src/App.jsx`：React 19 メインアプリ（StepPage / Step0Page / Step1Page / Step2Page 等）
 - `src/DiscussionPanel.jsx`：外部AI 相談プロンプト生成パネル（全STEP共通）
+- `src/lib/textUtils.js`：純関数ユーティリティ（テスト対象・App.jsxと同期）
+- `src/lib/__tests__/textUtils.test.js`：回帰テスト（vitest・37件）
 - `api/dify.js`：workflow 型 STEP の Dify API プロキシ
 - `api/dify-chat.js`：chat 型 STEP（STEP4 等）の Dify API プロキシ
 
