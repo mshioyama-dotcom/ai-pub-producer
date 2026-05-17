@@ -53,7 +53,9 @@ async function runDifyWorkflow(apiKey, inputs) {
   return output;
 }
 
-// 確定版テキストから検索キーワード3軸を抽出
+// 確定版テキストから検索キーワード（旧3軸形式と新「主要検索キーワード」セクション形式の両方に対応）
+// 旧形式: `主題軸: XXX` のインライン
+// 新形式: `## 主要検索キーワード\n- XXX\n- YYY` のセクション+箇条書き
 function extractKeywords3Axes(text) {
   if (!text) return { theme: "", reader: "", diff: "" };
   const grab = (label) => {
@@ -64,25 +66,75 @@ function extractKeywords3Axes(text) {
   return { theme: grab("主題軸"), reader: grab("読者軸"), diff: grab("差分軸") };
 }
 
+// 「## 主要検索キーワード」セクションから箇条書きキーワードを抽出
+// 新形式の Dify 出力に対応。1個でも複数でも検出する。
+function extractMainKeywordsSection(text) {
+  if (!text) return [];
+  // セクション見出し検出: ## / ### に「主要検索キーワード」「検索キーワード」「キーワード」のいずれか
+  const sectionRe = /(?:^|\n)#{2,3}\s*(?:主要)?検索キーワード[^\n]*\n([\s\S]*?)(?=\n#{1,3}\s|\n*$)/;
+  const m = text.match(sectionRe);
+  if (!m) return [];
+  // セクション本文から箇条書き行を抽出
+  const lines = m[1].split(/\n/);
+  const keywords = [];
+  for (const line of lines) {
+    const bullet = line.match(/^\s*[\-・*+]\s*(.+?)\s*$/);
+    if (bullet) {
+      const kw = bullet[1].replace(/\*+/g, "").trim();
+      if (kw) keywords.push(kw);
+    }
+  }
+  return keywords;
+}
+
 // STEP2 で選定したキーワードが、Dify から返ってきた確定版で書き換えられていないか検証。
 // 書き換えられていれば、STEP2 選定値で強制的に上書きして warnings に明示する。
 // 設計意図: STEP2 はAmazon検索のスコアデータに基づいてキーワードを確定する工程。
 // この結果を確定アクションのLLMが「コンセプト整合性」を理由に書き換えるのは、
 // 市場検証されていないキーワードで本書を設計することになり、本来の運用上の意図に反する。
 // もしキーワードを変えたい場合は STEP2 のキーワード分析からやり直すのが正しいフロー。
+//
+// 検出順序:
+//   ① 新形式「## 主要検索キーワード」セクションを探す → 全STEP2選定値が含まれていれば合格
+//   ② 旧形式「主題軸: XXX」を探す → 一致すれば合格、不一致なら置換
+//   ③ どちらも見つからなければ警告
 function enforceSelectedKeywords(confirmedText, selectedKeywords) {
   const warnings = [];
   if (!Array.isArray(selectedKeywords) || selectedKeywords.length === 0) {
     return { text: confirmedText, warnings };
   }
+  // 選定キーワードを正規化（全角/半角スペースの違いを吸収）
+  const normalize = (s) => String(s || "").replace(/[\s　]+/g, " ").trim();
+  const expectedKws = selectedKeywords.map(normalize).filter(Boolean);
+  if (expectedKws.length === 0) return { text: confirmedText, warnings };
+
+  // ① 新形式: 「## 主要検索キーワード」セクション
+  const mainSectionKws = extractMainKeywordsSection(confirmedText).map(normalize);
+  if (mainSectionKws.length > 0) {
+    // STEP2 選定値のすべてが含まれているか確認（スペース正規化後の完全一致）
+    const allIncluded = expectedKws.every((kw) => mainSectionKws.includes(kw));
+    if (allIncluded) {
+      // すべて反映済み → 警告なしで返す
+      return { text: confirmedText, warnings };
+    }
+    // 含まれていない選定値がある → セクション本文を STEP2 選定値で置換
+    const sectionRe = /((?:^|\n)#{2,3}\s*(?:主要)?検索キーワード[^\n]*\n)([\s\S]*?)(?=\n#{1,3}\s|\n*$)/;
+    const replacedSection = expectedKws.map((kw) => `- ${kw}`).join("\n") + "\n";
+    const replaced = confirmedText.replace(sectionRe, `$1${replacedSection}`);
+    warnings.push(
+      `⚠ Dify の確定アクション LLM が「主要検索キーワード」を STEP2 選定値（${expectedKws.join("、")}）と異なる値で出力していたため、STEP2 選定値に復元しました。`
+      + ` 元の値: ${mainSectionKws.join("、")}`
+      + ` 市場検証していないキーワードへの自動変更は無効化されます。`
+      + ` 本当にキーワードを変えたい場合は、STEP2 のキーワード分析からやり直してください。`
+    );
+    return { text: replaced, warnings };
+  }
+
+  // ② 旧形式: 「主題軸: XXX」インライン
   const extracted = extractKeywords3Axes(confirmedText);
-  const expectedTheme = String(selectedKeywords[0] || "").trim();
-  if (!expectedTheme) return { text: confirmedText, warnings };
+  const expectedTheme = expectedKws[0];
+  if (normalize(extracted.theme) === expectedTheme) return { text: confirmedText, warnings };
 
-  // 完全一致なら何もしない（既に正しい）
-  if (extracted.theme === expectedTheme) return { text: confirmedText, warnings };
-
-  // 確定版テキストの「主題軸」行を STEP2 選定値で置換
   let replaced = confirmedText;
   const themeLineRe = /((?:^|\n)\s*[\-・*+]?\s*主題軸\s*[：:]\s*)([^\n]+)/;
   if (themeLineRe.test(replaced)) {
@@ -92,12 +144,14 @@ function enforceSelectedKeywords(confirmedText, selectedKeywords) {
       + ` 市場検証していないキーワードへの自動変更は無効化されます。`
       + ` 本当にキーワードを変えたい場合は、STEP2 のキーワード分析からやり直してください。`
     );
-  } else {
-    warnings.push(
-      `⚠ 確定版に「主題軸」行が見つからなかったため、STEP2 選定キーワード「${expectedTheme}」を反映できませんでした。`
-      + ` 確定版を手動編集して主題軸を追加してください。`
-    );
+    return { text: replaced, warnings };
   }
+
+  // ③ どちらの形式も見つからない → 警告
+  warnings.push(
+    `⚠ 確定版に「## 主要検索キーワード」セクションも「主題軸：」行も見つからなかったため、STEP2 選定キーワード（${expectedKws.join("、")}）が反映されているか自動検証できませんでした。`
+    + ` 確定版プレビューで該当箇所を目視確認してください。問題なければそのまま次STEPへ進んでOKです。`
+  );
   return { text: replaced, warnings };
 }
 

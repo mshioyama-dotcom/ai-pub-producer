@@ -735,8 +735,19 @@ function extractKeywords3Axes(workProfileDraft) {
   const themeMatch = workProfileDraft.match(buildAxisRegex("主題軸"));
   const readerMatch = workProfileDraft.match(buildAxisRegex("読者軸"));
   const diffMatch = workProfileDraft.match(buildAxisRegex("差分軸"));
+  let theme = themeMatch ? pickFirst(themeMatch[1]) : "";
+  // 旧3軸形式（主題軸:）が見つからない場合は、新形式「## 主要検索キーワード」セクションを試す。
+  // 確定アクションの最新YMLは1軸+箇条書き形式を出力するため。
+  if (!theme) {
+    const sectionRe = /(?:^|\n)#{2,3}\s*(?:主要)?検索キーワード[^\n]*\n([\s\S]*?)(?=\n#{1,3}\s|\n*$)/;
+    const sm = workProfileDraft.match(sectionRe);
+    if (sm) {
+      const firstBullet = sm[1].split(/\n/).map((l) => l.match(/^\s*[\-・*+]\s*(.+?)\s*$/)).find((b) => b);
+      if (firstBullet) theme = pickFirst(firstBullet[1]);
+    }
+  }
   return {
-    theme: themeMatch ? pickFirst(themeMatch[1]) : "",
+    theme,
     reader: readerMatch ? pickFirst(readerMatch[1]) : "",
     diff: diffMatch ? pickFirst(diffMatch[1]) : "",
   };
@@ -744,6 +755,7 @@ function extractKeywords3Axes(workProfileDraft) {
 
 // 書籍プロファイル確定版から検索キーワード3軸（主題軸の最初2語）を抽出
 // 新STEP4（タイトル作成）の自動振り分けで keyword1 / keyword2 に流し込む
+// 新形式「## 主要検索キーワード」セクションにも対応（extractKeywords3Axes内で吸収）
 function parseWorkProfileKeywords(workProfile) {
   const empty = { keyword1: "", keyword2: "" };
   if (!workProfile) return empty;
