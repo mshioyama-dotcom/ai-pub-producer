@@ -831,6 +831,33 @@ function parseStep2Output(text) {
 function extractChapters(text) {
   if (!text || typeof text !== "string") return [];
 
+  // v4 fix: 入力テキストが `=== タイトル ===` ラッパー形式（STEP6/7/8 のバルク生成出力）の場合、
+  // ラッパーを章境界として最優先で扱う。これがないと、はじめにラッパー内の body に LLM が
+  // 「第1章: ...」と書いてしまった時、その章見出しが拾われて「はじめに」が消滅する事故が起きる。
+  // 平文の目次（STEP6 入力）の場合はラッパーが無いので、従来通り inline 検出にフォールバック。
+  if (/^===\s*.+?\s*===\s*$/m.test(text)) {
+    const { sections } = parseOutputSections(text);
+    if (sections.length > 0) {
+      const seen = new Map();
+      const deduped = [];
+      for (const s of sections) {
+        const key = normalizeChapterKey(s.title);
+        if (!key) continue;
+        if (seen.has(key)) {
+          const idx = seen.get(key);
+          if ((s.body || "").length > (deduped[idx].body || "").length) deduped[idx] = s;
+        } else {
+          seen.set(key, deduped.length);
+          deduped.push(s);
+        }
+      }
+      return deduped.map((s) => ({
+        chapterTitle: s.title,
+        body: s.body || "",
+      }));
+    }
+  }
+
   // 章タイトルかどうか判定するヘルパー：装飾記号を全部除去した文字列でキーワード判定する
   const stripDecoration = (s) =>
     String(s).replace(/^[\s　]*[\d０-９]+[.．、]?[\s　]*/, "") // 行頭の番号付きリスト記号 (1. 2. 等)
