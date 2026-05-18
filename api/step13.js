@@ -55,6 +55,33 @@ async function runDifyWorkflow(apiKey, inputs) {
   return output;
 }
 
+// LLM が間違って付けがちな前置き見出し・前置き文を除去する
+// （「## 【著者プロファイル】」「# 著者プロファイル更新版」「以下が更新版です」など）
+// セクション1 の本文は「■ 専門領域・強み」から始まる形式に正規化する
+function cleanAuthorProfile(text) {
+  if (!text) return "";
+  let cleaned = text.trim();
+  // 1. 最初の「■」が出るまでの行を全部削除（前置き見出し・前置き文を一掃）
+  const firstSectionIdx = cleaned.indexOf("■");
+  if (firstSectionIdx > 0) {
+    cleaned = cleaned.slice(firstSectionIdx);
+  }
+  // 2. 末尾の余分な改行や区切り（"---" や "==="）を削除
+  cleaned = cleaned.replace(/\n+\s*[-=]{3,}\s*$/, "").trim();
+  // 3. 末尾の「以下が次回作テーマです」「次回作のテーマ案を提示します」のような前置きが残っていれば削除
+  cleaned = cleaned.replace(/\n+\s*##?\s*次回作[^]*$/i, "").trim();
+  return cleaned;
+}
+
+// 次回作テーマ部分を整形（「以下が次回作」前置きを除去）
+function cleanNextBookThemes(text) {
+  if (!text) return "";
+  let cleaned = text.trim();
+  // 「## セクション2: 次回作テーマ候補」のような重複見出しを正規化
+  cleaned = cleaned.replace(/^##\s*セクション\s*2\s*[:：]?\s*次回作テーマ候補[（(参考[^\n]*\n+/i, "## 次回作テーマ候補（参考）\n\n");
+  return cleaned;
+}
+
 // Dify 出力からセクションを分離するヘルパー
 // Dify が 1 つの text 出力で「著者プロファイル更新版」「次回作テーマ候補」を返す前提で、
 // マーカーを使って分割する。マーカーが見つからない場合は全部 updated_author_profile に入れる。
@@ -64,8 +91,8 @@ function splitOutput(text) {
   if (marker.test(text)) {
     const [profile, themes] = text.split(marker);
     return {
-      updated_author_profile: (profile || "").trim(),
-      next_book_themes: (themes || "").trim(),
+      updated_author_profile: cleanAuthorProfile(profile || ""),
+      next_book_themes: cleanNextBookThemes(themes || ""),
     };
   }
   // マーカー無しなら、見出し「## 次回作テーマ候補」で分割
@@ -73,9 +100,13 @@ function splitOutput(text) {
   if (headingMatch) {
     const profile = text.slice(0, headingMatch.index).trim();
     const themes = headingMatch[1].trim();
-    return { updated_author_profile: profile, next_book_themes: themes };
+    return {
+      updated_author_profile: cleanAuthorProfile(profile),
+      next_book_themes: cleanNextBookThemes(themes),
+    };
   }
-  return { updated_author_profile: text.trim(), next_book_themes: "" };
+  // どちらの形式も見つからない → 全部 author_profile としてクリーニング
+  return { updated_author_profile: cleanAuthorProfile(text), next_book_themes: "" };
 }
 
 export default async function handler(req, res) {
