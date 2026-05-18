@@ -8,18 +8,20 @@
 1. **作業ディレクトリ確認**：必ず `C:\Users\mshio\Projects\ai-pub-producer` で作業する。
    `Downloads\Dify\.claude\worktrees\` 配下は worktree（一時コピー）で **実体ではない**。
 
-2. **リモートとの同期確認**：
+2. **作業ブランチの確認と同期**（2026-05-19 から dev が通常作業ブランチ）：
    ```bash
-   git fetch origin phase1
+   git fetch origin
+   git checkout dev                              # 必ず dev に居ること
    git status
-   git log --oneline HEAD..origin/phase1 -10   # origin が進んでいるか確認
+   git log --oneline HEAD..origin/dev -10        # origin が進んでいるか確認
    ```
 
 3. **origin が進んでいたら必ず取り込む**：
    ```bash
-   git pull --rebase origin phase1
+   git pull --rebase origin dev
    ```
    コンフリクトが出たら手動で解決してから作業を再開する。
+   phase1 で直接作業しない（本番反映時のみ phase1 に触れる・「🔀 開発→本番フロー」セクション参照）。
 
 4. **直近セッションの作業状況を把握**：
    - `docs/SESSION_HANDOFF.md` を読む
@@ -60,6 +62,7 @@
 - リモートに新コミットがある状態で push しようとすると、hook が exit 2 で push を中断
 - ユーザーに `git pull --rebase` を促すメッセージが出る
 - これで「別セッションの作業を上書きする」事故が構造的に防げる
+- dev / phase1 のどちらの push でも同じく動作する
 
 意図的に分岐させたい場合（backup ブランチからの復元など）は、Claude Code の外でターミナルから push するか、フックを一時的に無効化する。
 
@@ -119,12 +122,89 @@ npm run build        # TypeScript型チェック＋Vite本番ビルド（push前
 
 ## 📂 リポジトリの基本ルール
 
-- **作業ブランチ**: `phase1`（Vercel 自動デプロイ対象、本番反映用）
+- **作業ブランチ**: `dev`（開発・Preview デプロイ対象）
+- **本番ブランチ**: `phase1`（Vercel Production Branch・本番反映用）
 - main へのマージは行わない（モニター期間中）
-- すべての commit は phase1 に積む
-- **commit したら明示指示なしに `git push origin phase1` まで実行する**（feedback メモリーで指示済み）
+- すべての commit はまず dev に積む
+- **commit したら明示指示なしに `git push origin dev` まで実行する**（feedback メモリーで指示済み・ブランチ名は dev に更新）
 - **push 前に必ず `npm run test && npm run build` で両方緑を確認**（🧪 セクション参照）
 - API キーは絶対に画面・チャット・commit メッセージに貼らない
+
+## 🔀 開発 → 本番フロー（必須・2026-05-19 から運用）
+
+「開発環境で修正 → 動作確認 OK → 本番反映」の二段階リリースに移行した。**直接 phase1 にコミットしない**。
+
+### ブランチ構成
+
+```
+┌───────────────────────────────────────┐
+│ dev ブランチ（Preview デプロイ）       │
+│  - 通常作業はすべてここ                │
+│  - push 毎に Preview URL が更新される │
+│  - URL: ai-pub-producer-v2-git-dev-... │
+└───────────────┬───────────────────────┘
+                │ 動作確認 OK 後
+                │ ユーザー指示で merge & push
+                ↓
+┌───────────────────────────────────────┐
+│ phase1 ブランチ（Production デプロイ） │
+│  - Vercel Production Branch            │
+│  - dev からマージ専用                  │
+│  - URL: ai-pub-producer-v2.vercel.app  │
+└───────────────────────────────────────┘
+```
+
+### 通常作業（dev）
+
+1. dev ブランチで作業：`git checkout dev`（最初に必ず確認）
+2. 修正・テスト・ビルド：`npm run test && npm run build`
+3. commit：従来通り
+4. push：`git push origin dev` を明示指示なしで自動実行
+5. Vercel Preview URL（`...-git-dev-...vercel.app`）で動作確認
+
+### 本番反映（dev → phase1）
+
+ユーザーが以下のいずれかを発言したら、AI は確認なしで dev → phase1 の昇格を実行する：
+
+- 「本番反映」「本番に反映」「Production にデプロイ」「phase1 に反映」
+- 「本番に上げて」「本番更新して」「リリースして」
+- 「dev を phase1 にマージして」
+
+**AI が実行するコマンド（dev の最新を phase1 に取り込んで push）**：
+
+```bash
+git -C C:/Users/mshio/Projects/ai-pub-producer fetch origin && \
+git -C C:/Users/mshio/Projects/ai-pub-producer checkout phase1 && \
+git -C C:/Users/mshio/Projects/ai-pub-producer pull --rebase origin phase1 && \
+git -C C:/Users/mshio/Projects/ai-pub-producer merge --no-ff origin/dev -m "merge: dev → phase1 (本番反映)" && \
+git -C C:/Users/mshio/Projects/ai-pub-producer push origin phase1 && \
+git -C C:/Users/mshio/Projects/ai-pub-producer checkout dev
+```
+
+完了後、Vercel Production URL（`ai-pub-producer-v2.vercel.app`）の更新を確認するようユーザーに案内する。
+
+### 緊急時の hotfix
+
+本番だけ即座に直したい場合（dev で進行中の改修と分けたいケース）は：
+
+```bash
+git checkout phase1
+git checkout -b hotfix/<内容>
+# 修正
+git commit
+git checkout phase1 && git merge --no-ff hotfix/<内容>
+git push origin phase1
+# その後 dev にも取り込む
+git checkout dev && git merge --no-ff phase1 && git push origin dev
+```
+
+ただしこれは例外運用。**通常はすべて dev 経由**。
+
+### Vercel 側の設定（既設・確認用）
+
+- Production Branch: `phase1`
+- Preview Branches: すべてのブランチ（dev 含む）が自動 Preview デプロイ
+- env var はすべてブランチ制限なし（`scripts/fix-vercel-env-branch.mjs` で 2026-05-19 に解除済み）
 
 ## 🔢 STEPS 配列を拡張するときのチェックリスト（必須）
 
@@ -159,9 +239,11 @@ npm run build        # TypeScript型チェック＋Vite本番ビルド（push前
 - ユーザーが「env var を追加した」「Vercel に環境変数追加完了」「DIFY_API_KEY_STEP** を入れた」等を報告した直後、**AI は確認なしで以下を自動実行する**：
 
   ```bash
-  git -C C:/Users/mshio/Projects/ai-pub-producer commit --allow-empty -m "chore: trigger redeploy to pick up DIFY_API_KEY_STEP<NN> env var" && git -C C:/Users/mshio/Projects/ai-pub-producer push origin phase1
+  # 開発 Preview 用（通常はこちら）
+  git -C C:/Users/mshio/Projects/ai-pub-producer commit --allow-empty -m "chore: trigger redeploy to pick up DIFY_API_KEY_STEP<NN> env var" && git -C C:/Users/mshio/Projects/ai-pub-producer push origin dev
   ```
 
+  本番にも env var を反映済みで Production を直ちに再デプロイしたい場合のみ、ユーザーが「本番反映」を明示してから phase1 にも空 commit を積む（dev → phase1 マージ経由ではなく phase1 直接の場合）。
 - ユーザーに「Vercel ダッシュボードで Redeploy 押して」とは**もう案内しない**（手間を増やすだけ）。AI が代行する。
 - これは新規 STEP 実装時の他、既存 STEP のキー追加・キー差し替え時にも同じく適用する。
 
@@ -197,5 +279,9 @@ npm run build        # TypeScript型チェック＋Vite本番ビルド（push前
 ## ❓ 困ったとき
 
 - ローカルとリモートが分岐した → `git log --oneline --graph --all -20` で構造把握
-- push が hook で止められた → 表示メッセージに従って `git pull --rebase origin phase1` を実行
-- 「設計と実装がズレている」と感じた → `docs/LifeBookNavigator_全体設計書_2.md` と `docs/SESSION_HANDOFF.md` の両方を確認
+- push が hook で止められた → 表示メッセージに従って `git pull --rebase origin <現在のブランチ>` を実行（通常は dev）
+- どのブランチに居るか分からない → `git branch --show-current`（通常は dev）
+- Preview URL と Production URL の違い：
+  - Preview = `ai-pub-producer-v2-git-dev-...vercel.app`（dev push で更新）
+  - Production = `ai-pub-producer-v2.vercel.app`（phase1 push で更新）
+- 「設計と実装がズレている」と感じた → `docs/LifeBookNavigator_全体設計書_v4.md` と `docs/SESSION_HANDOFF.md` の両方を確認
