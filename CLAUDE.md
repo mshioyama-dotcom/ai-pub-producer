@@ -176,14 +176,16 @@ npm run build        # TypeScript型チェック＋Vite本番ビルド（push前
 ## 📚 主要ドキュメント
 
 - `docs/SESSION_HANDOFF.md`：直近セッションの作業状況・進行中リファクタ宣言・残タスク
-- `docs/LifeBookNavigator_全体設計書_2.md`：全体設計書（最終更新 2026-05-14）
-- `dify/`：Dify Cloud のワークフロー YML（STEP0〜9 + 補助ワークフロー）
-- `src/App.jsx`：React 19 メインアプリ（StepPage / Step0Page / Step1Page / Step2Page 等）
+- `docs/LifeBookNavigator_全体設計書_v4.md`：全体設計書（最新版・STEP11/12/13 実装反映済み・最終更新 2026-05-18）
+- `docs/LifeBookNavigator_全体設計書_2.md`：旧設計書（参考・2026-05-14）
+- `dify/`：Dify Cloud のワークフロー YML（STEP0〜13 + 補助ワークフロー）
+- `src/App.jsx`：React 19 メインアプリ（StepPage / Step0Page〜Step13Page 等）
 - `src/DiscussionPanel.jsx`：外部AI 相談プロンプト生成パネル（全STEP共通）
 - `src/lib/textUtils.js`：純関数ユーティリティ（テスト対象・App.jsxと同期）
 - `src/lib/__tests__/textUtils.test.js`：回帰テスト（vitest・37件）
 - `api/dify.js`：workflow 型 STEP の Dify API プロキシ
 - `api/dify-chat.js`：chat 型 STEP（STEP4 等）の Dify API プロキシ
+- `api/step2.js`, `step2-add.js`, `step3.js`, `step12.js`, `step13.js`, `work-profile-confirm.js`：個別オーケストレータ（RapidAPI 統合・複雑なフロー専用）
 
 ## 🧭 技術スタック
 
