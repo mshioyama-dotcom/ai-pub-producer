@@ -152,6 +152,19 @@ npm run build        # TypeScript型チェック＋Vite本番ビルド（push前
 - [ ] Vercel 環境変数に `DIFY_API_KEY_STEP<NN>` を追加（Production / Preview / Development 全部チェック）
 - [ ] **環境変数追加だけでは反映されないため、必ず Redeploy する**（Build Cache のチェックを外す）
 
+### 🔧 環境変数追加後の自動 Redeploy ルール（AI 側の運用）
+
+**Vercel は env var をビルド時のみ注入する仕様**のため、env var を追加しても既存デプロイには反映されない。これは毎回踏むため、AI 側の運用で必ず自動化する：
+
+- ユーザーが「env var を追加した」「Vercel に環境変数追加完了」「DIFY_API_KEY_STEP** を入れた」等を報告した直後、**AI は確認なしで以下を自動実行する**：
+
+  ```bash
+  git -C C:/Users/mshio/Projects/ai-pub-producer commit --allow-empty -m "chore: trigger redeploy to pick up DIFY_API_KEY_STEP<NN> env var" && git -C C:/Users/mshio/Projects/ai-pub-producer push origin phase1
+  ```
+
+- ユーザーに「Vercel ダッシュボードで Redeploy 押して」とは**もう案内しない**（手間を増やすだけ）。AI が代行する。
+- これは新規 STEP 実装時の他、既存 STEP のキー追加・キー差し替え時にも同じく適用する。
+
 ### 動作確認
 
 - [ ] サイドメニューに新 STEP が「未着手」で表示される
