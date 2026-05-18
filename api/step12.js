@@ -93,6 +93,39 @@ async function fetchWithRetry(url, headers, maxRetries = 3) {
   throw lastError || new Error("RapidAPI: max retries reached");
 }
 
+// オブジェクト/配列を安全に人間可読な文字列にする（[object Object] 化を防ぐ）
+function safeStringify(v) {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "string") return v.trim();
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  if (Array.isArray(v)) {
+    return v.map((item) => safeStringify(item)).filter(Boolean).join(" / ");
+  }
+  if (typeof v === "object") {
+    // よくある構造：{name, link, rank} 等 → 「name#rank」のように整形
+    const parts = [];
+    if (v.name) parts.push(safeStringify(v.name));
+    if (v.category) parts.push(safeStringify(v.category));
+    if (v.rank) parts.push(`#${safeStringify(v.rank)}`);
+    if (v.position) parts.push(`#${safeStringify(v.position)}`);
+    if (parts.length > 0) return parts.join(" ");
+    // 構造が不明な場合は JSON で表現（[object Object] 回避）
+    try { return JSON.stringify(v); } catch { return ""; }
+  }
+  return String(v);
+}
+
+// best_seller_rank / カテゴリ情報を product_information / category_path 等から抽出
+function extractBestSellerInfo(d) {
+  // 優先順：sales_volume → best_sellers_rank → category_path → product_information
+  const candidates = [d.sales_volume, d.best_sellers_rank, d.category_path, d.categories, d.product_information];
+  for (const c of candidates) {
+    const s = safeStringify(c);
+    if (s) return s;
+  }
+  return "";
+}
+
 // ASIN の Product Details を取得
 async function fetchProductDetails(asin, apiKey, host, endpoint) {
   const url = `https://${host}${endpoint}?asin=${encodeURIComponent(asin)}&country=JP`;
@@ -103,19 +136,19 @@ async function fetchProductDetails(asin, apiKey, host, endpoint) {
   const d = data?.data || {};
   return {
     asin: d.asin || asin,
-    title: d.product_title || "",
-    price: d.product_price || "",
-    currency: d.currency || "JPY",
-    rating: d.product_star_rating || "",
+    title: safeStringify(d.product_title),
+    price: safeStringify(d.product_price),
+    currency: safeStringify(d.currency) || "JPY",
+    rating: safeStringify(d.product_star_rating),
     num_ratings: Number(d.product_num_ratings) || 0,
-    best_seller_rank: d.sales_volume || d.best_sellers_rank || d.product_information || "",
-    product_url: d.product_url || "",
-    image_url: d.product_photo || "",
-    book_format: d.book_format || "",
-    description: d.product_description || "",
+    best_seller_rank: extractBestSellerInfo(d),
+    product_url: safeStringify(d.product_url),
+    image_url: safeStringify(d.product_photo),
+    book_format: safeStringify(d.book_format),
+    description: safeStringify(d.product_description),
     is_amazon_choice: !!d.is_amazon_choice,
     is_best_seller: !!d.is_best_seller,
-    raw_categories: d.category_path || d.categories || "",
+    raw_categories: safeStringify(d.category_path) || safeStringify(d.categories),
   };
 }
 
