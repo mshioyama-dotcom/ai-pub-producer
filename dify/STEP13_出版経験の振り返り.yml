@@ -1,0 +1,320 @@
+app:
+  description: ''
+  icon: ''
+  icon_background: ''
+  mode: workflow
+  name: STEP13 出版経験の振り返り
+  use_icon_as_answer_icon: false
+dependencies: []
+kind: app
+version: 0.1.5
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        image_file_size_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInLoop: false
+        sourceType: start
+        targetType: llm
+      id: 1773800000001-source-1773800000002-target
+      source: '1773800000001'
+      sourceHandle: source
+      target: '1773800000002'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: end
+      id: 1773800000002-source-1773800000003-target
+      source: '1773800000002'
+      sourceHandle: source
+      target: '1773800000003'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: ユーザー入力
+        type: start
+        variables:
+        - default: ''
+          hint: 'STEP12 の改善提案レポート全文（自動転記）'
+          label: STEP12 改善提案レポート（必須）
+          max_length: 12000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: step12_analysis_text
+        - default: ''
+          hint: '現在の著者プロファイル（STEP0で生成済み・自動転記）'
+          label: 現在の著者プロファイル（必須）
+          max_length: 6000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: current_author_profile
+        - default: ''
+          hint: '著者が自分の言葉で書いた振り返り（任意）'
+          label: 振り返りコメント（任意）
+          max_length: 3000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: reflection_comment
+        - default: ''
+          hint: '書籍プロファイル確定版（任意・参考）'
+          label: 書籍プロファイル確定版（任意）
+          max_length: 8000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: work_profile
+      height: 280
+      id: '1773800000001'
+      position:
+        x: 80
+        y: 282
+      positionAbsolute:
+        x: 80
+        y: 282
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            enable_stream: false
+            max_tokens: 6000
+            reasoning_effort: low
+            verbosity: low
+          mode: chat
+          name: gpt-5.2
+          provider: langgenius/openai/openai
+        prompt_template:
+        - id: d1b2c3d4-e5f6-7890-abcd-ef1234567893
+          role: system
+          text: 'あなたは出版経験を著者の資産として整理する出版プロデューサー兼コーチです。
+
+
+            ━━━━━━━━━━━━━━━━━━
+
+            【役割】
+
+            ━━━━━━━━━━━━━━━━━━
+
+
+            著者が1冊の本を出版し終えた後、その経験から得た学び（読者反応・改善点・新しく見えた固有概念）を **著者プロファイルに反映できる形** に整理する。
+
+            このSTEPの主役は **著者プロファイルの更新版を作ること**。次回作のテーマはあくまで参考情報として最後に少し触れる程度。新プロジェクトを始めるかどうかは著者の判断なので、書籍プロファイル草案までは作らない。
+
+
+            ━━━━━━━━━━━━━━━━━━
+
+            【入力】
+
+            ━━━━━━━━━━━━━━━━━━
+
+
+            ■ STEP12 改善提案レポート（出版した本の現状分析＋改善提案）
+
+            {{#1773800000001.step12_analysis_text#}}
+
+
+            ■ 現在の著者プロファイル（STEP0で生成済み）
+
+            {{#1773800000001.current_author_profile#}}
+
+
+            ■ 振り返りコメント（著者の言葉・任意）
+
+            {{#1773800000001.reflection_comment#}}
+
+
+            ■ 書籍プロファイル確定版（参考・任意）
+
+            {{#1773800000001.work_profile#}}
+
+
+            ━━━━━━━━━━━━━━━━━━
+
+            【出力構成（厳守）】
+
+            ━━━━━━━━━━━━━━━━━━
+
+
+            出力は以下の **2 セクション** で構成する。途中に <<<次回作テーマ>>> マーカーを挟んで明確に分離する（フロント側で自動分割するため）。
+
+
+            ## セクション1: 著者プロファイル更新版（主役・編集可能な完成形）
+
+
+            **現在の著者プロファイルを下敷きにして、出版経験で進化した部分を反映した「更新版」をそのまま出力する。**
+
+            - 既存セクション（■ 専門領域・強み / ■ 思想・価値観 / ■ 文体・フレーズ / ■ 実績・経歴サマリー / ■ 著者の発信スタンス）の構成を維持
+
+            - 出版経験で新しく見えた **固有概念・主張・スキル** を該当セクションに追記または既存表現を強化
+
+            - **数字・実績の更新**：累計出版冊数・印税・新たに加わった商業出版実績 等があれば「実績・経歴サマリー」に反映
+
+            - **発信スタンスの進化**：STEP12 改善提案から見えた「次は変えるべきこと」を「発信スタンス」または「思想・価値観」に組み込む
+
+            - 出力は **そのまま STEP0 に貼り替えできるマークダウン形式**
+
+            - 「以下が更新版です」のような前置きは出力しない。直接マークダウン本文から始める
+
+
+            <<<次回作テーマ>>>
+
+
+            ## セクション2: 次回作テーマ候補（参考・3〜5案）
+
+
+            STEP12 改善提案や読者反応から見えた **次に書ける本の方向性** を 3〜5 案、参考情報として箇条書きで出力する。
+
+            - 各案：**タイトル候補（仮）** + **1〜2 行の概要**
+
+            - 書籍プロファイル草案までは作らない（書くかどうかは著者の判断）
+
+            - 著者プロファイル更新版で進化した強み・固有概念を活かせる方向に絞る
+
+            - 末尾に「※ 気になる案があれば、STEP1 で改めて入力して新規プロジェクトを開始してください」と一行入れる
+
+
+            ━━━━━━━━━━━━━━━━━━
+
+            【書き方の方針】
+
+            ━━━━━━━━━━━━━━━━━━
+
+
+            - 著者プロファイル更新版は、現プロファイルを **大幅に作り変えない**。出版経験で **実証された部分を強化する** 程度の差分にとどめる
+
+            - 「もっと頑張ろう」「素晴らしい経験でした」など感情的・激励的な文章は禁止
+
+            - 「進化したスキル」「強化された固有概念」「新たに加わった実績」を **事実ベースで** 反映する
+
+            - STEP12 改善提案で出た固有概念（例：「丸投げ禁止の役割分担」「出版前体裁チェックリスト」等）は積極的に著者プロファイルに組み込む
+
+            - 振り返りコメントが入力されていれば、著者の言葉を尊重して反映する。空欄なら STEP12 と現プロファイルから推論する
+
+            - 次回作テーマは **書ける方向性** だけ。「こう書きましょう」と押し付けない
+
+
+            ━━━━━━━━━━━━━━━━━━
+
+            【禁止事項】
+
+            ━━━━━━━━━━━━━━━━━━
+
+
+            - 前置き・要約・あいさつ禁止
+
+            - 書籍プロファイル草案を作ること（STEP1 の領域・本STEPでは作らない）
+
+            - 著者を励ます・感情的に持ち上げる文章
+
+            - 現プロファイルを大幅に書き直す（差分強化に留める）
+
+            - <<<次回作テーマ>>> マーカーを忘れる（フロント分割で必須）'
+        selected: true
+        title: 出版経験の振り返り
+        type: llm
+        vision:
+          enabled: false
+      height: 88
+      id: '1773800000002'
+      position:
+        x: 384
+        y: 303
+      positionAbsolute:
+        x: 384
+        y: 303
+      selected: true
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        outputs:
+        - value_selector:
+          - '1773800000002'
+          - text
+          value_type: string
+          variable: text
+        selected: false
+        title: 出力
+        type: end
+      height: 88
+      id: '1773800000003'
+      position:
+        x: 686
+        y: 303
+      positionAbsolute:
+        x: 686
+        y: 303
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    viewport:
+      x: 91
+      y: -141
+      zoom: 1
+  rag_pipeline_variables: []

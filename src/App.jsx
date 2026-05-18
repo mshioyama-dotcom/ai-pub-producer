@@ -230,18 +230,34 @@ const STEPS = [
     // v4 拡張: 出版後の改善・次回作向け分析。設計書では STEP14（Keepa活用）だが、
     // サブスク計画変更で Real-Time Amazon Data API（STEP2/3 と同じ）を使う方針へ。
     // 番号も繰り上げて STEP12 として実装。
-    id: "step_12", num: 12, title: "出版状況分析",
-    description: "出版した本のASINを入力すると、Real-Time Amazon Data API で現状（タイトル・評価・レビュー）を取得し、KDP手動データ・キャンペーン情報と合わせて Dify で客観分析＋改善提案を生成します。タイトル/説明文/価格/施策の改善案と、次回作（STEP13）への引き継ぎ事項を出力。",
+    id: "step_12", num: 12, title: "本の改善提案",
+    description: "出版した本の ASIN を入力すると、Amazon の現状データと読者レビューから、AI が「この本を改善するための具体提案」を生成します。タイトル・サブタイトル・Amazon説明文・価格・施策の改善案を、レビュー引用付きで提示。改訂版・タイトル変更・施策実行の判断材料として使えます。",
     category: "改善・次回作", type: "custom",
     url: "",
     inputs: [],
-    outputTitle: "出版状況分析レポート",
+    outputTitle: "本の改善提案レポート",
     help: [
       "ASIN（B0で始まる10文字）を入力するだけで Amazon の現状データを取得します",
       "KDP管理画面の数値（売上巻数・KU既読・印税 等）は任意で手動入力欄に貼り付けてください",
       "無料キャンペーンやセールなどの施策履歴も任意入力できます",
-      "AIは「現状サマリ／レビュー傾向／改善提案／次回作引き継ぎ」の4セクションで分析レポートを生成します",
-      "改善提案はそのまま STEP5（タイトル）/ STEP10（Amazon説明文）に貼り付けて再生成にも使えます"
+      "AIは「現状サマリ／レビュー傾向／改善提案」の3セクションで改善レポートを生成します",
+      "改善提案はそのまま STEP5（タイトル）/ STEP10（Amazon説明文）に貼り付けて再生成にも使えます",
+      "出版経験を著者プロファイルに反映する場合は、STEP13 へ進んでください（任意）"
+    ]
+  },
+  {
+    id: "step_13", num: 13, title: "出版経験の振り返り",
+    description: "STEP12 の改善提案レポートと現在の著者プロファイルから、AI が「著者プロファイル更新版」を生成。著者が編集して STEP0 に上書き保存することで、出版経験で進化したスキル・主張・固有概念を著者プロファイルに反映できます。次回作テーマ候補も参考情報として併記。新プロジェクト開始は任意で、STEP1 へ手動で進めてください。",
+    category: "改善・次回作", type: "custom",
+    url: "",
+    inputs: [],
+    outputTitle: "著者プロファイル更新版",
+    help: [
+      "STEP12 を実行済みでないと使えません（STEP12 の改善提案レポートを入力に使うため）",
+      "振り返りコメント欄は任意です。著者の言葉を入れると AI の更新案がより具体的になります",
+      "AI が生成した「著者プロファイル更新版」は画面上で編集できます",
+      "「✓ STEP0 に反映する」ボタンで上書き保存。以降の全STEPで新しいプロファイルが使われます",
+      "次回作テーマ候補は参考情報。気になる案があれば STEP1 で新規プロジェクトとして手動入力してください"
     ]
   }
 ];
@@ -250,7 +266,7 @@ const CATEGORIES = [
   { label: "企画設計", steps: [1, 2, 3, 4, 5] },
   { label: "執筆設計", steps: [6, 7, 8, 9] },
   { label: "販売準備", steps: [10, 11] },
-  { label: "改善・次回作", steps: [12] }
+  { label: "改善・次回作", steps: [12, 13] }
 ];
 
 const STATUS_LABELS = { not_started: "未着手", in_progress: "進行中", completed: "完了" };
@@ -289,6 +305,10 @@ const STEP3_ANALYSIS_KEY = "aipub:step3_analysis";
 // 形式: { asin, kdp_manual_data, campaign_notes, product_snapshot, review_summary, analysis_text, ai_recommendation, warnings }
 const STEP12_INPUTS_KEY = "aipub:step12_inputs";
 const STEP12_ANALYSIS_KEY = "aipub:step12_analysis";
+
+// STEP13 出版経験の振り返り: 入力（振り返りコメント）と結果（著者プロファイル更新版・次回作テーマ候補）を保存
+const STEP13_INPUTS_KEY = "aipub:step13_inputs";
+const STEP13_RESULT_KEY = "aipub:step13_result";
 
 // 出版目標のチェックボックス選択肢（マーケティング観点の主要ゴール）
 const PUBLISHING_GOAL_OPTIONS = [
@@ -519,6 +539,8 @@ async function resetAllData() {
     localStorage.removeItem(STEP3_ANALYSIS_KEY);
     localStorage.removeItem(STEP12_INPUTS_KEY);
     localStorage.removeItem(STEP12_ANALYSIS_KEY);
+    localStorage.removeItem(STEP13_INPUTS_KEY);
+    localStorage.removeItem(STEP13_RESULT_KEY);
   } catch (e) { console.error(e); }
 }
 
@@ -3332,7 +3354,7 @@ const Step12Page = ({ savedAuthorProfile, savedWorkProfileConfirmed, onNavigate 
     setStageMsg("Amazonデータを取得中（Product Details + Reviews）…");
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 4 * 60 * 1000);
-    const stageTicker = setTimeout(() => setStageMsg("Dify で分析中（現状サマリ・レビュー傾向・改善提案）…"), 6000);
+    const stageTicker = setTimeout(() => setStageMsg("Dify で改善提案を生成中（現状サマリ・レビュー傾向・改善提案）…"), 6000);
     try {
       const response = await fetch("/api/step12", {
         method: "POST",
@@ -3391,9 +3413,9 @@ const Step12Page = ({ savedAuthorProfile, savedWorkProfileConfirmed, onNavigate 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: C.gold, marginBottom: 4, letterSpacing: "0.08em" }}>STEP 12</div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: C.navy, margin: "0 0 6px", letterSpacing: "-0.01em" }}>出版状況分析</h1>
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: C.navy, margin: "0 0 6px", letterSpacing: "-0.01em" }}>本の改善提案</h1>
           <p style={{ fontSize: 13.5, color: C.textSub, margin: 0, lineHeight: 1.7 }}>
-            出版した本のASINを入力すると、Amazon の現状データ（評価・レビュー・ランキング）を取得し、KDP手動データ・キャンペーン情報と統合して、AIが客観分析＋改善提案レポートを生成します。次回作（STEP13）への引き継ぎ事項も出力。
+            出版した本の ASIN を入力すると、Amazon の現状データと読者レビューから、AI が「**この本を改善するための具体提案**」を生成します。タイトル・サブタイトル・Amazon説明文・価格・施策の改善案を、レビュー引用付きで提示。改訂版や施策実行の判断材料として使えます。
           </p>
         </div>
       </div>
@@ -3465,14 +3487,14 @@ const Step12Page = ({ savedAuthorProfile, savedWorkProfileConfirmed, onNavigate 
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
           <StepBadge num="②" />
-          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>分析を実行</h2>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>改善提案を生成</h2>
         </div>
         <Card style={{ background: "#eef2f7", border: "1px solid #c8d4e0" }}>
           <div style={{ fontSize: 13, color: C.textSub, marginBottom: 12, lineHeight: 1.8 }}>
-            ボタンを押すと、Real-Time Amazon Data API で ASIN の現状（タイトル・評価・レビュー）を取得し、Dify で「現状サマリ／レビュー傾向／改善提案／次回作引き継ぎ事項」の4セクション分析を生成します。30秒〜2分かかります。
+            ボタンを押すと、Real-Time Amazon Data API で ASIN の現状（タイトル・評価・レビュー）を取得し、Dify で「現状サマリ／レビュー傾向／改善提案」の 3 セクション改善レポートを生成します。30秒〜2分かかります。
           </div>
           <BtnPrimary onClick={handleRunAnalysis} disabled={isRunning || !asin.trim()}>
-            {isRunning ? "分析中..." : "▶ 出版状況を分析する"}
+            {isRunning ? "生成中..." : "▶ 改善提案を生成する"}
           </BtnPrimary>
           {isRunning && stageMsg && (
             <div style={{ marginTop: 10, padding: "8px 12px", background: C.white, border: `1px solid ${C.border}`, borderRadius: 4, fontSize: 12.5, color: C.navy, fontWeight: 600 }}>
@@ -3548,12 +3570,12 @@ const Step12Page = ({ savedAuthorProfile, savedWorkProfileConfirmed, onNavigate 
         </div>
       )}
 
-      {/* ④ 分析レポート */}
+      {/* ④ 改善提案レポート */}
       {analysis?.analysis_text && (
         <div style={{ marginBottom: 28 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
             <StepBadge num="④" />
-            <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>分析レポート（4セクション）</h2>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>改善提案レポート（3セクション）</h2>
           </div>
           <Card style={{ background: C.white, border: `1px solid ${C.border}` }}>
             <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordWrap: "break-word", fontFamily: "inherit", fontSize: 13, lineHeight: 1.85, color: C.text }}>
@@ -3561,10 +3583,266 @@ const Step12Page = ({ savedAuthorProfile, savedWorkProfileConfirmed, onNavigate 
             </pre>
           </Card>
           <div style={{ display: "flex", gap: 10, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <BtnPrimary onClick={handleSaveAnalysis}>分析結果を保存</BtnPrimary>
+            <BtnPrimary onClick={handleSaveAnalysis}>レポートを保存</BtnPrimary>
             {saveMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました</span>}
-            <span style={{ fontSize: 11.5, color: C.textLight }}>※ 分析実行直後にも自動保存されています</span>
+            <span style={{ fontSize: 11.5, color: C.textLight }}>※ 生成直後にも自動保存されています</span>
           </div>
+          <div style={{ marginTop: 14, padding: "10px 14px", background: C.goldPale, border: `1px solid ${C.goldLight}`, borderRadius: 4, fontSize: 12.5, color: C.text, lineHeight: 1.8 }}>
+            💡 <strong>次の選択肢：</strong>
+            <ul style={{ margin: "4px 0 0 0", paddingLeft: 22 }}>
+              <li>改善提案を実行（タイトル変更／Amazon説明文差し替え／改訂版アップロード 等）</li>
+              <li>出版経験を著者プロファイルに反映したい場合は <strong>STEP13「出版経験の振り返り」</strong> へ進む（任意）</li>
+            </ul>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// STEP13「出版経験の振り返り」のページコンポーネント
+// STEP12 の改善提案レポート＋現在の著者プロファイルから、AI が著者プロファイル更新版を生成。
+// 著者は更新版を編集して STEP0 に上書き保存できる（任意）。次回作テーマ候補も参考情報として併記。
+// 新プロジェクト開始は強制せず、著者の判断に委ねる。
+const Step13Page = ({ savedAuthorProfile, savedWorkProfileConfirmed, onSaveAuthorProfile, onNavigate }) => {
+  // STEP12 の結果を localStorage から取得
+  const step12Result = (() => {
+    try {
+      const raw = (typeof window !== "undefined") ? localStorage.getItem(STEP12_ANALYSIS_KEY) : null;
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  })();
+  const step12AnalysisText = step12Result?.analysis_text || "";
+
+  // 入力・結果の復元
+  const initialInputs = (() => {
+    try {
+      const raw = (typeof window !== "undefined") ? localStorage.getItem(STEP13_INPUTS_KEY) : null;
+      return raw ? JSON.parse(raw) : { reflection_comment: "" };
+    } catch { return { reflection_comment: "" }; }
+  })();
+  const initialResult = (() => {
+    try {
+      const raw = (typeof window !== "undefined") ? localStorage.getItem(STEP13_RESULT_KEY) : null;
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  })();
+
+  const [reflectionComment, setReflectionComment] = useState(initialInputs.reflection_comment || "");
+  const [result, setResult] = useState(initialResult);
+  const [editableProfile, setEditableProfile] = useState(initialResult?.updated_author_profile || "");
+  const [isRunning, setIsRunning] = useState(false);
+  const [runError, setRunError] = useState("");
+  const [applyMsg, setApplyMsg] = useState(false);
+  const [stageMsg, setStageMsg] = useState("");
+
+  const hasStep12 = !!step12AnalysisText.trim();
+  const hasAuthorProfile = !!(savedAuthorProfile || "").trim();
+
+  // 入力を自動保存
+  useEffect(() => {
+    try {
+      localStorage.setItem(STEP13_INPUTS_KEY, JSON.stringify({ reflection_comment: reflectionComment }));
+    } catch (e) { console.error(e); }
+  }, [reflectionComment]);
+
+  // result が更新されたら editableProfile も追従（初回読み込み時の同期）
+  useEffect(() => {
+    if (result?.updated_author_profile && !editableProfile) {
+      setEditableProfile(result.updated_author_profile);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result]);
+
+  const handleRun = async () => {
+    setRunError("");
+    if (!hasStep12) { setRunError("STEP12 の改善提案レポートが見つかりません。先に STEP12 を実行してください。"); return; }
+    if (!hasAuthorProfile) { setRunError("現在の著者プロファイルが空です。STEP0 で著者プロファイルを生成してください。"); return; }
+
+    setIsRunning(true);
+    setStageMsg("AI が出版経験から著者プロファイル更新案を生成中…");
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4 * 60 * 1000);
+    try {
+      const response = await fetch("/api/step13", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          step12_analysis_text: step12AnalysisText,
+          current_author_profile: savedAuthorProfile || "",
+          reflection_comment: reflectionComment,
+          work_profile: savedWorkProfileConfirmed || "",
+        }),
+      });
+      const contentType = response.headers.get("content-type") || "";
+      let data;
+      if (contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        setRunError(`サーバから非JSON応答（${response.status}）：${text.slice(0, 300)}`);
+        return;
+      }
+      if (!response.ok) {
+        const missing = Array.isArray(data?.missingEnv) && data.missingEnv.length > 0
+          ? `\n\n未設定の環境変数：${data.missingEnv.join(", ")}\n→ Vercelの環境変数設定をご確認ください。`
+          : "";
+        setRunError((data?.error || `HTTP ${response.status} エラー`) + missing);
+        return;
+      }
+      setResult(data);
+      setEditableProfile(data.updated_author_profile || "");
+      try { localStorage.setItem(STEP13_RESULT_KEY, JSON.stringify(data)); } catch (e) {}
+    } catch (e) {
+      if (e.name === "AbortError") {
+        setRunError("4分以上応答がなかったため処理を中断しました。もう一度お試しください。");
+      } else {
+        setRunError(`通信エラー：${e.message}`);
+      }
+    } finally {
+      clearTimeout(timeoutId);
+      setStageMsg("");
+      setIsRunning(false);
+    }
+  };
+
+  const handleApplyToStep0 = async () => {
+    if (!editableProfile.trim()) { alert("更新版が空です。"); return; }
+    const ok = window.confirm("著者プロファイル（STEP0）を更新版で上書きします。よろしいですか？\n\n※ 既存のプロファイルは上書きされます。元に戻したい場合は STEP0 を再実行してください。");
+    if (!ok) return;
+    try {
+      await onSaveAuthorProfile(editableProfile.trim());
+      setApplyMsg(true);
+      setTimeout(() => setApplyMsg(false), 3000);
+    } catch (e) {
+      alert("反映に失敗しました：" + e.message);
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.gold, marginBottom: 4, letterSpacing: "0.08em" }}>STEP 13</div>
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: C.navy, margin: "0 0 6px", letterSpacing: "-0.01em" }}>出版経験の振り返り</h1>
+          <p style={{ fontSize: 13.5, color: C.textSub, margin: 0, lineHeight: 1.7 }}>
+            STEP12 の改善提案レポートと現在の著者プロファイルから、AI が「著者プロファイル更新版」を生成します。出版経験で進化したスキル・主張・固有概念を反映し、編集して STEP0 に上書き保存できます。次回作テーマ候補も参考情報として併記します。
+          </p>
+        </div>
+      </div>
+      <div style={{ height: 1, background: `linear-gradient(to right, ${C.gold}, ${C.goldLight}, transparent)`, width: "100%", opacity: 0.9, marginBottom: 20 }} />
+
+      {/* 前提チェック */}
+      <Card style={{ marginBottom: 16, background: hasStep12 ? "#eef7ee" : "#fff7e6", border: `1px solid ${hasStep12 ? "#c8d4c8" : "#e0c8a0"}` }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.navy }}>
+          📊 STEP12 改善提案レポート：{hasStep12 ? `✓ 設定済み（${step12AnalysisText.length.toLocaleString()}文字）` : "⚠ 未実行（STEP12 を先に実行してください）"}
+        </div>
+        {!hasStep12 && (
+          <div style={{ marginTop: 8 }}>
+            <BtnPrimary onClick={() => onNavigate("step_12")}>← STEP12「本の改善提案」へ進む</BtnPrimary>
+          </div>
+        )}
+      </Card>
+      <Card style={{ marginBottom: 24, background: hasAuthorProfile ? "#eef7ee" : "#fff7e6", border: `1px solid ${hasAuthorProfile ? "#c8d4c8" : "#e0c8a0"}` }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.navy }}>
+          📌 現在の著者プロファイル：{hasAuthorProfile ? `✓ 設定済み（${(savedAuthorProfile || "").length.toLocaleString()}文字）` : "⚠ 未設定"}
+        </div>
+      </Card>
+
+      {/* ① 振り返りコメント */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <StepBadge num="①" />
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>振り返りコメント（任意）</h2>
+        </div>
+        <Card style={{ background: C.white, border: `1px solid ${C.border}` }}>
+          <div style={{ fontSize: 13, color: C.textSub, marginBottom: 10, lineHeight: 1.7 }}>
+            著者ご自身の言葉で、出版経験で気づいたこと・学んだことを自由に書いてください。空欄でも構いません。
+            入力があると、AI の更新案がより具体的になります。
+          </div>
+          <textarea value={reflectionComment} onChange={(e) => setReflectionComment(e.target.value)}
+            placeholder={`例:\n本書を書いて気づいたのは、AIに「丸投げ」ではなく「叩き台→経験注入→チェック」の3層分担が必須だということ。\nまた、体裁の細部（目次粒度・ページ番号）が読者の信頼を左右することを思い知った。`}
+            rows={5}
+            style={{ width: "100%", padding: "9px 12px", fontSize: 13, border: `1px solid ${C.border}`, borderRadius: 3, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", lineHeight: 1.7 }} />
+          <div style={{ marginTop: 4, fontSize: 11, color: C.textLight, textAlign: "right" }}>
+            {reflectionComment.length.toLocaleString()} / 3,000文字
+          </div>
+        </Card>
+      </div>
+
+      {/* ② 実行 */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <StepBadge num="②" />
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>著者プロファイル更新案を生成</h2>
+        </div>
+        <Card style={{ background: "#eef2f7", border: "1px solid #c8d4e0" }}>
+          <div style={{ fontSize: 13, color: C.textSub, marginBottom: 12, lineHeight: 1.8 }}>
+            STEP12 の改善提案＋現在の著者プロファイル＋振り返りコメントを統合し、AI が「著者プロファイル更新版」と「次回作テーマ候補（参考）」を生成します。30秒〜1分かかります。
+          </div>
+          <BtnPrimary onClick={handleRun} disabled={isRunning || !hasStep12 || !hasAuthorProfile}>
+            {isRunning ? "生成中..." : "▶ 著者プロファイル更新案を生成"}
+          </BtnPrimary>
+          {isRunning && stageMsg && (
+            <div style={{ marginTop: 10, padding: "8px 12px", background: C.white, border: `1px solid ${C.border}`, borderRadius: 4, fontSize: 12.5, color: C.navy, fontWeight: 600 }}>
+              ⏳ {stageMsg}
+            </div>
+          )}
+          {runError && (
+            <div style={{ marginTop: 12, padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, fontSize: 13, color: C.red, whiteSpace: "pre-wrap", lineHeight: 1.7 }}>{runError}</div>
+          )}
+        </Card>
+      </div>
+
+      {/* ③ 著者プロファイル更新版（編集可能） */}
+      {result?.updated_author_profile && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <StepBadge num="③" />
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>著者プロファイル更新版（編集可能）</h2>
+          </div>
+          <Card style={{ background: C.white, border: `1px solid ${C.border}` }}>
+            <div style={{ fontSize: 12.5, color: C.textSub, marginBottom: 8, lineHeight: 1.7 }}>
+              内容を確認し、必要なら編集してください。**「✓ STEP0 に反映する」**ボタンで、著者プロファイルを上書き保存します。
+              反映後は、以降の全STEP（STEP1〜STEP10）で新しいプロファイルが自動的に使われます。
+            </div>
+            <textarea value={editableProfile} onChange={(e) => setEditableProfile(e.target.value)}
+              rows={20}
+              style={{ width: "100%", padding: "10px 12px", fontSize: 13, border: `1px solid ${C.border}`, borderRadius: 3, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", lineHeight: 1.85, background: C.white }} />
+            <div style={{ marginTop: 4, fontSize: 11, color: C.textLight, textAlign: "right" }}>
+              {editableProfile.length.toLocaleString()}文字
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <button onClick={handleApplyToStep0}
+                disabled={!editableProfile.trim()}
+                style={{ fontSize: 13, fontWeight: 700, color: C.white, background: editableProfile.trim() ? C.gold : "rgba(0,0,0,0.15)", border: "none", borderRadius: 3, padding: "10px 22px", cursor: editableProfile.trim() ? "pointer" : "default" }}>
+                ✓ STEP0 に反映する
+              </button>
+              {applyMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 著者プロファイルを更新しました（STEP0 に保存済み）</span>}
+              <BtnSecondary onClick={() => setEditableProfile(result.updated_author_profile)}>
+                AI 生成版に戻す
+              </BtnSecondary>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* ④ 次回作テーマ候補（参考） */}
+      {result?.next_book_themes && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <StepBadge num="④" />
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>次回作テーマ候補（参考・任意）</h2>
+          </div>
+          <Card style={{ background: "#fafafa", border: `1px dashed ${C.border}` }}>
+            <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordWrap: "break-word", fontFamily: "inherit", fontSize: 13, lineHeight: 1.85, color: C.text }}>
+              {result.next_book_themes}
+            </pre>
+            <div style={{ marginTop: 12, padding: "8px 12px", background: C.goldPale, border: `1px solid ${C.goldLight}`, borderRadius: 4, fontSize: 12, color: C.navyMid, lineHeight: 1.7 }}>
+              💡 気になる案があれば、メモとしてコピーしておいてください。新規プロジェクトを始める時は <strong>STEP1「書籍プロファイル草案」</strong> へ手動で進んでください（自動転記はしません・著者の判断を尊重する設計）。
+            </div>
+          </Card>
         </div>
       )}
     </div>
@@ -5796,6 +6074,7 @@ export default function App() {
     if (page === "step_3") return <Step3Page savedAuthorProfile={authorProfile} savedWorkProfileDraft={workProfile} onNavigate={nav} project={project} />;
     if (page === "step_confirm") return <ConfirmActionPage savedAuthorProfile={authorProfile} savedWorkProfileDraft={workProfile} savedWorkProfileConfirmed={workProfileConfirmed} onSaveWorkProfileConfirmed={handleSaveWorkProfileConfirmed} onNavigate={nav} project={project} />;
     if (page === "step_12") return <Step12Page savedAuthorProfile={authorProfile} savedWorkProfileConfirmed={workProfileConfirmed} onNavigate={nav} />;
+    if (page === "step_13") return <Step13Page savedAuthorProfile={authorProfile} savedWorkProfileConfirmed={workProfileConfirmed} onSaveAuthorProfile={handleSaveAuthorProfile} onNavigate={nav} />;
     if (page.startsWith("step_")) {
       const num = parseInt(page.replace("step_", ""), 10);
       const step = STEPS[num - 1];
