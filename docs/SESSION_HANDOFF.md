@@ -3,7 +3,18 @@
 > 別チャットで作業を継続するためのコンテキスト一式。
 > 新しいチャットを開いたら、このファイルの内容を最初に貼り付けて作業を再開してください。
 
-最終更新コミット: 2026-05-19 時点（STEP11/12/13 実装完了 MVP + 開発→本番フロー導入）
+最終更新コミット: `e4be790`（2026-05-19・開発→本番フロー dev→phase1 導入完了）
+
+直前のコミット（時系列・新→旧）:
+- `e4be790` docs: 開発→本番フロー（dev→phase1）を CLAUDE.md / SESSION_HANDOFF.md に明文化
+- `9ae155d` chore: trigger production deployment after Production Branch switched to phase1
+- `44592f3` fix(script): Sensitive 環境変数の development スコープ不可制約に対応
+- `a3696ee` chore: Vercel 環境変数のブランチ制限を一括解除するスクリプト追加
+- `998d85a` feat: データのエクスポート/インポート機能（Preview ↔ Production 間でデータ移行）
+- `9293676` docs(guide): 使い方ページを v4 実装に合わせて全面リライト（初心者向け）
+- `7cc3672` docs: 設計書 v4 / SESSION_HANDOFF / CLAUDE.md を実装に合わせて更新
+- `9d42d40` fix(step13): 余計な前置き見出し除去＋次回作テーマセクション欠落対策
+- `5da9800` feat(step12-13): STEP12を「本の改善提案」に絞り、STEP13「出版経験の振り返り」を新規実装
 
 ---
 
