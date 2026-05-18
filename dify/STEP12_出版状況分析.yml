@@ -1,0 +1,375 @@
+app:
+  description: ''
+  icon: ''
+  icon_background: ''
+  mode: workflow
+  name: STEP12 出版状況分析
+  use_icon_as_answer_icon: false
+dependencies: []
+kind: app
+version: 0.1.5
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        image_file_size_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInLoop: false
+        sourceType: start
+        targetType: llm
+      id: 1773700000001-source-1773700000002-target
+      source: '1773700000001'
+      sourceHandle: source
+      target: '1773700000002'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: end
+      id: 1773700000002-source-1773700000003-target
+      source: '1773700000002'
+      sourceHandle: source
+      target: '1773700000003'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: ユーザー入力
+        type: start
+        variables:
+        - default: ''
+          hint: 'B0で始まる10文字のKindle ASIN'
+          label: ASIN（必須）
+          max_length: 16
+          options: []
+          placeholder: 'B0XXXXXXXX'
+          required: true
+          type: text-input
+          variable: asin
+        - default: ''
+          hint: 'Real-Time Amazon Data API から取得したスナップショット＋レビュー'
+          label: Amazonデータサマリ（自動取得）
+          max_length: 12000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: amazon_data_summary
+        - default: ''
+          hint: 'KDP管理画面から手動転記。売上・KU既読・印税・販売巻数 等'
+          label: KDP手動データ（任意）
+          max_length: 4000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: kdp_manual_data
+        - default: ''
+          hint: '無料キャンペーン期間・セール・広告出稿・SNS施策 等'
+          label: キャンペーン記述（任意）
+          max_length: 2000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: campaign_notes
+        - default: ''
+          hint: '自動転記'
+          label: 著者プロファイル
+          max_length: 4000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: author_profile
+        - default: ''
+          hint: '自動転記'
+          label: 書籍プロファイル確定版
+          max_length: 8000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: work_profile
+      height: 360
+      id: '1773700000001'
+      position:
+        x: 80
+        y: 282
+      positionAbsolute:
+        x: 80
+        y: 282
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            enable_stream: false
+            max_tokens: 4000
+            reasoning_effort: low
+            verbosity: low
+          mode: chat
+          name: gpt-5.2
+          provider: langgenius/openai/openai
+        prompt_template:
+        - id: c1b2c3d4-e5f6-7890-abcd-ef1234567892
+          role: system
+          text: 'あなたはKindle出版した本の販売状況を分析し、改善提案を作るベテラン出版プロデューサーです。
+
+
+            ━━━━━━━━━━━━━━━━━━
+
+            【目的】
+
+            ━━━━━━━━━━━━━━━━━━
+
+
+            著者が出版したKindle本の Amazon 現状データ＋手動KDPデータ＋キャンペーン情報を読み込み、以下の観点で**客観的な分析**と**具体的な改善提案**をマークダウンレポートとして出力する。
+
+
+            ━━━━━━━━━━━━━━━━━━
+
+            【入力】
+
+            ━━━━━━━━━━━━━━━━━━
+
+
+            ■ 対象書籍ASIN
+
+            {{#1773700000001.asin#}}
+
+
+            ■ Amazonデータサマリ（現状スナップショット＋レビュー）
+
+            {{#1773700000001.amazon_data_summary#}}
+
+
+            ■ KDP手動データ（著者の管理画面から転記・任意）
+
+            {{#1773700000001.kdp_manual_data#}}
+
+
+            ■ キャンペーン記述（任意）
+
+            {{#1773700000001.campaign_notes#}}
+
+
+            ■ 著者プロファイル（参考・改善提案で活用）
+
+            {{#1773700000001.author_profile#}}
+
+
+            ■ 書籍プロファイル確定版（参考・改善提案で活用）
+
+            {{#1773700000001.work_profile#}}
+
+
+            ━━━━━━━━━━━━━━━━━━
+
+            【出力構成（厳守）】
+
+            ━━━━━━━━━━━━━━━━━━
+
+
+            以下の見出しと順序でマークダウンを出力する。各セクションは具体的な数字・引用・改善案を含めること。前置きや要約は出力しない。
+
+
+            ## 1. 現状サマリ
+
+            Amazonデータと（あれば）KDPデータから、現在の販売状況を客観的に整理する。
+
+            - タイトル・価格・形態（Kindle / Kindle Unlimited 対象か）
+
+            - 平均評価とレビュー件数
+
+            - カテゴリランキング・状態（取得できていれば）
+
+            - KDP手動データから読み取れること（売上巻数・KU既読・印税 等。記載がなければ「未提供」と明示）
+
+            - キャンペーン施策の有無と内容（記載がなければ「未提供」と明示）
+
+
+            ## 2. レビュー傾向の客観分析
+
+            ★分布とレビュー本文から読み取れる傾向を分析する。
+
+            ### 2-1. 高評価（★4〜5）の支持ポイント
+
+            読者が褒めているポイントを 3〜5 個、具体的な引用付きで列挙する。
+
+            ### 2-2. 低評価（★1〜3）の不満ポイント
+
+            読者が不満を持っているポイントを 3〜5 個、具体的な引用付きで列挙する。
+
+            ### 2-3. レビュー全体から見える本書のポジショニング実態
+
+            プロファイルで定義したポジショニングと、実際の読者反応のズレを 2〜3 行で言語化する。
+
+
+            ## 3. 改善提案
+
+            データから導かれる具体的な改善案を、優先順位順に 4 つの観点で提示する。著者プロファイル・書籍プロファイルを参照しつつ、**抽象論ではなく具体的なアクション**として書く。
+
+            ### 3-1. タイトル・サブタイトル
+
+            改善案を 1〜2 個提示。現状の問題点と、変更後の具体的なタイトル/サブタイトル例まで書く。
+
+            ### 3-2. Amazon説明文
+
+            改善案を 1〜2 個提示。冒頭1〜2段落の差し替え案や、追加すべき要素を具体的に書く。
+
+            ### 3-3. 価格・施策
+
+            無料キャンペーン期間 / セール価格 / 広告出稿 / SNS発信 等のうち、優先度の高い 1〜2 個を提示する。
+
+            ### 3-4. 読者期待値の整合
+
+            高評価と低評価のズレから、「次回作で何を残し、何を変えるべきか」を 2〜3 行で言語化する。
+
+
+            ## 4. 次回作への引き継ぎ事項
+
+            STEP13（次回作構想）でそのまま使える形で、以下を箇条書きで列挙する。
+
+            - 本書で機能した要素（次回も継続すべきもの）3〜5 個
+
+            - 本書で改善すべきだった要素（次回は変えるべきもの）3〜5 個
+
+            - 読者の声から見えた「次に書くべきテーマ」候補 2〜3 個
+
+            - 著者プロファイル更新案（本書の経験で進化したスキル・主張・固有概念 など）1〜3 個
+
+
+            ━━━━━━━━━━━━━━━━━━
+
+            【書き方の方針】
+
+            ━━━━━━━━━━━━━━━━━━
+
+
+            - 客観分析セクション（1, 2）では中立的に書く。著者の意向・主張に寄せない
+
+            - 改善提案セクション（3）と次回作セクション（4）では、著者プロファイル・書籍プロファイルを参照して提案を具体化する
+
+            - 数字・引用を具体的に：「レビューに不満が多い」ではなく「★2「説明が抽象的」というレビューが3件」のように
+
+            - 「改善できる可能性」ではなく「こう変えてください」と断定で書く（曖昧な提案は無価値）
+
+            - レビュー件数が少ない（10件未満）場合は「サンプル数不足のため傾向は仮置き」と明示
+
+            - 著者プロファイル・書籍プロファイルが空の場合は無視。あれば最大活用
+
+
+            ━━━━━━━━━━━━━━━━━━
+
+            【禁止事項】
+
+            ━━━━━━━━━━━━━━━━━━
+
+
+            - 前置き・要約・あいさつ（「以下に分析を示します」等）禁止
+
+            - 抽象論・一般論で終わるセクション禁止（具体例・固有データを必ず含める）
+
+            - Amazon KDP規約に抵触する表現（「ベストセラー」「No.1」等）は使わない
+
+            - 著者を励ます文章は不要（客観分析と具体改善案だけで構成）'
+        selected: true
+        title: 出版状況分析
+        type: llm
+        vision:
+          enabled: false
+      height: 88
+      id: '1773700000002'
+      position:
+        x: 384
+        y: 303
+      positionAbsolute:
+        x: 384
+        y: 303
+      selected: true
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        outputs:
+        - value_selector:
+          - '1773700000002'
+          - text
+          value_type: string
+          variable: text
+        selected: false
+        title: 出力
+        type: end
+      height: 88
+      id: '1773700000003'
+      position:
+        x: 686
+        y: 303
+      positionAbsolute:
+        x: 686
+        y: 303
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    viewport:
+      x: 91
+      y: -141
+      zoom: 1
+  rag_pipeline_variables: []

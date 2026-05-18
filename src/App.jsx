@@ -225,13 +225,32 @@ const STEPS = [
       "「ツイート」ではなく「240〜280字の短文記事」として生成します。X 以外（Note / Threads 等）にも転用できます",
       "著者プロファイルの文体・発信スタンスから乖離した投稿が出た場合は、出力をAIチャットに貼り付けて修正を指示してください"
     ]
+  },
+  {
+    // v4 拡張: 出版後の改善・次回作向け分析。設計書では STEP14（Keepa活用）だが、
+    // サブスク計画変更で Real-Time Amazon Data API（STEP2/3 と同じ）を使う方針へ。
+    // 番号も繰り上げて STEP12 として実装。
+    id: "step_12", num: 12, title: "出版状況分析",
+    description: "出版した本のASINを入力すると、Real-Time Amazon Data API で現状（タイトル・評価・レビュー）を取得し、KDP手動データ・キャンペーン情報と合わせて Dify で客観分析＋改善提案を生成します。タイトル/説明文/価格/施策の改善案と、次回作（STEP13）への引き継ぎ事項を出力。",
+    category: "改善・次回作", type: "custom",
+    url: "",
+    inputs: [],
+    outputTitle: "出版状況分析レポート",
+    help: [
+      "ASIN（B0で始まる10文字）を入力するだけで Amazon の現状データを取得します",
+      "KDP管理画面の数値（売上巻数・KU既読・印税 等）は任意で手動入力欄に貼り付けてください",
+      "無料キャンペーンやセールなどの施策履歴も任意入力できます",
+      "AIは「現状サマリ／レビュー傾向／改善提案／次回作引き継ぎ」の4セクションで分析レポートを生成します",
+      "改善提案はそのまま STEP5（タイトル）/ STEP10（Amazon説明文）に貼り付けて再生成にも使えます"
+    ]
   }
 ];
 
 const CATEGORIES = [
   { label: "企画設計", steps: [1, 2, 3, 4, 5] },
   { label: "執筆設計", steps: [6, 7, 8, 9] },
-  { label: "販売準備", steps: [10, 11] }
+  { label: "販売準備", steps: [10, 11] },
+  { label: "改善・次回作", steps: [12] }
 ];
 
 const STATUS_LABELS = { not_started: "未着手", in_progress: "進行中", completed: "完了" };
@@ -265,6 +284,11 @@ const STEP2_SELECTED_KEYWORDS_KEY = "aipub:step2_selected_keywords";
 // v4新規：新STEP3「競合レビュー評価」の分析結果（api/step3 の戻り値そのまま）
 // 形式: { analyzed_books, analysis_text, ai_recommendation, differentiation_count, return_feedback_for_step1, warnings }
 const STEP3_ANALYSIS_KEY = "aipub:step3_analysis";
+
+// STEP12 出版状況分析: 入力（ASIN・KDP手動データ・キャンペーン）と分析結果を保存
+// 形式: { asin, kdp_manual_data, campaign_notes, product_snapshot, review_summary, analysis_text, ai_recommendation, warnings }
+const STEP12_INPUTS_KEY = "aipub:step12_inputs";
+const STEP12_ANALYSIS_KEY = "aipub:step12_analysis";
 
 // 出版目標のチェックボックス選択肢（マーケティング観点の主要ゴール）
 const PUBLISHING_GOAL_OPTIONS = [
@@ -493,6 +517,8 @@ async function resetAllData() {
     localStorage.removeItem(STEP2_ANALYSIS_KEY);
     localStorage.removeItem(STEP2_SELECTED_KEYWORDS_KEY);
     localStorage.removeItem(STEP3_ANALYSIS_KEY);
+    localStorage.removeItem(STEP12_INPUTS_KEY);
+    localStorage.removeItem(STEP12_ANALYSIS_KEY);
   } catch (e) { console.error(e); }
 }
 
@@ -3256,6 +3282,278 @@ const Step3Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
   );
 };
 
+// STEP12「出版状況分析」のページコンポーネント
+// ASIN を入力 → api/step12.js が Real-Time Amazon Data API（Product Details + Reviews）を取得
+// →（任意で）KDP手動データ・キャンペーン記述を追加 → Dify で客観分析＋改善提案レポート生成
+const Step12Page = ({ savedAuthorProfile, savedWorkProfileConfirmed, onNavigate }) => {
+  // 入力の復元
+  const initialInputs = (() => {
+    try {
+      const raw = (typeof window !== "undefined") ? localStorage.getItem(STEP12_INPUTS_KEY) : null;
+      return raw ? JSON.parse(raw) : { asin: "", kdp_manual_data: "", campaign_notes: "" };
+    } catch { return { asin: "", kdp_manual_data: "", campaign_notes: "" }; }
+  })();
+  const initialAnalysis = (() => {
+    try {
+      const raw = (typeof window !== "undefined") ? localStorage.getItem(STEP12_ANALYSIS_KEY) : null;
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  })();
+
+  const [asin, setAsin] = useState(initialInputs.asin || "");
+  const [kdpData, setKdpData] = useState(initialInputs.kdp_manual_data || "");
+  const [campaignNotes, setCampaignNotes] = useState(initialInputs.campaign_notes || "");
+  const [analysis, setAnalysis] = useState(initialAnalysis);
+  const [isRunning, setIsRunning] = useState(false);
+  const [runError, setRunError] = useState("");
+  const [stageMsg, setStageMsg] = useState("");
+  const [saveMsg, setSaveMsg] = useState(false);
+
+  const hasConfirmedProfile = !!(savedWorkProfileConfirmed || "").trim();
+  const hasAuthorProfile = !!(savedAuthorProfile || "").trim();
+
+  // 入力を自動保存
+  useEffect(() => {
+    try {
+      localStorage.setItem(STEP12_INPUTS_KEY, JSON.stringify({ asin, kdp_manual_data: kdpData, campaign_notes: campaignNotes }));
+    } catch (e) { console.error(e); }
+  }, [asin, kdpData, campaignNotes]);
+
+  const handleRunAnalysis = async () => {
+    setRunError("");
+    const trimmed = asin.trim().toUpperCase();
+    if (!trimmed) { setRunError("ASINを入力してください。"); return; }
+    if (!/^B0[A-Z0-9]{8}$/.test(trimmed)) {
+      const ok = window.confirm("ASIN の形式が一般的なKindle ASIN（B0で始まる10文字）と異なります。このまま実行しますか？");
+      if (!ok) return;
+    }
+
+    setIsRunning(true);
+    setStageMsg("Amazonデータを取得中（Product Details + Reviews）…");
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4 * 60 * 1000);
+    const stageTicker = setTimeout(() => setStageMsg("Dify で分析中（現状サマリ・レビュー傾向・改善提案）…"), 6000);
+    try {
+      const response = await fetch("/api/step12", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          asin: trimmed,
+          kdp_manual_data: kdpData,
+          campaign_notes: campaignNotes,
+          author_profile: savedAuthorProfile || "",
+          work_profile: savedWorkProfileConfirmed || "",
+        }),
+      });
+      const contentType = response.headers.get("content-type") || "";
+      let data;
+      if (contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        setRunError(`サーバから非JSON応答（${response.status}）：${text.slice(0, 300)}`);
+        return;
+      }
+      if (!response.ok) {
+        const missing = Array.isArray(data?.missingEnv) && data.missingEnv.length > 0
+          ? `\n\n未設定の環境変数：${data.missingEnv.join(", ")}\n→ Vercelの環境変数設定をご確認ください。`
+          : "";
+        setRunError((data?.error || `HTTP ${response.status} エラー`) + missing);
+        return;
+      }
+      setAnalysis(data);
+      try { localStorage.setItem(STEP12_ANALYSIS_KEY, JSON.stringify(data)); } catch (e) {}
+    } catch (e) {
+      if (e.name === "AbortError") {
+        setRunError("4分以上応答がなかったため処理を中断しました。もう一度お試しください。");
+      } else {
+        setRunError(`通信エラー：${e.message}`);
+      }
+    } finally {
+      clearTimeout(timeoutId);
+      clearTimeout(stageTicker);
+      setStageMsg("");
+      setIsRunning(false);
+    }
+  };
+
+  const handleSaveAnalysis = () => {
+    try {
+      if (analysis) localStorage.setItem(STEP12_ANALYSIS_KEY, JSON.stringify(analysis));
+      setSaveMsg(true);
+      setTimeout(() => setSaveMsg(false), 2500);
+    } catch (e) { console.error(e); }
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.gold, marginBottom: 4, letterSpacing: "0.08em" }}>STEP 12</div>
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: C.navy, margin: "0 0 6px", letterSpacing: "-0.01em" }}>出版状況分析</h1>
+          <p style={{ fontSize: 13.5, color: C.textSub, margin: 0, lineHeight: 1.7 }}>
+            出版した本のASINを入力すると、Amazon の現状データ（評価・レビュー・ランキング）を取得し、KDP手動データ・キャンペーン情報と統合して、AIが客観分析＋改善提案レポートを生成します。次回作（STEP13）への引き継ぎ事項も出力。
+          </p>
+        </div>
+      </div>
+      <div style={{ height: 1, background: `linear-gradient(to right, ${C.gold}, ${C.goldLight}, transparent)`, width: "100%", opacity: 0.9, marginBottom: 20 }} />
+
+      {/* 参照情報のステータス */}
+      <Card style={{ marginBottom: 16, background: hasAuthorProfile ? "#eef7ee" : "#fff7e6", border: `1px solid ${hasAuthorProfile ? "#c8d4c8" : "#e0c8a0"}` }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.navy }}>
+          📌 著者プロファイル：{hasAuthorProfile ? "✓ 設定済み（自動転記）" : "⚠ 未設定（STEP0で生成してください）"}
+        </div>
+      </Card>
+      <Card style={{ marginBottom: 24, background: hasConfirmedProfile ? "#eef7ee" : "#fff7e6", border: `1px solid ${hasConfirmedProfile ? "#c8d4c8" : "#e0c8a0"}` }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.navy }}>
+          📋 書籍プロファイル確定版：{hasConfirmedProfile ? "✓ 設定済み（自動転記）" : "⚠ 未設定（改善提案の精度が下がります）"}
+        </div>
+      </Card>
+
+      {/* ① 入力 */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <StepBadge num="①" />
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>分析対象の入力</h2>
+        </div>
+        <Card style={{ background: C.white, border: `1px solid ${C.border}` }}>
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontSize: 13.5, fontWeight: 600, color: C.navy, display: "block", marginBottom: 4 }}>
+              ASIN <RequiredMark />
+              <span style={{ marginLeft: 8, fontSize: 11.5, color: C.textLight, fontWeight: 400 }}>
+                （Amazon 商品ページURLの末尾 "B0XXXXXXXX" 10文字）
+              </span>
+            </label>
+            <input type="text" value={asin} onChange={(e) => setAsin(e.target.value.toUpperCase())}
+              placeholder="例: B0XXXXXXXX"
+              style={{ width: "100%", maxWidth: 280, padding: "9px 12px", fontSize: 14, fontFamily: "monospace", border: `1px solid ${C.border}`, borderRadius: 3, outline: "none", boxSizing: "border-box", background: C.white }} />
+            <div style={{ marginTop: 4, fontSize: 11.5, color: C.textLight }}>
+              {asin && !/^B0[A-Z0-9]{8}$/.test(asin.trim().toUpperCase()) && (
+                <span style={{ color: C.gold }}>△ Kindle ASIN の一般的形式（B0で始まる10文字）と異なります。続行可能ですが、Amazon側で本書が見つからない可能性があります。</span>
+              )}
+            </div>
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ fontSize: 13.5, fontWeight: 600, color: C.navy, display: "block", marginBottom: 4 }}>
+              KDP手動データ（任意）
+              <span style={{ marginLeft: 8, fontSize: 11.5, color: C.textLight, fontWeight: 400 }}>
+                売上巻数・KU既読・印税 等を KDP 管理画面から転記
+              </span>
+            </label>
+            <textarea value={kdpData} onChange={(e) => setKdpData(e.target.value)}
+              placeholder={`例:\n出版から30日：ペーパーバック 12部 / Kindle 67部\nKU 既読ページ: 23,450 ページ\n印税合計: ¥18,420`}
+              rows={4}
+              style={{ width: "100%", padding: "9px 12px", fontSize: 13, border: `1px solid ${C.border}`, borderRadius: 3, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", lineHeight: 1.6 }} />
+          </div>
+          <div style={{ marginBottom: 4 }}>
+            <label style={{ fontSize: 13.5, fontWeight: 600, color: C.navy, display: "block", marginBottom: 4 }}>
+              キャンペーン記述（任意）
+              <span style={{ marginLeft: 8, fontSize: 11.5, color: C.textLight, fontWeight: 400 }}>
+                無料キャンペーン期間 / セール価格 / 広告 / SNS発信 等
+              </span>
+            </label>
+            <textarea value={campaignNotes} onChange={(e) => setCampaignNotes(e.target.value)}
+              placeholder={`例:\n出版〜3日目：無料キャンペーン実施（DLs 240）\n出版30日目：99円セール（3日間）\nXでの告知投稿 15本`}
+              rows={3}
+              style={{ width: "100%", padding: "9px 12px", fontSize: 13, border: `1px solid ${C.border}`, borderRadius: 3, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", lineHeight: 1.6 }} />
+          </div>
+        </Card>
+      </div>
+
+      {/* ② 実行 */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <StepBadge num="②" />
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>分析を実行</h2>
+        </div>
+        <Card style={{ background: "#eef2f7", border: "1px solid #c8d4e0" }}>
+          <div style={{ fontSize: 13, color: C.textSub, marginBottom: 12, lineHeight: 1.8 }}>
+            ボタンを押すと、Real-Time Amazon Data API で ASIN の現状（タイトル・評価・レビュー）を取得し、Dify で「現状サマリ／レビュー傾向／改善提案／次回作引き継ぎ事項」の4セクション分析を生成します。30秒〜2分かかります。
+          </div>
+          <BtnPrimary onClick={handleRunAnalysis} disabled={isRunning || !asin.trim()}>
+            {isRunning ? "分析中..." : "▶ 出版状況を分析する"}
+          </BtnPrimary>
+          {isRunning && stageMsg && (
+            <div style={{ marginTop: 10, padding: "8px 12px", background: C.white, border: `1px solid ${C.border}`, borderRadius: 4, fontSize: 12.5, color: C.navy, fontWeight: 600 }}>
+              ⏳ {stageMsg}
+            </div>
+          )}
+          {runError && (
+            <div style={{ marginTop: 12, padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, fontSize: 13, color: C.red, whiteSpace: "pre-wrap", lineHeight: 1.7 }}>
+              {runError}
+            </div>
+          )}
+          {Array.isArray(analysis?.warnings) && analysis.warnings.length > 0 && (
+            <div style={{ marginTop: 10, padding: "8px 12px", background: "#fff8e1", border: `1px solid ${C.gold}`, borderRadius: 4, fontSize: 12, color: C.navyMid, lineHeight: 1.7 }}>
+              <strong>⚠ 警告：</strong>
+              <ul style={{ margin: "4px 0 0 0", paddingLeft: 18 }}>
+                {analysis.warnings.map((w, i) => <li key={i}>{w}</li>)}
+              </ul>
+            </div>
+          )}
+        </Card>
+      </div>
+
+      {/* ③ 現状スナップショット */}
+      {analysis?.product_snapshot && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <StepBadge num="③" />
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>現状スナップショット（Amazon取得）</h2>
+          </div>
+          <Card style={{ background: C.white, border: `1px solid ${C.border}` }}>
+            <div style={{ fontSize: 13.5, color: C.text, lineHeight: 1.85 }}>
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>{analysis.product_snapshot.title || "（タイトル取得失敗）"}</div>
+              <div>価格: <strong>{analysis.product_snapshot.price}</strong> {analysis.product_snapshot.currency || ""}</div>
+              <div>平均評価: <strong>★{analysis.product_snapshot.rating || "?"}</strong> （{(analysis.product_snapshot.num_ratings || 0).toLocaleString()}件）</div>
+              <div>形態: {analysis.product_snapshot.book_format || "Kindle"}</div>
+              {analysis.product_snapshot.is_best_seller && <div style={{ color: C.gold, fontWeight: 600 }}>★ ベストセラー指定中</div>}
+              {analysis.product_snapshot.is_amazon_choice && <div style={{ color: C.gold, fontWeight: 600 }}>★ Amazon Choice 指定中</div>}
+              {analysis.product_snapshot.product_url && (
+                <div style={{ marginTop: 6 }}>
+                  <a href={analysis.product_snapshot.product_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: C.gold }}>Amazon商品ページを開く →</a>
+                </div>
+              )}
+            </div>
+            {analysis.review_summary?.rating_distribution && (
+              <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px dashed ${C.border}`, fontSize: 12.5, color: C.text }}>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>レビュー分布:</div>
+                {["5", "4", "3", "2", "1"].map((star) => (
+                  <div key={star} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                    <span style={{ width: 40, color: C.gold }}>★{star}</span>
+                    <span>{analysis.review_summary.rating_distribution[star] || 0}件</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {/* ④ 分析レポート */}
+      {analysis?.analysis_text && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <StepBadge num="④" />
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>分析レポート（4セクション）</h2>
+          </div>
+          <Card style={{ background: C.white, border: `1px solid ${C.border}` }}>
+            <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordWrap: "break-word", fontFamily: "inherit", fontSize: 13, lineHeight: 1.85, color: C.text }}>
+              {analysis.analysis_text}
+            </pre>
+          </Card>
+          <div style={{ display: "flex", gap: 10, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <BtnPrimary onClick={handleSaveAnalysis}>分析結果を保存</BtnPrimary>
+            {saveMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました</span>}
+            <span style={{ fontSize: 11.5, color: C.textLight }}>※ 分析実行直後にも自動保存されています</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // v4新規：書籍プロファイル確定アクションのページコンポーネント。
 // STEP3 完了後、受講生の明示的なボタン押下によって、書籍プロファイル確定版を生成する。
 // STEP1草案+STEP2選定キーワード+上位本+STEP3分析 を api/work-profile-confirm.js で統合。
@@ -5480,6 +5778,7 @@ export default function App() {
     if (page === "step_2") return <Step2Page savedAuthorProfile={authorProfile} savedWorkProfileDraft={workProfile} onNavigate={nav} project={project} />;
     if (page === "step_3") return <Step3Page savedAuthorProfile={authorProfile} savedWorkProfileDraft={workProfile} onNavigate={nav} project={project} />;
     if (page === "step_confirm") return <ConfirmActionPage savedAuthorProfile={authorProfile} savedWorkProfileDraft={workProfile} savedWorkProfileConfirmed={workProfileConfirmed} onSaveWorkProfileConfirmed={handleSaveWorkProfileConfirmed} onNavigate={nav} project={project} />;
+    if (page === "step_12") return <Step12Page savedAuthorProfile={authorProfile} savedWorkProfileConfirmed={workProfileConfirmed} onNavigate={nav} />;
     if (page.startsWith("step_")) {
       const num = parseInt(page.replace("step_", ""), 10);
       const step = STEPS[num - 1];
