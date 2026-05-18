@@ -520,6 +520,37 @@ async function loadAllSteps() {
   return all;
 }
 
+// localStorage の "aipub:" プレフィックス付きキーをすべて JSON として返す（Export 用）
+// 用途：別ドメイン（Preview ↔ Production など）にデータを移す時のスナップショット作成
+function exportAllData() {
+  const data = {};
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith("aipub:")) {
+        data[k] = localStorage.getItem(k);
+      }
+    }
+  } catch (e) { console.error(e); }
+  return data;
+}
+
+// JSON 形式のスナップショットを localStorage に書き戻す（Import 用）
+// 既存キーは上書き、含まれていないキーは変更しない（マージモード）
+function importAllData(json) {
+  let imported = 0;
+  let skipped = 0;
+  try {
+    for (const [k, v] of Object.entries(json || {})) {
+      if (typeof k !== "string" || !k.startsWith("aipub:")) { skipped++; continue; }
+      if (typeof v !== "string") { skipped++; continue; }
+      localStorage.setItem(k, v);
+      imported++;
+    }
+  } catch (e) { console.error(e); }
+  return { imported, skipped };
+}
+
 async function resetAllData() {
   try {
     localStorage.removeItem(STORAGE_KEY);
@@ -1780,6 +1811,50 @@ const HomePage = ({ project, stepStatuses, allSteps, onNavigate }) => {
         <h2 style={{ fontSize: 14, fontWeight: 700, color: C.navy, marginBottom: 12 }}>その他の操作</h2>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <BtnSecondary onClick={() => onNavigate("saved")}>保存データを参照</BtnSecondary>
+          <BtnSecondary onClick={() => {
+            // すべての aipub: データを JSON ファイルとしてダウンロード
+            const data = exportAllData();
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+            a.href = url;
+            a.download = `aipub-backup-${ts}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          }}>📥 データをエクスポート（JSON）</BtnSecondary>
+          <BtnSecondary onClick={() => {
+            // 隠しファイル入力をクリック
+            const input = document.createElement("input");
+            input.type = "file";
+            input.accept = "application/json,.json";
+            input.onchange = (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = (ev) => {
+                try {
+                  const json = JSON.parse(ev.target?.result || "{}");
+                  const keysToImport = Object.keys(json).filter((k) => k.startsWith("aipub:"));
+                  if (keysToImport.length === 0) {
+                    alert("ファイルに有効なデータが見つかりませんでした（aipub: で始まるキーが必要です）。");
+                    return;
+                  }
+                  const ok = window.confirm(`${keysToImport.length} 件のデータをインポートします。現在のデータは上書きされます。続行しますか？\n\n（インポート対象のキー先頭5件:\n${keysToImport.slice(0, 5).join("\n")}${keysToImport.length > 5 ? "\n..." : ""}）`);
+                  if (!ok) return;
+                  const result = importAllData(json);
+                  alert(`✓ インポート完了：${result.imported} 件反映（${result.skipped} 件スキップ）\nページをリロードします。`);
+                  location.reload();
+                } catch (err) {
+                  alert("インポート失敗：" + err.message + "\nファイルが正しい JSON 形式か確認してください。");
+                }
+              };
+              reader.readAsText(file);
+            };
+            input.click();
+          }}>📤 データをインポート（JSON）</BtnSecondary>
           <BtnSecondary onClick={() => setShowResetConfirm(true)}>保存データを削除</BtnSecondary>
           <BtnSecondary onClick={() => onNavigate("guide")}>使い方を参照</BtnSecondary>
         </div>
@@ -1792,6 +1867,9 @@ const HomePage = ({ project, stepStatuses, allSteps, onNavigate }) => {
             </div>
           </div>
         )}
+        <div style={{ marginTop: 8, fontSize: 11.5, color: C.textLight, lineHeight: 1.7 }}>
+          💡 <strong>エクスポート / インポート</strong>：Preview 環境（開発）で作ったデータを Production 環境（本番）にコピーする時、または別PC へ移行する時に使います。JSON ファイルとしてダウンロード→別ドメインで読み込みでデータが復元されます。
+        </div>
       </div>
       <Card style={{ background: "#eef2f7", border: "1px solid #c8d4e0" }}>
         <h3 style={{ fontSize: 13, fontWeight: 700, color: C.navyMid, margin: "0 0 10px" }}>このツールの使い方</h3>
