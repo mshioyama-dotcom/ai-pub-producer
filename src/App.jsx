@@ -3527,6 +3527,23 @@ const Step12Page = ({ savedAuthorProfile, savedWorkProfileConfirmed, onNavigate 
                 ))}
               </div>
             )}
+            {analysis.product_snapshot.best_seller_rank && (
+              <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px dashed ${C.border}`, fontSize: 12.5, color: C.text }}>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>ランキング情報:</div>
+                <div style={{ fontSize: 12, color: C.textSub, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                  {analysis.product_snapshot.best_seller_rank}
+                </div>
+              </div>
+            )}
+            {/* デバッグ用：Amazon API から取得できた生のランキング関連フィールド */}
+            {analysis.product_snapshot._raw_rank_fields && (
+              <details style={{ marginTop: 10, fontSize: 11, color: C.textLight }}>
+                <summary style={{ cursor: "pointer", fontWeight: 600 }}>🔍 デバッグ：API から取得した生フィールド（クリックで展開）</summary>
+                <pre style={{ marginTop: 6, padding: "8px 10px", background: "#f7f7f7", border: `1px solid ${C.border}`, borderRadius: 3, fontSize: 11, overflow: "auto", maxHeight: 300 }}>
+                  {JSON.stringify(analysis.product_snapshot._raw_rank_fields, null, 2)}
+                </pre>
+              </details>
+            )}
           </Card>
         </div>
       )}

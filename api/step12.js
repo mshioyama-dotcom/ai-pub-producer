@@ -115,15 +115,67 @@ function safeStringify(v) {
   return String(v);
 }
 
-// best_seller_rank / カテゴリ情報を product_information / category_path 等から抽出
+// Real-Time Amazon Data API のレスポンスから「ランキング情報」を可能な限り抽出。
+// API の仕様上、ランキング情報は複数のフィールドに分散しており、しかも日本語/英語、
+// 配列/文字列/オブジェクトと形式が安定しない。以下の優先順位で全部試す。
 function extractBestSellerInfo(d) {
-  // 優先順：sales_volume → best_sellers_rank → category_path → product_information
-  const candidates = [d.sales_volume, d.best_sellers_rank, d.category_path, d.categories, d.product_information];
-  for (const c of candidates) {
-    const s = safeStringify(c);
-    if (s) return s;
+  const found = [];
+
+  // 1) best_sellers_rank フィールド（配列または文字列）
+  if (d.best_sellers_rank) {
+    if (Array.isArray(d.best_sellers_rank)) {
+      // 例: [{ category: "Kindleストア", rank: 11247 }, ...]
+      const entries = d.best_sellers_rank
+        .map((r) => {
+          if (!r) return "";
+          const cat = r.category || r.name || r.path || "";
+          const rk = r.rank || r.position || "";
+          if (cat && rk) return `${cat} #${rk}位`;
+          if (cat) return cat;
+          if (rk) return `#${rk}位`;
+          return safeStringify(r);
+        })
+        .filter(Boolean);
+      if (entries.length > 0) found.push(...entries);
+    } else {
+      const s = safeStringify(d.best_sellers_rank);
+      if (s) found.push(s);
+    }
   }
-  return "";
+
+  // 2) sales_volume フィールド（例: "1,234 bought in past month"）
+  if (d.sales_volume) {
+    const s = safeStringify(d.sales_volume);
+    if (s) found.push(s);
+  }
+
+  // 3) product_information の中にランキングが入っているケース（日本語キー対応）
+  if (d.product_information && typeof d.product_information === "object" && !Array.isArray(d.product_information)) {
+    for (const [key, value] of Object.entries(d.product_information)) {
+      // ランキング関連キー（日本語・英語両対応）
+      if (/ランキング|順位|rank/i.test(key)) {
+        const s = safeStringify(value);
+        if (s) found.push(`${key}: ${s}`);
+      }
+    }
+  }
+
+  // 4) その他、ランキング数値が含まれそうなトップレベルフィールド
+  const otherRankKeys = ["product_rank", "ranking", "amazon_rank", "kindle_rank"];
+  for (const k of otherRankKeys) {
+    if (d[k]) {
+      const s = safeStringify(d[k]);
+      if (s) found.push(`${k}: ${s}`);
+    }
+  }
+
+  // 5) フォールバック：カテゴリパス（ランキングは無いが「どの棚にいるか」が分かる）
+  if (found.length === 0) {
+    const catPath = safeStringify(d.category_path) || safeStringify(d.categories);
+    if (catPath) found.push(`カテゴリパス: ${catPath}`);
+  }
+
+  return found.join(" / ");
 }
 
 // ASIN の Product Details を取得
@@ -134,6 +186,19 @@ async function fetchProductDetails(asin, apiKey, host, endpoint) {
     "x-rapidapi-host": host,
   });
   const d = data?.data || {};
+  // ランキング関連のフィールドを丸ごと保存（デバッグ・改善ヒント用）
+  const rawRankFields = {
+    best_sellers_rank: d.best_sellers_rank,
+    sales_volume: d.sales_volume,
+    product_information_keys: d.product_information && typeof d.product_information === "object"
+      ? Object.keys(d.product_information)
+      : null,
+    product_information_ranking: d.product_information && typeof d.product_information === "object"
+      ? Object.entries(d.product_information)
+        .filter(([k]) => /ランキング|順位|rank/i.test(k))
+        .reduce((acc, [k, v]) => { acc[k] = v; return acc; }, {})
+      : null,
+  };
   return {
     asin: d.asin || asin,
     title: safeStringify(d.product_title),
@@ -149,6 +214,7 @@ async function fetchProductDetails(asin, apiKey, host, endpoint) {
     is_amazon_choice: !!d.is_amazon_choice,
     is_best_seller: !!d.is_best_seller,
     raw_categories: safeStringify(d.category_path) || safeStringify(d.categories),
+    _raw_rank_fields: rawRankFields, // フロント側でデバッグ用に確認可能
   };
 }
 
