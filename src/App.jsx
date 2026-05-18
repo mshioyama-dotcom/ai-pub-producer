@@ -4388,18 +4388,27 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           target_purpose: slot.target_purpose,
           existing_summary: existingSummary,
         };
-        // 文字数下限（standard_280 → 220字、short_140 → 100字）
-        // LLM が短く生成した場合、最大1回だけリトライ要求を出す
-        const minChars = tweetLength === "short_140" ? 100 : 220;
+        // 文字数下限（standard_280 → 240字、short_140 → 110字）
+        // 2段階生成戦略：
+        //   1段階目：通常生成（170字くらい出やすい）
+        //   2段階目：1段階目の結果を「これを 260字 まで拡張して」と explicit に拡張指示
+        //   3段階目（保険）：それでも足りなければさらにもう一度拡張要求
+        const minChars = tweetLength === "short_140" ? 110 : 240;
+        const targetChars = tweetLength === "short_140" ? 130 : 260;
         let content = "";
-        for (let attempt = 0; attempt < 2; attempt++) {
-          const retryHint = attempt === 0
-            ? ""
-            : `※前回の生成結果が短すぎました（${content.length}字）。今回は **必ず ${minChars} 字以上** の本文を書いてください。具体例・固有体験・補足説明・問いかけを加えて膨らませてください。`;
-          const reqInputs = { ...execInputs };
-          if (retryHint) {
-            // existing_summary フィールドにリトライ指示を追記（プロンプト末尾に届く）
-            reqInputs.existing_summary = (reqInputs.existing_summary || "") + "\n\n" + retryHint;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          let reqInputs;
+          if (attempt === 0) {
+            // 1段階目: 通常生成
+            reqInputs = { ...execInputs };
+          } else {
+            // 2段階目以降: 「これを拡張して」と explicit に指示する
+            // existing_summary フィールドに「過去の生成結果＋拡張指示」を入れる
+            const expandInstruction = `\n\n━━━━━━━━━━━━━\n【重要：拡張指示】\n━━━━━━━━━━━━━\n\n前回 ${content.length}字 の以下の短文記事を生成しました：\n\n---\n${content}\n---\n\n**この内容を保ちつつ、${targetChars}字（${minChars}〜${targetChars + 20}字）まで拡張してください。**\n\n拡張の方法：\n- 著者の具体的なシーン描写を1〜2文追加（例：「会議室で資料を出した瞬間、上司が無言で赤入れした」など）\n- 固有実績の数字を補強（Kindle20冊／印税300万円超／ITコンサル／東工大院 等）\n- 本書の固有概念をもう1つ織り込む（未整理仮説／3行モヤモヤ／反応駆動ループ／経験の4分類 等）\n- 読者への問いかけを最後に追加\n\n上記4点のうち2〜3個を加えて、必ず ${minChars}字以上 にしてください。元の核メッセージは保ち、改善版として書き直す。`;
+            reqInputs = {
+              ...execInputs,
+              existing_summary: (execInputs.existing_summary || "") + expandInstruction,
+            };
           }
           const response = await fetch("/api/dify", {
             method: "POST",
@@ -4410,14 +4419,20 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           if (!response.ok) {
             throw new Error(`投稿 ${i + 1}（${slot.target_timing}・${slot.target_purpose}）の生成で失敗：${data.error || "不明なエラー"}`);
           }
-          content = (data.output || "").trim();
-          if (!content) {
+          const newContent = (data.output || "").trim();
+          if (!newContent) {
             throw new Error(`投稿 ${i + 1}（${slot.target_timing}・${slot.target_purpose}）の生成結果が空でした。`);
           }
-          // 文字数が下限以上ならループ抜ける、未満かつまだリトライ可能なら再度生成
+          // 2段階目以降で逆に短くなった場合は前回の結果を残す（拡張に失敗したケース）
+          if (attempt > 0 && newContent.length < content.length) {
+            // 既存 content の方が長い → そのまま採用してループ終了
+            break;
+          }
+          content = newContent;
+          // 下限到達なら終了
           if (content.length >= minChars) break;
-          if (attempt === 1) break; // 2回目でも短ければ諦めて採用
-          // リトライ前のウェイト
+          if (attempt === 2) break; // 3回目でも短ければ諦めて採用
+          // 次の拡張前にウェイト
           await new Promise((r) => setTimeout(r, 500));
         }
         results.push({ ...slot, content });
