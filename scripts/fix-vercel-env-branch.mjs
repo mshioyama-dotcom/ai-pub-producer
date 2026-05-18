@@ -116,17 +116,27 @@ async function main() {
     return;
   }
 
-  console.log("🔧 ブランチ制限を解除し、Production/Preview/Development の全環境に有効化します...\n");
+  console.log("🔧 ブランチ制限を解除し、Production + Preview の両環境に有効化します...\n");
+  console.log("   ※ Sensitive 環境変数は development スコープに設定不可なので、production + preview のみ\n");
 
   let success = 0;
   let failed = 0;
   for (const env of branchRestricted) {
     try {
+      // Sensitive 変数は development をターゲットにできないため、production + preview のみ
+      // 既に development を含むなら維持する（非 Sensitive の場合のため）
+      const currentTargets = new Set(env.target || []);
+      currentTargets.add("production");
+      currentTargets.add("preview");
+      // Sensitive 変数の場合は development を除外（API が 400 を返す）
+      if (env.type === "sensitive") {
+        currentTargets.delete("development");
+      }
       await patchEnvVar(env.id, {
         gitBranch: null, // ブランチ制限を解除
-        target: ["production", "preview", "development"], // 全環境で有効化
+        target: Array.from(currentTargets),
       });
-      console.log(`  ✓ ${env.key}`);
+      console.log(`  ✓ ${env.key}  → target: ${Array.from(currentTargets).join("/")}`);
       success++;
     } catch (err) {
       console.error(`  ✗ ${env.key} → ${err.message}`);
