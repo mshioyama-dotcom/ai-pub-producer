@@ -5856,55 +5856,155 @@ const GuidePage = ({ onNavigate }) => {
       </Card>
     </div>
   );
+  // 各 STEP の説明用ミニカード
+  const StepRow = ({ num, title, desc, badge }) => (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 0", borderBottom: `1px dashed ${C.border}` }}>
+      <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 36, height: 24, padding: "0 8px", borderRadius: 3, background: badge === "🆕" ? C.gold : C.navy, color: C.white, fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{num}</span>
+      <div style={{ fontSize: 13, color: C.text, lineHeight: 1.7 }}>
+        <span style={{ fontWeight: 700, color: C.navy }}>{title}</span>
+        {badge === "🆕" && <span style={{ marginLeft: 6, fontSize: 10, color: C.gold, fontWeight: 700 }}>NEW</span>}
+        <br />
+        <span style={{ color: C.textSub }}>{desc}</span>
+      </div>
+    </div>
+  );
   return (
     <div>
       <div style={{ fontSize: 11, fontWeight: 700, color: C.gold, letterSpacing: "0.08em", marginBottom: 6 }}>GUIDE</div>
       <h1 style={{ fontSize: 22, fontWeight: 700, color: C.navy, margin: "0 0 6px" }}>使い方</h1>
-      <p style={{ fontSize: 13.5, color: C.textSub, marginBottom: 28 }}>AI出版プロデューサーの進め方を、短く確認できます</p>
-      <Section title="全体の流れ">
-        <ul style={{ margin: 0, paddingLeft: 18 }}>
-          <li>STEP1からSTEP9まで順番に進めます</li>
-          <li>前のステップの出力を次のステップの入力に使います</li>
-          <li>途中で止まっても、保存データからいつでも再開できます</li>
+      <p style={{ fontSize: 13.5, color: C.textSub, marginBottom: 28 }}>初めての方でも迷わないように、AI 出版プロデューサーの全体像と操作方法を解説します。</p>
+
+      <Section title="🎯 このツールで何ができる？">
+        <div style={{ marginBottom: 8 }}>
+          <strong style={{ color: C.navy }}>Kindle 出版の「企画 → 執筆 → 販売 → 改善 → 次回作」のサイクル全体</strong>を、AI と一緒に進めるツールです。
+        </div>
+        <ul style={{ margin: "8px 0 0 0", paddingLeft: 18 }}>
+          <li>1 冊目を出すまでの全工程をガイド付きで進められる</li>
+          <li>各 STEP の出力は次の STEP の入力に自動転記される</li>
+          <li>出版後は本の改善提案・著者プロファイル進化まで対応</li>
+          <li>サブスクサービス Life Book Navigator の中核機能</li>
         </ul>
       </Section>
-      <Section title="操作方法（ワークフロー型:STEP1〜2・4〜9）">
-        <ul style={{ margin: 0, paddingLeft: 18 }}>
-          <li>① 入力データ欄に情報を入力する。「自動転記」「参照」「自動振り分け」ボタンを活用してください</li>
-          <li style={{ marginTop: 4 }}><span style={{ fontWeight: 700 }}>自動転記（ネイビー）</span>：押すと前のSTEPの出力が自動で入力欄に入る</li>
-          <li style={{ marginTop: 4 }}><span style={{ fontWeight: 700 }}>参照（薄ネイビー）</span>：押すと画面右側に前のSTEPの出力が表示される</li>
-          <li style={{ marginTop: 4 }}><span style={{ fontWeight: 700 }}>自動振り分け（ゴールド）</span>：STEP4のキーワード入力欄専用。書籍プロファイル確定版（STEP2）から主題軸キーワードを自動抽出</li>
-          <li style={{ marginTop: 8 }}>② 「実行する」ボタンを押すとAIが自動で処理し、結果が出力欄に表示される</li>
-          <li>③ 内容を確認・修正して「出力データを保存」を押す</li>
-        </ul>
-        <div style={{ marginTop: 8, fontSize: 12.5, color: "#b8922a", fontWeight: 600 }}>⚠️ 出力を修正した場合も必ず「出力データを保存」を押してから次のステップへ。</div>
+
+      <Section title="📋 全体の流れ（STEP0 → STEP13）">
+        <div style={{ marginBottom: 10, fontSize: 12.5, color: C.textSub }}>
+          全 14 ステップを 4 カテゴリで段階的に進めます。左メニューから順番に開いてください。
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.gold, marginBottom: 4 }}>📌 著者プロファイル（土台）</div>
+          <StepRow num="0" title="著者プロファイル" desc="あなた自身の専門領域・思想・文体・実績を AI が抽出。以降の全 STEP で自動転記されます。" />
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.gold, marginBottom: 4 }}>📘 企画設計フェーズ（STEP1〜5）</div>
+          <StepRow num="1" title="書籍プロファイル草案" desc="本のテーマ・想定読者・コアベネフィットを定義。" />
+          <StepRow num="2" title="キーワード絞り込み" desc="Amazon Kindle データから検索キーワード10個を3軸スコアリング。1〜2個を選定。" />
+          <StepRow num="3" title="競合レビュー評価" desc="上位本3冊のAmazonレビューを分析し、差別化ポイントを抽出。" />
+          <StepRow num="–" title="書籍プロファイル確定" desc="STEP1〜3を統合した「確定版」を生成。これ以降の全STEPの判断軸になります。" />
+          <StepRow num="4" title="エピソードインタビュー" desc="AI とチャット形式で、本の素材となる体験・気づきを引き出します。" />
+          <StepRow num="5" title="タイトル・サブタイトル作成" desc="3案を生成して 1 案を「推し案」として提示。Amazon KDP 規約準拠。" />
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.gold, marginBottom: 4 }}>📝 執筆設計フェーズ（STEP6〜9）</div>
+          <StepRow num="6" title="目次作成" desc="章タイトル＋節見出しを一気に生成（デフォルト 7 章構成）。" />
+          <StepRow num="7" title="章構成作成" desc="目次から章ごとに節要約を一括生成（全章順次処理）。" />
+          <StepRow num="8" title="詳細プロット作成" desc="章ごとに「節 → 項」レベルまで分解（全章順次処理）。" />
+          <StepRow num="9" title="本文作成" desc="章ごとに本文を生成。1 章ずつ確認しながら進められます。" />
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.gold, marginBottom: 4 }}>📣 販売準備フェーズ（STEP10〜11）</div>
+          <StepRow num="10" title="Amazon説明文作成" desc="商品ページに載せる紹介文を 7 段落構成で生成。" />
+          <StepRow num="11" title="X投稿生成" badge="🆕" desc="出版前後の SNS 用短文記事を毎日投稿型で 10〜20 本生成（出版前1週間 + 当日 + 出版後1週間）。" />
+        </div>
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.gold, marginBottom: 4 }}>📈 改善・次回作フェーズ（STEP12〜13・出版後に使う）</div>
+          <StepRow num="12" title="本の改善提案" badge="🆕" desc="出版済み本の ASIN を入力すると、Amazon のレビュー・評価から「タイトル・説明文・価格・施策」の改善案を AI が生成。" />
+          <StepRow num="13" title="出版経験の振り返り" badge="🆕" desc="STEP12 の改善提案を元に、著者プロファイルの更新版を生成。出版経験で進化した強みを STEP0 に反映できます。" />
+        </div>
       </Section>
-      <Section title="操作方法（チャット型:STEP3）">
-        <ul style={{ margin: 0, paddingLeft: 18 }}>
-          <li>① 入力データ欄に情報を入力して「入力データを保存」を押す</li>
-          <li>② 「チャットに転記して開始」を押すと入力データがそのまま送信され、AIから最初の質問が届く</li>
-          <li>③ AIの質問に答えながら会話を進める</li>
-          <li>④ 会話が終わったら「↓ 最後の回答を出力データへ転記」を押す</li>
-          <li>⑤ 出力データ欄の内容を確認して「出力データを保存」を押す</li>
-        </ul>
-      </Section>
-      <Section title="データの保存について">
-        <ul style={{ margin: 0, paddingLeft: 18 }}>
-          <li>各ステップの入力・出力は「保存」ボタンでブラウザに保存されます</li>
-          <li>同じブラウザで再度開けば、保存したデータはそのまま残っています</li>
-          <li>別のブラウザや別のPC・スマホからはデータを引き継げません</li>
-          <li>ブラウザのキャッシュをクリアするとデータが消えるため、大事な出力はコピーして別途保管してください</li>
-        </ul>
-      </Section>
-      <Section title="STEP2 市場検証のHTML取得方法">
-        <ol style={{ margin: 0, paddingLeft: 18 }}>
-          <li>AmazonのKindleストアで主題軸キーワードを検索（必要に応じて読者軸・差分軸も）</li>
-          <li>検索結果ページで右クリック→「ページのソースを表示」</li>
-          <li>Ctrl+A → Ctrl+C で全選択コピー</li>
-          <li>STEP2の各軸の入力欄に貼り付けて「実行する」を押す</li>
+
+      <Section title="🟢 基本の操作方法（ワークフロー型 STEP・STEP1/2/3/5/6/7/8/9/10/11/12/13/確定）">
+        <div style={{ marginBottom: 8, fontSize: 12.5, color: C.textSub }}>
+          ほとんどの STEP はこのパターンです。「入力 → AI 実行 → 出力確認・保存」の 3 工程。
+        </div>
+        <ol style={{ margin: 0, paddingLeft: 20 }}>
+          <li><strong>入力データを入力</strong>（または<strong>「自動転記」「自動振り分け」</strong>ボタンで前STEP出力を取り込み）</li>
+          <li><strong>「実行する」</strong>または<strong>「全章を順次生成」</strong>ボタンを押す → AI が処理 → 出力欄に表示</li>
+          <li>出力を確認し、必要なら編集 → <strong>「出力データを保存」</strong>ボタンを押す</li>
         </ol>
-        <div style={{ marginTop: 8, fontSize: 12.5, color: C.textLight }}>「実行する」を押すと自動でクリーニングしてAIに渡します。最低でも主題軸の1軸が必須・読者軸/差分軸は任意。</div>
+        <div style={{ marginTop: 12, fontSize: 12.5, color: C.text }}>
+          <strong>3 つの便利ボタン</strong>:
+        </div>
+        <ul style={{ margin: "4px 0 0 0", paddingLeft: 18 }}>
+          <li><span style={{ background: C.navy, color: C.white, padding: "1px 6px", borderRadius: 2, fontSize: 11, fontWeight: 600 }}>自動転記</span>：押すと前 STEP の出力が自動で入力欄に入る</li>
+          <li><span style={{ background: C.blueLight, color: C.navyMid, padding: "1px 6px", borderRadius: 2, fontSize: 11, fontWeight: 600, border: `1px solid rgba(42,68,104,0.2)` }}>参照</span>：押すと画面右側に前 STEP の出力が表示される（コピーに使う）</li>
+          <li><span style={{ background: C.gold, color: C.white, padding: "1px 6px", borderRadius: 2, fontSize: 11, fontWeight: 600 }}>自動振り分け</span>：STEP5 のキーワード欄など、書籍プロファイル確定版から特定値を自動抽出</li>
+        </ul>
+        <div style={{ marginTop: 8, padding: "8px 12px", background: "#fff8e1", border: `1px solid ${C.gold}`, borderRadius: 3, fontSize: 12, color: C.navyMid, fontWeight: 600 }}>
+          ⚠️ 出力を修正した場合も<strong>必ず「出力データを保存」</strong>を押してから次のステップへ進んでください。保存しないと次の STEP に転記されません。
+        </div>
       </Section>
+
+      <Section title="💬 チャット型 STEP（STEP4 エピソードインタビューだけ）">
+        <div style={{ marginBottom: 8, fontSize: 12.5, color: C.textSub }}>
+          STEP4 だけは AI と会話する形式です。本の素材となる体験談を引き出すための質問に答えます。
+        </div>
+        <ol style={{ margin: 0, paddingLeft: 20 }}>
+          <li>下部のチャット欄で「<strong>開始</strong>」や「<strong>準備できました</strong>」など何か送信すると、AI が質問1から始める</li>
+          <li>AI の質問に答える（1 回 1 つの質問）</li>
+          <li>全質問が終わると AI が要約を出してくれる</li>
+          <li><strong>「↓ 最後の回答を出力データへ転記」</strong>ボタンを押す → 要約が出力欄に入る</li>
+          <li>内容を確認して<strong>「出力データを保存」</strong>を押す → STEP5 以降で自動利用</li>
+        </ol>
+      </Section>
+
+      <Section title="📚 確定アクション（STEP3 完了後・必須）">
+        <div style={{ marginBottom: 8, fontSize: 12.5, color: C.textSub }}>
+          STEP1〜3 を統合した「書籍プロファイル確定版」を生成する重要なステップです。サイドメニューの「<strong>確定 書籍プロファイル確定</strong>」をクリック。
+        </div>
+        <ol style={{ margin: 0, paddingLeft: 20 }}>
+          <li>前提チェック：STEP1 草案・STEP2 選定キーワード・STEP3 分析結果が揃っているか確認（揃っていなければ各STEPへ戻る案内）</li>
+          <li><strong>「▶ 書籍プロファイル確定版を生成」</strong>ボタン → AI が 30秒〜1分で生成</li>
+          <li>プレビュー画面で内容を確認（マークダウン形式・編集可能）</li>
+          <li>外部 AI（ChatGPT / Claude）で相談用プロンプトを取得してブラッシュアップも可能</li>
+          <li>「<strong>保存して STEP4 へ進む</strong>」ボタンで確定 → 制作フェーズへ</li>
+        </ol>
+        <div style={{ marginTop: 8, padding: "8px 12px", background: "#eef7ee", border: `1px solid rgba(45,122,79,0.3)`, borderRadius: 3, fontSize: 12, color: C.navyMid }}>
+          ✓ 確定版は<strong>STEP4 以降の全STEPの判断軸</strong>として機能します。後で気づきがあれば、各STEPの右上「📝 確定版を見直す」ボタンからいつでも編集・再保存できます（ライブドキュメント運用）。
+        </div>
+      </Section>
+
+      <Section title="🔁 出版後の循環フロー（STEP12 → STEP13）">
+        <div style={{ marginBottom: 8, fontSize: 12.5, color: C.textSub }}>
+          1冊出版した後、改善と次回作につなげるフローです。サイドメニュー「<strong>改善・次回作</strong>」カテゴリから使えます。
+        </div>
+        <ol style={{ margin: 0, paddingLeft: 20 }}>
+          <li><strong>STEP12「本の改善提案」</strong>：出版した本の ASIN を入力 → Amazon の現状データとレビューから AI が改善提案を生成</li>
+          <li>改善提案を見て、改訂版・タイトル変更・施策実行を判断（実行は著者の判断・強制しません）</li>
+          <li><strong>STEP13「出版経験の振り返り」</strong>：STEP12 の結果＋著者プロファイルから、著者プロファイル更新版を生成</li>
+          <li>更新版を確認・編集 → <strong>「✓ STEP0 に反映する」</strong>ボタンで上書き保存（任意）</li>
+          <li>次回作を始めるなら STEP1 へ進む。続けないなら何もしなくて OK（著者の判断を尊重）</li>
+        </ol>
+      </Section>
+
+      <Section title="💾 データの保存について">
+        <ul style={{ margin: 0, paddingLeft: 18 }}>
+          <li>各STEPの入力・出力は<strong>「保存」ボタンでブラウザに保存</strong>されます（ローカルストレージ）</li>
+          <li>同じブラウザで再度開けば、保存データはそのまま残っています</li>
+          <li><strong>別のブラウザ・別のPC・スマホからはデータを引き継げません</strong>（ブラウザ単位の保存）</li>
+          <li>ブラウザのキャッシュをクリアするとデータが消えるため、<strong>大事な出力はコピーして別途保管</strong>してください</li>
+          <li>左メニューの<strong>「保存データ」</strong>から、過去の各STEP出力をいつでも閲覧・コピーできます</li>
+        </ul>
+      </Section>
+
+      <Section title="🆘 困ったときは">
+        <ul style={{ margin: 0, paddingLeft: 18 }}>
+          <li><strong>AI 出力が期待と違う</strong>：各STEP下部の「📋 外部AIで相談するプロンプトを取得」ボタンから、ChatGPT/Claude で改善版を作って貼り戻す</li>
+          <li><strong>白画面になる</strong>：ブラウザを <strong>Ctrl+Shift+R</strong> でハードリフレッシュ</li>
+          <li><strong>「実行する」が反応しない</strong>：必須入力欄（赤いマーク）が空欄になっていないか確認</li>
+          <li><strong>処理が長い（504エラー）</strong>：もう一度実行ボタンを押す（Dify Cloud の一過性タイムアウトであることが多い）</li>
+        </ul>
+      </Section>
+
       <BtnSecondary onClick={() => onNavigate("home")}>ホームへ戻る</BtnSecondary>
     </div>
   );
