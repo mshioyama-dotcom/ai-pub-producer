@@ -90,6 +90,75 @@ function mapInputs(stepNum, inputs) {
   return m;
 }
 
+// Dify 呼び出しのタイムアウト・リトライ設定
+const DIFY_FETCH_TIMEOUT_MS = 270 * 1000; // 270s（Vercel maxDuration:300 から余裕30秒）
+const DIFY_MAX_RETRIES = 1;               // 502/503/504/timeout は1回だけリトライ
+const DIFY_RETRY_DELAY_MS = 3000;         // リトライまでの待機（3秒）
+
+// HTML エラーレスポンスを人間に読めるメッセージへ変換する
+function buildFriendlyUpstreamError(stepNum, status, attempts) {
+  const tried = attempts > 1 ? `（${attempts}回試行しましたが応答が得られず）` : "";
+  if (status === 504) {
+    return `Dify サーバが時間内に応答しませんでした（504 Gateway Timeout）${tried}。Dify ワークフローの処理に時間がかかりすぎている可能性があります。1〜2分待ってから再実行してください。それでも続く場合は、入力テキストを短くする／プロンプトを簡略化する／Dify ダッシュボードでワークフローの実行ログを確認する、などをご検討ください。`;
+  }
+  if (status === 502) {
+    return `Dify サーバが一時的に応答できませんでした（502 Bad Gateway）${tried}。1〜2分待ってから再実行してください。`;
+  }
+  if (status === 503) {
+    return `Dify サーバが一時的に利用できません（503 Service Unavailable）${tried}。1〜2分待ってから再実行してください。`;
+  }
+  return `Dify サーバが応答できませんでした（${status}）${tried}。1〜2分後に再実行してください。`;
+}
+
+// AbortController + リトライ付きで Dify を呼び出す
+async function callDifyWithRetry(apiKey, difyInputs, stepNum) {
+  let lastError = null;
+  let lastResponse = null;
+  for (let attempt = 0; attempt <= DIFY_MAX_RETRIES; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), DIFY_FETCH_TIMEOUT_MS);
+    try {
+      const response = await fetch(`${DIFY_API_BASE}/workflows/run`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          inputs: difyInputs,
+          response_mode: "blocking",
+          user: "ai-pub-producer-user",
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      lastResponse = response;
+      if (response.ok) {
+        return { response, attempts: attempt + 1 };
+      }
+      // 502/503/504 は upstream の一時的な不調なのでリトライ
+      const retriable = response.status === 502 || response.status === 503 || response.status === 504;
+      if (retriable && attempt < DIFY_MAX_RETRIES) {
+        console.log(`[DIFY_RETRY] STEP${stepNum} status=${response.status} attempt=${attempt + 1}/${DIFY_MAX_RETRIES + 1} retrying in ${DIFY_RETRY_DELAY_MS}ms`);
+        await new Promise((r) => setTimeout(r, DIFY_RETRY_DELAY_MS));
+        continue;
+      }
+      return { response, attempts: attempt + 1 };
+    } catch (e) {
+      clearTimeout(timeoutId);
+      lastError = e;
+      if (e.name === "AbortError" && attempt < DIFY_MAX_RETRIES) {
+        console.log(`[DIFY_RETRY] STEP${stepNum} client-side timeout attempt=${attempt + 1}/${DIFY_MAX_RETRIES + 1} retrying in ${DIFY_RETRY_DELAY_MS}ms`);
+        await new Promise((r) => setTimeout(r, DIFY_RETRY_DELAY_MS));
+        continue;
+      }
+      throw e;
+    }
+  }
+  if (lastError) throw lastError;
+  return { response: lastResponse, attempts: DIFY_MAX_RETRIES + 1 };
+}
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -107,21 +176,22 @@ export default async function handler(req, res) {
   const difyInputs = mapInputs(stepNum, inputs);
 
   try {
-    const response = await fetch(`${DIFY_API_BASE}/workflows/run`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        inputs: difyInputs,
-        response_mode: "blocking",
-        user: "ai-pub-producer-user",
-      }),
-    });
+    const { response, attempts } = await callDifyWithRetry(apiKey, difyInputs, stepNum);
 
     if (!response.ok) {
       const errorText = await response.text();
+      const looksLikeHtml = /<!doctype html|<html[\s>]/i.test(errorText);
+      // Cloudflare/Dify の HTML エラーページが返ってきたケースは、人間に読める文章に変換
+      if (looksLikeHtml) {
+        const friendly = buildFriendlyUpstreamError(stepNum, response.status, attempts);
+        console.log(`[DIFY_UPSTREAM_HTML_ERROR] STEP${stepNum} status=${response.status} attempts=${attempts} bodyLen=${errorText.length}`);
+        return res.status(response.status).json({
+          error: friendly,
+          upstreamStatus: response.status,
+          attempts,
+        });
+      }
+      // それ以外のエラーは生のテキストを返す（Dify の構造化エラーなど）
       return res.status(response.status).json({ error: `Dify API error: ${errorText}` });
     }
 
@@ -166,6 +236,12 @@ export default async function handler(req, res) {
     return res.status(200).json({ output });
 
   } catch (error) {
+    if (error?.name === "AbortError") {
+      return res.status(504).json({
+        error: `Dify API がタイムアウトしました（${Math.round(DIFY_FETCH_TIMEOUT_MS / 1000)}秒）。Dify ワークフローの処理が長すぎる可能性があります。入力サイズの削減やプロンプトの簡略化をご検討ください。1〜2分後に再実行することで通る場合もあります。`,
+        upstreamStatus: 504,
+      });
+    }
     return res.status(500).json({ error: `Server error: ${error.message}` });
   }
 }
