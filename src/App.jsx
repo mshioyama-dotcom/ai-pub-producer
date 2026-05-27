@@ -4137,7 +4137,7 @@ const ConfirmActionPage = ({ savedAuthorProfile, savedWorkProfileDraft, onSaveWo
           placeholder="確定版生成後にここにマークダウンが表示されます。手動編集も可能です。"
           style={{ width: "100%", padding: "12px 14px", fontSize: 13.5, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.85 }} />
         <div style={{ display: "flex", gap: 10, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <BtnPrimary onClick={handleSaveOnly} disabled={!confirmedText.trim()}>確定版を保存（STEP4に進まない）</BtnPrimary>
+          <BtnPrimary onClick={handleSaveOnly} disabled={!confirmedText.trim()}>出力データを保存</BtnPrimary>
           {saveMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました</span>}
           <span style={{ fontSize: 11.5, color: C.textLight }}>※ 外部AI相談 → textarea で編集 → 保存 → 再相談 のループに使えます</span>
         </div>
@@ -4159,8 +4159,6 @@ const ConfirmActionPage = ({ savedAuthorProfile, savedWorkProfileDraft, onSaveWo
           <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>確定して次STEPへ進む</h2>
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <BtnSecondary onClick={() => onNavigate("step_3")}>← STEP3に戻る</BtnSecondary>
-          <BtnSecondary onClick={() => onNavigate("step_1")}>← STEP1に戻る</BtnSecondary>
           <BtnPrimary onClick={handleSaveAndProceed} disabled={!confirmedText.trim()}>
             書籍プロファイルを確定保存してSTEP4へ進む →
           </BtnPrimary>
