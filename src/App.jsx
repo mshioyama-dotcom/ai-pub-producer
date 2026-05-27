@@ -3350,11 +3350,22 @@ const Step3Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
         </div>
       )}
 
-      {/* ④ 次のアクション */}
+      {/* ④ 外部AIで相談する（書籍プロファイル確定アクション用プロンプト生成） */}
+      {analysis && (
+        <DiscussionPanel
+          stepNum="confirm"
+          stepName="書籍プロファイル確定アクション"
+          stepOutput={analysis.analysis_text || ""}
+          authorProfile={savedAuthorProfile || ""}
+          workProfile={savedWorkProfileDraft || ""}
+        />
+      )}
+
+      {/* ⑤ 次のアクション */}
       {analysis && (
         <div style={{ marginBottom: 28 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-            <StepBadge num="④" />
+            <StepBadge num="⑤" />
             <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>次のステップ</h2>
           </div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -3365,7 +3376,6 @@ const Step3Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
             </BtnPrimary>
           </div>
           <div style={{ marginTop: 8, fontSize: 11.5, color: C.textLight, lineHeight: 1.7 }}>
-            ※ STEP3には外部AI相談機能（DiscussionPanel）はありません。客観データ分析のため、上のAI判定アシストが相談機能の代替として機能します（v4設計）。<br />
             ※ 「書籍プロファイル確定アクション」では STEP1主観コンセプト × STEP2/3客観データ を統合した確定版を生成し、外部AIで最終レビューしてからSTEP4以降の制作フェーズに進めます。
           </div>
         </div>
