@@ -1451,8 +1451,8 @@ const AutoInjectedProfilesPanel = ({ onNavigate, stepNum }) => {
         </button>
         {/* v4: 確定版がある場合、折りたたみ状態でも「見直す」ボタンを直接出す（ライブドキュメント運用） */}
         {workProfileSource === "confirmed" && (
-          <button onClick={(e) => { e.stopPropagation(); onNavigate?.("step_confirm"); }}
-            title="書籍プロファイル確定版を編集・再保存できます。後段STEPの判断軸になるため、進めながら磨いていく運用です。"
+          <button onClick={(e) => { e.stopPropagation(); onNavigate?.("step_3"); }}
+            title="STEP3 ページ内で書籍プロファイル確定版を編集・再保存できます。後段STEPの判断軸になるため、進めながら磨いていく運用です。"
             style={{ fontSize: 11.5, color: C.white, background: C.gold, border: "none", borderRadius: 3, padding: "5px 12px", cursor: "pointer", fontWeight: 600, flexShrink: 0 }}>
             📝 確定版を見直す
           </button>
@@ -1492,7 +1492,7 @@ const AutoInjectedProfilesPanel = ({ onNavigate, stepNum }) => {
               </span>
               {/* v4: 確定版は「ライブドキュメント」。STEP4以降からいつでも見直して再保存できる */}
               {workProfileSource === "confirmed" ? (
-                <button onClick={() => onNavigate?.("step_confirm")}
+                <button onClick={() => onNavigate?.("step_3")}
                   style={{ fontSize: 11.5, color: C.white, background: C.gold, border: "none", borderRadius: 3, padding: "5px 12px", cursor: "pointer", fontWeight: 600 }}>
                   📝 確定版を見直す ›
                 </button>
@@ -1737,16 +1737,8 @@ const SideMenu = ({ currentPage, onNavigate, stepStatuses, confirmStatus }) => {
             {cat.steps.map((n) => {
               const s = STEPS[n - 1];
               const item = menuItem(`STEP${n}　${s.title}`, `step_${n}`, stepStatuses[n]);
-              // v4: STEP3 (競合レビュー評価) と STEP4 (エピソードインタビュー) の間に
-              // 「書籍プロファイル確定」アクションを挿入する。サイドナビからもアクセス可能に。
-              if (n === 3) {
-                return (
-                  <div key={`stepwrap_${n}`}>
-                    {item}
-                    {menuItem("　　確定　書籍プロファイル確定", "step_confirm", confirmStatus)}
-                  </div>
-                );
-              }
+              // v5: STEP3 末尾に「書籍プロファイル確定」機能を統合したため、専用の
+              // step_confirm メニュー項目は廃止（STEP3 ページ内 ④〜⑦ で完結）。
               return item;
             })}
           </div>
@@ -3056,7 +3048,6 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
             <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>次のステップ</h2>
           </div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <BtnSecondary onClick={handleReturnToStep1}>← STEP1に戻る</BtnSecondary>
             <BtnPrimary onClick={handleProceedToStep3} disabled={selectedKeywords.length === 0}>
               STEP3「競合レビュー評価」へ進む →
             </BtnPrimary>
@@ -3075,7 +3066,7 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
 // 経由で取得し、Dify LLM で読者の共通不満点・差別化ポイント・落とし穴を分析する。
 // 相談機能（DiscussionPanel）は無し（v4 §9-2 のとおり、客観データ分析のためAI判定アシストで代替）。
 // 確定アクション（優先度4）への遷移は本ページ完了後に行う。
-const Step3Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, project }) => {
+const Step3Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfileConfirmed, onSaveWorkProfileConfirmed, onNavigate, project }) => {
   // STEP2 関連データの取得（無ければ STEP2 へ戻る案内）
   const step2Analysis = (() => {
     try {
@@ -3203,11 +3194,6 @@ const Step3Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
     onNavigate("step_1");
   };
 
-  // v4: 「書籍プロファイル確定アクション」専用画面へ遷移
-  const handleProceedToConfirm = () => {
-    onNavigate("step_confirm");
-  };
-
   const recommendsReturn = analysis?.ai_recommendation === "return_to_step1";
   const recommendsProceed = analysis?.ai_recommendation === "proceed_to_confirmation";
 
@@ -3221,13 +3207,126 @@ const Step3Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
     } catch (e) { console.error(e); }
   };
 
+  // ─── 書籍プロファイル確定（旧 ConfirmActionPage の機能を STEP3 末尾に統合） ───
+  // 確定版生成に使う上位本コンテキスト（is_released なし、/api/work-profile-confirm 互換）
+  const selectedBooksForContext = useMemo(() => {
+    if (!hasStep2Data || !hasSelectedKeywords) return [];
+    const scored = step2Analysis.scored || [];
+    const books = [];
+    for (const kw of selectedKeywords) {
+      const entry = scored.find((s) => s.keyword === kw);
+      if (entry && Array.isArray(entry.top_books)) {
+        for (const b of entry.top_books) {
+          if (b && b.asin && !books.find((x) => x.asin === b.asin)) {
+            books.push(b);
+          }
+        }
+      }
+    }
+    return books;
+  }, [hasStep2Data, hasSelectedKeywords, selectedKeywords, step2Analysis]);
+
+  const [confirmedText, setConfirmedText] = useState(savedWorkProfileConfirmed || "");
+  const [isGeneratingConfirmed, setIsGeneratingConfirmed] = useState(false);
+  const [confirmGenerateError, setConfirmGenerateError] = useState("");
+  const [confirmSaveMsg, setConfirmSaveMsg] = useState(false);
+  const [confirmWarnings, setConfirmWarnings] = useState([]);
+
+  const hasStep3AnalysisForConfirm = !!analysis && !!analysis.analysis_text;
+  const canGenerateConfirmed = hasDraft && hasSelectedKeywords && hasStep3AnalysisForConfirm;
+
+  // 確定版を AI で生成（STEP1草案 + STEP2選定キーワード + STEP3分析 を統合）
+  const handleGenerateConfirmed = async () => {
+    setConfirmGenerateError("");
+    if (!canGenerateConfirmed) {
+      setConfirmGenerateError("確定版を生成するには、STEP1草案・STEP2選定キーワード・STEP3分析結果の3つすべてが必要です。前提条件を満たしてから再実行してください。");
+      return;
+    }
+    setIsGeneratingConfirmed(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4 * 60 * 1000);
+    try {
+      const response = await fetch("/api/work-profile-confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          work_profile_draft: savedWorkProfileDraft || "",
+          author_profile: savedAuthorProfile || "",
+          publishing_goal: savedPublishingGoal || "",
+          selected_keywords: selectedKeywords,
+          selected_books_for_context: selectedBooksForContext,
+          step3_analysis_text: analysis?.analysis_text || "",
+        }),
+      });
+      const contentType = response.headers.get("content-type") || "";
+      let data;
+      if (contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        setConfirmGenerateError(`サーバから非JSON応答（${response.status}）：${text.slice(0, 300)}`);
+        return;
+      }
+      if (!response.ok) {
+        const missing = Array.isArray(data?.missingEnv) && data.missingEnv.length > 0
+          ? `\n\n未設定の環境変数：${data.missingEnv.join(", ")}\n→ Vercelの環境変数設定をご確認ください。`
+          : "";
+        setConfirmGenerateError((data?.error || `HTTP ${response.status} エラー`) + missing);
+        return;
+      }
+      setConfirmedText(data.work_profile_final || "");
+      setConfirmWarnings(Array.isArray(data.warnings) ? data.warnings : []);
+    } catch (e) {
+      if (e.name === "AbortError") {
+        setConfirmGenerateError("4分以上応答がなかったため処理を中断しました。もう一度ボタンを押してみてください。");
+      } else {
+        setConfirmGenerateError(`通信エラーが発生しました：${e.message}`);
+      }
+    } finally {
+      clearTimeout(timeoutId);
+      setIsGeneratingConfirmed(false);
+    }
+  };
+
+  // 確定版を保存のみ（STEP4 へ進まない・編集→保存→外部AIで再相談ループ用）
+  const handleSaveConfirmedOnly = async () => {
+    const cleaned = cleanOutputText(confirmedText);
+    if (!cleaned.trim()) {
+      setConfirmGenerateError("確定版が空のままです。先に「確定版を生成」を実行してください。");
+      return;
+    }
+    setConfirmGenerateError("");
+    if (cleaned !== confirmedText) setConfirmedText(cleaned);
+    await onSaveWorkProfileConfirmed(cleaned);
+    setConfirmSaveMsg(true);
+    setTimeout(() => setConfirmSaveMsg(false), 2500);
+  };
+
+  // 確定版を保存して STEP4 へ進む
+  const handleSaveAndProceedToStep4 = async () => {
+    const cleaned = cleanOutputText(confirmedText);
+    if (!cleaned.trim()) {
+      setConfirmGenerateError("確定版が空のままです。先に「確定版を生成」を実行してください。");
+      return;
+    }
+    setConfirmGenerateError("");
+    if (cleaned !== confirmedText) setConfirmedText(cleaned);
+    await onSaveWorkProfileConfirmed(cleaned);
+    setConfirmSaveMsg(true);
+    setTimeout(() => {
+      setConfirmSaveMsg(false);
+      onNavigate("step_4");
+    }, 1500);
+  };
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: C.gold, marginBottom: 4, letterSpacing: "0.08em" }}>STEP 3</div>
           <h1 style={{ fontSize: 20, fontWeight: 700, color: C.navy, margin: "0 0 6px", letterSpacing: "-0.01em" }}>競合レビュー評価</h1>
-          <p style={{ fontSize: 13.5, color: C.textSub, margin: 0, lineHeight: 1.7 }}>STEP2で選定したキーワードの上位本3冊のAmazonレビューを取得・分析し、読者の共通不満点・差別化ポイント・落とし穴を抽出します。差別化ポイントが3個以上なら確定アクションへ、2個以下ならSTEP1に戻ってコンセプトを調整しましょう。</p>
+          <p style={{ fontSize: 13.5, color: C.textSub, margin: 0, lineHeight: 1.7 }}>STEP2で選定したキーワードの上位本3冊のAmazonレビューを取得・分析し、読者の共通不満点・差別化ポイント・落とし穴を抽出します。分析後、続けて書籍プロファイル確定版の生成・外部AI相談・STEP4 への確定保存までこのページで完結します。</p>
         </div>
       </div>
       <div style={{ height: 1, background: `linear-gradient(to right, ${C.gold}, ${C.goldLight}, transparent)`, width: "100%", opacity: 0.9, marginBottom: 20 }} />
@@ -3341,32 +3440,91 @@ const Step3Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
           )}
           {recommendsProceed && (
             <Card style={{ background: "#eef7ee", border: `1px solid ${C.green}` }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: C.green, marginBottom: 6 }}>✓ 書籍プロファイル確定アクションへ進むことを推奨します</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.green, marginBottom: 6 }}>✓ 確定版を生成して STEP4 へ進むことを推奨します</div>
               <div style={{ fontSize: 12.5, color: C.textSub, lineHeight: 1.7 }}>
-                差別化ポイントが {analysis.differentiation_count || 0} 個明確に抽出できました。書籍プロファイル確定版を生成して STEP4 以降の制作フェーズに進みましょう。
+                差別化ポイントが {analysis.differentiation_count || 0} 個明確に抽出できました。下の④以降で書籍プロファイル確定版を生成し、STEP4 以降の制作フェーズに進みましょう。
               </div>
             </Card>
           )}
         </div>
       )}
 
-      {/* ④ 次のアクション */}
+      {/* ④ 書籍プロファイル確定版を生成（旧 ConfirmActionPage ①） */}
       {analysis && (
         <div style={{ marginBottom: 28 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
             <StepBadge num="④" />
-            <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>次のステップ</h2>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>書籍プロファイル確定版を生成</h2>
+          </div>
+          <Card style={{ background: "#eef2f7", border: "1px solid #c8d4e0" }}>
+            <div style={{ fontSize: 13, color: C.textSub, marginBottom: 12, lineHeight: 1.8 }}>
+              STEP1草案 + STEP2選定キーワード + STEP3分析結果を AI が統合し、後段STEP4〜10 がそのまま参照できる「書籍プロファイル確定版」をマークダウン構造で生成します。30秒〜1分かかります。
+            </div>
+            <BtnPrimary onClick={handleGenerateConfirmed} disabled={isGeneratingConfirmed || !canGenerateConfirmed}>
+              {isGeneratingConfirmed ? "生成中..." : "▶ 書籍プロファイル確定版を生成"}
+            </BtnPrimary>
+            {confirmGenerateError && <div style={{ marginTop: 12, padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, fontSize: 13, color: C.red, whiteSpace: "pre-wrap", lineHeight: 1.7 }}>{confirmGenerateError}</div>}
+          </Card>
+        </div>
+      )}
+
+      {/* ⑤ 確定版プレビュー・編集（旧 ConfirmActionPage ②） */}
+      {analysis && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <StepBadge num="⑤" />
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>確定版プレビュー（編集可能）</h2>
+          </div>
+          <div style={{ fontSize: 12, color: C.textSub, marginBottom: 8, lineHeight: 1.7 }}>
+            AIが生成した確定版を確認してください。受講生の判断で内容を編集できます。マークダウン構造（## 見出し）は崩さないでください（後段STEPが見出しで構造抽出するため）。
+          </div>
+          {confirmWarnings.length > 0 && (
+            <div style={{ marginBottom: 12, padding: "10px 14px", background: "#fff8e1", border: `1px solid ${C.gold}`, borderRadius: 4, fontSize: 12.5, color: C.navy, lineHeight: 1.75 }}>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>⚠ 確定版生成時の警告</div>
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {confirmWarnings.map((w, i) => <li key={i} style={{ marginBottom: 4 }}>{w}</li>)}
+              </ul>
+            </div>
+          )}
+          <textarea value={confirmedText} onChange={(e) => setConfirmedText(e.target.value)}
+            rows={24}
+            placeholder="確定版生成後にここにマークダウンが表示されます。手動編集も可能です。"
+            style={{ width: "100%", padding: "12px 14px", fontSize: 13.5, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.85 }} />
+          <div style={{ display: "flex", gap: 10, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <BtnPrimary onClick={handleSaveConfirmedOnly} disabled={!confirmedText.trim()}>出力データを保存</BtnPrimary>
+            {confirmSaveMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました</span>}
+            <span style={{ fontSize: 11.5, color: C.textLight }}>※ 外部AI相談 → textarea で編集 → 保存 → 再相談 のループに使えます</span>
+          </div>
+        </div>
+      )}
+
+      {/* ⑥ 外部AIで相談する（確定アクション専用6観点・stepOutput は確定版テキスト） */}
+      {analysis && (
+        <DiscussionPanel
+          stepNum="confirm"
+          stepName="書籍プロファイル確定アクション"
+          stepOutput={confirmedText}
+          authorProfile={savedAuthorProfile || ""}
+          workProfile={savedWorkProfileDraft || ""}
+        />
+      )}
+
+      {/* ⑦ 確定保存して STEP4 へ進む（旧 ConfirmActionPage ④） */}
+      {analysis && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <StepBadge num="⑦" />
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>確定して STEP4 へ進む</h2>
           </div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <BtnSecondary onClick={handleReturnToStep1}>← STEP1に戻る</BtnSecondary>
-            <BtnSecondary onClick={() => onNavigate("step_2")}>← STEP2に戻る</BtnSecondary>
-            <BtnPrimary onClick={handleProceedToConfirm} disabled={!recommendsProceed}>
-              書籍プロファイル確定アクションへ →
+            <BtnPrimary onClick={handleSaveAndProceedToStep4} disabled={!confirmedText.trim()}>
+              書籍プロファイルを確定保存して STEP4 へ進む →
             </BtnPrimary>
           </div>
+          {confirmSaveMsg && <div style={{ marginTop: 8, fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 確定版を保存しました。STEP4 に移動します...</div>}
           <div style={{ marginTop: 8, fontSize: 11.5, color: C.textLight, lineHeight: 1.7 }}>
-            ※ STEP3には外部AI相談機能（DiscussionPanel）はありません。客観データ分析のため、上のAI判定アシストが相談機能の代替として機能します（v4設計）。<br />
-            ※ 「書籍プロファイル確定アクション」では STEP1主観コンセプト × STEP2/3客観データ を統合した確定版を生成し、外部AIで最終レビューしてからSTEP4以降の制作フェーズに進めます。
+            ※ 保存すると STEP4 エピソードインタビュー以降のすべてのSTEPがこの確定版を「書籍プロファイル」として参照するようになります。<br />
+            ※ 保存後も本ページに戻れば内容を修正・再生成できますが、STEP4 以降の出力には反映されない場合があります。
           </div>
         </div>
       )}
@@ -3927,12 +4085,17 @@ const Step13Page = ({ savedAuthorProfile, savedWorkProfileConfirmed, onSaveAutho
   );
 };
 
+// ⚠ DEPRECATED（v5・2026-05-27）：
+// STEP3 ページに書籍プロファイル確定アクションを完全統合したため、本コンポーネントは未使用。
+// step_confirm ルートも Step3Page にエイリアスされたので呼び出されないが、
+// ロジック参照用に一時的に残してある。安定動作確認後に削除予定。
 // v4新規：書籍プロファイル確定アクションのページコンポーネント。
 // STEP3 完了後、受講生の明示的なボタン押下によって、書籍プロファイル確定版を生成する。
 // STEP1草案+STEP2選定キーワード+上位本+STEP3分析 を api/work-profile-confirm.js で統合。
 // プレビュー画面で受講生が編集可能。「保存」で確定 → STEP4へ進む。
 // 相談機能 DiscussionPanel あり（stepNum="confirm"、6観点）。
 // v4実装指示書 §6 を参照。
+// eslint-disable-next-line no-unused-vars
 const ConfirmActionPage = ({ savedAuthorProfile, savedWorkProfileDraft, onSaveWorkProfileConfirmed, savedWorkProfileConfirmed, onNavigate, project }) => {
   // 前提データ取得
   const step2Analysis = (() => {
@@ -4137,7 +4300,7 @@ const ConfirmActionPage = ({ savedAuthorProfile, savedWorkProfileDraft, onSaveWo
           placeholder="確定版生成後にここにマークダウンが表示されます。手動編集も可能です。"
           style={{ width: "100%", padding: "12px 14px", fontSize: 13.5, border: `1px solid ${C.border}`, borderRadius: 4, outline: "none", boxSizing: "border-box", resize: "vertical", fontFamily: "inherit", background: C.white, lineHeight: 1.85 }} />
         <div style={{ display: "flex", gap: 10, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <BtnPrimary onClick={handleSaveOnly} disabled={!confirmedText.trim()}>確定版を保存（STEP4に進まない）</BtnPrimary>
+          <BtnPrimary onClick={handleSaveOnly} disabled={!confirmedText.trim()}>出力データを保存</BtnPrimary>
           {saveMsg && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました</span>}
           <span style={{ fontSize: 11.5, color: C.textLight }}>※ 外部AI相談 → textarea で編集 → 保存 → 再相談 のループに使えます</span>
         </div>
@@ -4159,8 +4322,6 @@ const ConfirmActionPage = ({ savedAuthorProfile, savedWorkProfileDraft, onSaveWo
           <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>確定して次STEPへ進む</h2>
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <BtnSecondary onClick={() => onNavigate("step_3")}>← STEP3に戻る</BtnSecondary>
-          <BtnSecondary onClick={() => onNavigate("step_1")}>← STEP1に戻る</BtnSecondary>
           <BtnPrimary onClick={handleSaveAndProceed} disabled={!confirmedText.trim()}>
             書籍プロファイルを確定保存してSTEP4へ進む →
           </BtnPrimary>
@@ -6249,8 +6410,8 @@ export default function App() {
     if (page === "step_0") return <Step0Page savedProfile={authorProfile} onSaveProfile={handleSaveAuthorProfile} onNavigate={nav} />;
     if (page === "step_1") return <Step1Page savedAuthorProfile={authorProfile} savedWorkProfile={workProfile} onSaveWorkProfile={handleSaveWorkProfile} onNavigate={nav} pendingApply={step1PendingApply} project={project} />;
     if (page === "step_2") return <Step2Page savedAuthorProfile={authorProfile} savedWorkProfileDraft={workProfile} onNavigate={nav} project={project} />;
-    if (page === "step_3") return <Step3Page savedAuthorProfile={authorProfile} savedWorkProfileDraft={workProfile} onNavigate={nav} project={project} />;
-    if (page === "step_confirm") return <ConfirmActionPage savedAuthorProfile={authorProfile} savedWorkProfileDraft={workProfile} savedWorkProfileConfirmed={workProfileConfirmed} onSaveWorkProfileConfirmed={handleSaveWorkProfileConfirmed} onNavigate={nav} project={project} />;
+    // v5: STEP3 末尾に書籍プロファイル確定機能を統合したため、step_3 と step_confirm の両方を Step3Page にルーティング（古いリンク・ブックマーク対策）
+    if (page === "step_3" || page === "step_confirm") return <Step3Page savedAuthorProfile={authorProfile} savedWorkProfileDraft={workProfile} savedWorkProfileConfirmed={workProfileConfirmed} onSaveWorkProfileConfirmed={handleSaveWorkProfileConfirmed} onNavigate={nav} project={project} />;
     if (page === "step_12") return <Step12Page savedAuthorProfile={authorProfile} savedWorkProfileConfirmed={workProfileConfirmed} onNavigate={nav} />;
     if (page === "step_13") return <Step13Page savedAuthorProfile={authorProfile} savedWorkProfileConfirmed={workProfileConfirmed} onSaveAuthorProfile={handleSaveAuthorProfile} onNavigate={nav} />;
     if (page.startsWith("step_")) {

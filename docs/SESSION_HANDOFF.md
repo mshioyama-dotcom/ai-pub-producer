@@ -3,7 +3,18 @@
 > 別チャットで作業を継続するためのコンテキスト一式。
 > 新しいチャットを開いたら、このファイルの内容を最初に貼り付けて作業を再開してください。
 
-最終更新コミット: `9d42d40`（2026-05-18・STEP11/12/13 実装完了・MVP 完成）
+最終更新コミット: `e4be790`（2026-05-19・開発→本番フロー dev→phase1 導入完了）
+
+直前のコミット（時系列・新→旧）:
+- `e4be790` docs: 開発→本番フロー（dev→phase1）を CLAUDE.md / SESSION_HANDOFF.md に明文化
+- `9ae155d` chore: trigger production deployment after Production Branch switched to phase1
+- `44592f3` fix(script): Sensitive 環境変数の development スコープ不可制約に対応
+- `a3696ee` chore: Vercel 環境変数のブランチ制限を一括解除するスクリプト追加
+- `998d85a` feat: データのエクスポート/インポート機能（Preview ↔ Production 間でデータ移行）
+- `9293676` docs(guide): 使い方ページを v4 実装に合わせて全面リライト（初心者向け）
+- `7cc3672` docs: 設計書 v4 / SESSION_HANDOFF / CLAUDE.md を実装に合わせて更新
+- `9d42d40` fix(step13): 余計な前置き見出し除去＋次回作テーマセクション欠落対策
+- `5da9800` feat(step12-13): STEP12を「本の改善提案」に絞り、STEP13「出版経験の振り返り」を新規実装
 
 ---
 
@@ -27,6 +38,30 @@
 - 番号繰り上げ：旧 STEP13/14/15 → STEP11/12/13（番号飛びを避けるため）
 - 旧計画の STEP11(A+コンテンツ)/STEP12(プレゼント企画)は削除のまま
 - CLAUDE.md に「STEPS 配列拡張時のチェックリスト」「env var 追加後の自動 Redeploy ルール」を明文化
+
+### 📌 2026-05-19 時点の重要な運用変更：開発 → 本番フロー導入
+
+これまで `phase1` 直接運用だったが、**Preview 環境（dev）で確認 → Production（phase1）へ昇格**の二段階に移行した。
+
+**変更点**：
+- **新ブランチ**: `dev` を作成（origin/phase1 から派生）
+- **作業ブランチ**: `phase1` → `dev` に変更（通常はすべて dev で作業）
+- **Vercel Production Branch**: `phase1` のまま（`scripts/fix-vercel-env-branch.mjs` で env var のブランチ制限解除済み）
+- **Preview URL**: `ai-pub-producer-v2-git-dev-...vercel.app`（dev push で自動更新）
+- **Production URL**: `ai-pub-producer-v2.vercel.app`（phase1 push で自動更新）
+
+**フロー**：
+1. AI/著者は dev で commit + push（Preview デプロイ）
+2. Preview URL で動作確認 OK
+3. ユーザーが「本番反映」等を指示
+4. AI が `dev → phase1` を merge してpush（Production デプロイ）
+
+詳細は `CLAUDE.md` の「🔀 開発 → 本番フロー（必須・2026-05-19 から運用）」を参照。
+
+**理由（このフローを導入した背景）**：
+- 本番ユーザーに影響する変更を、本番に直接出すのは MVP 完成後はリスクが高い
+- Preview で確認してから本番に出すことで、白画面事故（commit `e39969c` のような）を未然に防げる
+- 開発環境のデータと本番環境のデータは分離されているため、Export/Import 機能でユーザーが手動移行する形に既になっている
 
 ### 📝 過去の進行中エントリの記録例（参考フォーマット）
 
@@ -70,14 +105,17 @@ git branch --show-current
 
 期待される結果：
 - `git status`: clean（or 把握済みの未コミット変更のみ）
-- `git log` 先頭: `8f2bb15 fix(review): 各STEPに「方向性ズレ」捕捉用の観点を追加（v5）`
-- `git rev-parse HEAD`: `8f2bb15797e359a372b0ea8cb206e9ca5fcabb4a`
-- `git branch --show-current`: `phase1`
+- `git branch --show-current`: `dev`（2026-05-19 から dev が通常作業ブランチ）
 
-### ✅ ブランチ運用
-- 作業ブランチ: **`phase1`**（モニター期間用、本番デプロイ対象）
-- `main` への merge は行わない（モニター期間中）
-- すべての commit は `phase1` に積み、push する
+### ✅ ブランチ運用（2026-05-19 更新）
+
+- **通常作業ブランチ**: `dev`（Vercel Preview デプロイ対象）
+- **本番ブランチ**: `phase1`（Vercel Production デプロイ対象・dev からマージ専用）
+- **main** への merge は行わない（モニター期間中）
+- すべての作業はまず dev に積み、push（Preview で動作確認）
+- ユーザー指示で dev → phase1 を merge & push（本番反映）
+
+詳細は `CLAUDE.md` の「🔀 開発 → 本番フロー（必須・2026-05-19 から運用）」を参照。
 
 ---
 
