@@ -3056,7 +3056,6 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
             <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>次のステップ</h2>
           </div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <BtnSecondary onClick={handleReturnToStep1}>← STEP1に戻る</BtnSecondary>
             <BtnPrimary onClick={handleProceedToStep3} disabled={selectedKeywords.length === 0}>
               STEP3「競合レビュー評価」へ進む →
             </BtnPrimary>
@@ -3369,8 +3368,6 @@ const Step3Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
             <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>次のステップ</h2>
           </div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <BtnSecondary onClick={handleReturnToStep1}>← STEP1に戻る</BtnSecondary>
-            <BtnSecondary onClick={() => onNavigate("step_2")}>← STEP2に戻る</BtnSecondary>
             <BtnPrimary onClick={handleProceedToConfirm} disabled={!recommendsProceed}>
               書籍プロファイル確定アクションへ →
             </BtnPrimary>
