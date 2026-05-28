@@ -625,6 +625,15 @@ function consumeStep1Pending() {
   } catch { return null; }
 }
 
+// STEP2 で確定した検索キーワードを localStorage から取得（DiscussionPanel 用）
+function getSelectedKeywordsForDiscussion() {
+  try {
+    if (typeof window === "undefined") return [];
+    const raw = localStorage.getItem(STEP2_SELECTED_KEYWORDS_KEY);
+    return raw ? (JSON.parse(raw) || []) : [];
+  } catch { return []; }
+}
+
 function getAutoInjectedProfiles() {
   try {
     if (typeof window === "undefined") return {};
@@ -3506,6 +3515,7 @@ const Step3Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
           stepOutput={confirmedText}
           authorProfile={savedAuthorProfile || ""}
           workProfile={savedWorkProfileDraft || ""}
+          selectedKeywords={selectedKeywords || []}
         />
       )}
 
@@ -6016,12 +6026,21 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           「出力 → 相談で練る → 確定」の自然な流れを作る。
           他STEPは相談機能を出力欄の直下に1つだけ表示する。 */}
       {/* workProfile は軽量化版を渡す：STEP2の出力60KBから市場分析データを除き、相談に必要な核情報のみに圧縮 */}
+      {/* STEP別の文脈注入：
+            STEP5  → kw1/kw2 を渡す（観点「kw1+kw2 含有」用）
+            STEP6/7/8/9/10 → 確定タイトル・サブタイトルを渡す（観点「確定タイトル・サブタイトル整合」用）
+            STEP6/7/8 → STEP4 インタビュー要約を渡す（観点「interview_notes 反映」用）
+       */}
       <DiscussionPanel
         stepNum={step.num}
         stepName={step.title}
         stepOutput={outputText}
         authorProfile={getAutoInjectedProfiles().author_profile || ""}
         workProfile={extractDiscussionContext(getAutoInjectedProfiles().work_profile || "")}
+        selectedKeywords={step.num === 5 ? getSelectedKeywordsForDiscussion() : []}
+        confirmedTitle={step.num >= 6 ? (getAutoInjectedProfiles().title || "") : ""}
+        confirmedSubtitle={step.num >= 6 ? (getAutoInjectedProfiles().subtitle || "") : ""}
+        interviewNotes={(step.num === 6 || step.num === 7 || step.num === 8) ? ((allSteps?.[4]?.outputText) || "").trim() : ""}
       />
 
       {/* STEP5（タイトル・サブタイトル）専用：採用案を確定する UI（相談機能の後に配置） */}

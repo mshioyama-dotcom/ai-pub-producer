@@ -180,9 +180,26 @@ function withHeading(text, heading) {
 // チェック観点はSTEPごとに STEP_REVIEW_HINTS で定義した内容を埋め込む（共通6観点ではなくSTEP特化）。
 // 著者プロファイルなら「文体の再現性」、タイトルなら「KDP NG語」など、
 // そのSTEPで本当に重要な観点だけがプロンプトに入る。
-function generateStrategicReviewPrompt({ stepNum, stepName, authorProfile, workProfile, currentOutput }) {
+function generateStrategicReviewPrompt({ stepNum, stepName, authorProfile, workProfile, currentOutput, selectedKeywords = [], confirmedTitle = "", confirmedSubtitle = "", interviewNotes = "" }) {
   const reviewHint = STEP_REVIEW_HINTS[stepNum] || STEP_REVIEW_HINTS[1];
   const aspectsList = reviewHint.aspects.map((a, i) => `${i + 1}. **${a.key}**\n   - ${a.desc}`).join("\n\n");
+
+  // STEP2で確定した検索キーワード（kw1・kw2）を明示注入。
+  // 観点リストに「kw1+kw2含有」が含まれる STEP5 などで、AI が kw1/kw2 を推測せずに済むよう
+  // 検索キーワードを語そのまま提示する。
+  const keywordsSection = (selectedKeywords && selectedKeywords.length > 0)
+    ? `\n\n━━━━━━━━━━━\n【STEP2で確定した検索キーワード】\n━━━━━━━━━━━\n\n${selectedKeywords.map((k, i) => `kw${i + 1} = 「${k}」`).join("\n")}\n\n※ 以降の評価で「kw1」「kw2」と言及した場合は、上記の語そのものを指します。言い換え・類義語への置き換えは「kw含有」と見なしません。`
+    : "";
+
+  // STEP5で確定したタイトル・サブタイトルを明示注入（STEP6〜10で「確定タイトル・サブタイトル整合」観点を満たすため）
+  const titleSubtitleSection = (confirmedTitle || confirmedSubtitle)
+    ? `\n\n━━━━━━━━━━━\n【STEP5で確定したタイトル・サブタイトル】\n━━━━━━━━━━━\n\nメインタイトル：${(confirmedTitle || "（未確定）").trim()}\nサブタイトル：${(confirmedSubtitle || "（未確定）").trim()}\n\n※ 以降の評価で「確定タイトル」「サブタイトル」と言及した場合は、上記の語を指します。`
+    : "";
+
+  // STEP4のインタビュー要約を明示注入（STEP6/7/8で「interview_notes 反映」観点を満たすため）
+  const interviewSection = (interviewNotes && interviewNotes.trim())
+    ? `\n\n━━━━━━━━━━━\n【STEP4 エピソードインタビュー要約（interview_notes）】\n━━━━━━━━━━━\n\n${interviewNotes.trim()}`
+    : "";
   // v4: 確定アクションは数値STEP番号を持たないため、表記を「書籍プロファイル確定アクション」に切り替える
   const stepLabel = stepNum === "confirm" ? "書籍プロファイル確定アクション" : `STEP${stepNum}「${stepName}」`;
   const stepLabelShort = stepNum === "confirm" ? "書籍プロファイル確定アクション" : `STEP${stepNum}`;
@@ -295,7 +312,7 @@ ${aspectsList}
 ${withHeading(authorProfile, "【著者プロファイル】")}
 
 
-${withHeading(workProfile, "【書籍プロファイル】")}
+${withHeading(workProfile, "【書籍プロファイル】")}${keywordsSection}${titleSubtitleSection}${interviewSection}
 
 
 【現在の出力（レビュー対象：${stepLabel}）】
@@ -446,6 +463,10 @@ export default function DiscussionPanel({
   stepOutput,
   authorProfile = "",
   workProfile = "",
+  selectedKeywords = [],
+  confirmedTitle = "",
+  confirmedSubtitle = "",
+  interviewNotes = "",
 }) {
   const [open, setOpen] = useState(false);
   const [copyMsg, setCopyMsg] = useState("");
@@ -457,6 +478,10 @@ export default function DiscussionPanel({
     authorProfile,
     workProfile,
     currentOutput: stepOutput,
+    selectedKeywords,
+    confirmedTitle,
+    confirmedSubtitle,
+    interviewNotes,
   });
 
   const handleCopyPrompt = () => {
