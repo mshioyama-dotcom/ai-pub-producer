@@ -246,7 +246,7 @@ const STEPS = [
     ]
   },
   {
-    id: "step_13", num: 13, title: "出版経験の振り返り",
+    id: "step_13", num: 13, title: "著者プロファイル更新",
     description: "STEP12 の改善提案レポートと現在の著者プロファイルから、AI が「著者プロファイル更新版」を生成。著者が編集して STEP0 に上書き保存することで、出版経験で進化したスキル・主張・固有概念を著者プロファイルに反映できます。次回作テーマ候補も参考情報として併記。新プロジェクト開始は任意で、STEP1 へ手動で進めてください。",
     category: "改善・次回作", type: "custom",
     url: "",
@@ -306,7 +306,7 @@ const STEP3_ANALYSIS_KEY = "aipub:step3_analysis";
 const STEP12_INPUTS_KEY = "aipub:step12_inputs";
 const STEP12_ANALYSIS_KEY = "aipub:step12_analysis";
 
-// STEP13 出版経験の振り返り: 入力（振り返りコメント）と結果（著者プロファイル更新版・次回作テーマ候補）を保存
+// STEP13 著者プロファイル更新: 入力（振り返りコメント）と結果（著者プロファイル更新版・次回作テーマ候補）を保存
 const STEP13_INPUTS_KEY = "aipub:step13_inputs";
 const STEP13_RESULT_KEY = "aipub:step13_result";
 
@@ -1728,7 +1728,7 @@ const SideMenu = ({ currentPage, onNavigate, stepStatuses, confirmStatus }) => {
           <div style={{ width: 1.5, height: 42, background: C.gold, flexShrink: 0, opacity: 0.6 }} />
           <div>
             <div style={{ fontSize: 18, fontWeight: 700, color: "#ffffff", letterSpacing: "0.01em", lineHeight: 1.25, fontFamily: "'Noto Sans JP', sans-serif", whiteSpace: "nowrap" }}>AI出版プロデューサー</div>
-            <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.65)", marginTop: 5, letterSpacing: "0.04em", fontFamily: "'Noto Sans JP', sans-serif" }}>Kindle出版を10ステップで進める</div>
+            <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.65)", marginTop: 5, letterSpacing: "0.04em", fontFamily: "'Noto Sans JP', sans-serif" }}>Kindle出版を14ステップで進める</div>
           </div>
         </div>
         <div style={{ height: 1, background: `linear-gradient(to right, ${C.gold}, rgba(184,146,42,0.2), transparent)` }} />
@@ -1739,7 +1739,7 @@ const SideMenu = ({ currentPage, onNavigate, stepStatuses, confirmStatus }) => {
         {menuItem("使い方", "guide", null)}
         {/* phase1ブランチではSTEP0を再表示してテスト可能にする（mainは非表示維持） */}
         {catLabel("著者プロファイル")}
-        {menuItem("STEP0　著者プロファイル", "step_0", null)}
+        {menuItem("STEP0　著者プロファイル作成", "step_0", null)}
         {CATEGORIES.map((cat) => (
           <div key={cat.label}>
             {catLabel(cat.label)}
@@ -2136,7 +2136,7 @@ const Step0Page = ({ savedProfile, onSaveProfile, onNavigate }) => {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: C.gold, marginBottom: 4, letterSpacing: "0.08em" }}>STEP 0</div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: C.navy, margin: "0 0 6px", letterSpacing: "-0.01em" }}>著者プロファイル</h1>
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: C.navy, margin: "0 0 6px", letterSpacing: "-0.01em" }}>著者プロファイル作成</h1>
           <p style={{ fontSize: 13.5, color: C.textSub, margin: 0, lineHeight: 1.7 }}>過去の出版物・SNS投稿などからAIが著者の作家性を抽出します。生成したプロファイルはSTEP1〜9の各ステップで自動的に活用されます。</p>
         </div>
       </div>
@@ -3837,7 +3837,7 @@ const Step12Page = ({ savedAuthorProfile, savedWorkProfileConfirmed, onNavigate 
             💡 <strong>次の選択肢：</strong>
             <ul style={{ margin: "4px 0 0 0", paddingLeft: 22 }}>
               <li>改善提案を実行（タイトル変更／Amazon説明文差し替え／改訂版アップロード 等）</li>
-              <li>出版経験を著者プロファイルに反映したい場合は <strong>STEP13「出版経験の振り返り」</strong> へ進む（任意）</li>
+              <li>出版経験を著者プロファイルに反映したい場合は <strong>STEP13「著者プロファイル更新」</strong> へ進む（任意）</li>
             </ul>
           </div>
         </div>
@@ -3846,7 +3846,7 @@ const Step12Page = ({ savedAuthorProfile, savedWorkProfileConfirmed, onNavigate 
   );
 };
 
-// STEP13「出版経験の振り返り」のページコンポーネント
+// STEP13「著者プロファイル更新」のページコンポーネント
 // STEP12 の改善提案レポート＋現在の著者プロファイルから、AI が著者プロファイル更新版を生成。
 // 著者は更新版を編集して STEP0 に上書き保存できる（任意）。次回作テーマ候補も参考情報として併記。
 // 新プロジェクト開始は強制せず、著者の判断に委ねる。
@@ -3971,7 +3971,7 @@ const Step13Page = ({ savedAuthorProfile, savedWorkProfileConfirmed, onSaveAutho
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: C.gold, marginBottom: 4, letterSpacing: "0.08em" }}>STEP 13</div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: C.navy, margin: "0 0 6px", letterSpacing: "-0.01em" }}>出版経験の振り返り</h1>
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: C.navy, margin: "0 0 6px", letterSpacing: "-0.01em" }}>著者プロファイル更新</h1>
           <p style={{ fontSize: 13.5, color: C.textSub, margin: 0, lineHeight: 1.7 }}>
             STEP12 の改善提案レポートと現在の著者プロファイルから、AI が「著者プロファイル更新版」を生成します。出版経験で進化したスキル・主張・固有概念を反映し、編集して STEP0 に上書き保存できます。次回作テーマ候補も参考情報として併記します。
           </p>
@@ -6150,14 +6150,13 @@ const GuidePage = ({ onNavigate }) => {
         </div>
         <div style={{ marginBottom: 12 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: C.gold, marginBottom: 4 }}>📌 著者プロファイル（土台）</div>
-          <StepRow num="0" title="著者プロファイル" desc="あなた自身の専門領域・思想・文体・実績を AI が抽出。以降の全 STEP で自動転記されます。" />
+          <StepRow num="0" title="著者プロファイル作成" desc="あなた自身の専門領域・思想・文体・実績を AI が抽出。以降の全 STEP で自動転記されます。" />
         </div>
         <div style={{ marginBottom: 12 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: C.gold, marginBottom: 4 }}>📘 企画設計フェーズ（STEP1〜5）</div>
           <StepRow num="1" title="書籍プロファイル草案" desc="本のテーマ・想定読者・コアベネフィットを定義。" />
           <StepRow num="2" title="キーワード絞り込み" desc="Amazon Kindle データから検索キーワード10個を3軸スコアリング。1〜2個を選定。" />
-          <StepRow num="3" title="競合レビュー評価" desc="上位本3冊のAmazonレビューを分析し、差別化ポイントを抽出。" />
-          <StepRow num="–" title="書籍プロファイル確定" desc="STEP1〜3を統合した「確定版」を生成。これ以降の全STEPの判断軸になります。" />
+          <StepRow num="3" title="競合レビュー評価＆書籍プロファイル確定" desc="上位本3冊のAmazonレビューを分析→差別化ポイントを抽出。続けて STEP1〜3 を統合した「書籍プロファイル確定版」を生成。これ以降の全STEPの判断軸になります（v5：旧確定STEPを統合）。" />
           <StepRow num="4" title="エピソードインタビュー" desc="AI とチャット形式で、本の素材となる体験・気づきを引き出します。" />
           <StepRow num="5" title="タイトル・サブタイトル作成" desc="3案を生成して 1 案を「推し案」として提示。Amazon KDP 規約準拠。" />
         </div>
@@ -6176,11 +6175,11 @@ const GuidePage = ({ onNavigate }) => {
         <div>
           <div style={{ fontSize: 12, fontWeight: 700, color: C.gold, marginBottom: 4 }}>📈 改善・次回作フェーズ（STEP12〜13・出版後に使う）</div>
           <StepRow num="12" title="本の改善提案" badge="🆕" desc="出版済み本の ASIN を入力すると、Amazon のレビュー・評価から「タイトル・説明文・価格・施策」の改善案を AI が生成。" />
-          <StepRow num="13" title="出版経験の振り返り" badge="🆕" desc="STEP12 の改善提案を元に、著者プロファイルの更新版を生成。出版経験で進化した強みを STEP0 に反映できます。" />
+          <StepRow num="13" title="著者プロファイル更新" badge="🆕" desc="STEP12 の改善提案を元に、著者プロファイルの更新版を生成。出版経験で進化した強みを STEP0 に反映できます。" />
         </div>
       </Section>
 
-      <Section title="🟢 基本の操作方法（ワークフロー型 STEP・STEP1/2/3/5/6/7/8/9/10/11/12/13/確定）">
+      <Section title="🟢 基本の操作方法（ワークフロー型 STEP・STEP1/2/3/5/6/7/8/9/10/11/12/13）">
         <div style={{ marginBottom: 8, fontSize: 12.5, color: C.textSub }}>
           ほとんどの STEP はこのパターンです。「入力 → AI 実行 → 出力確認・保存」の 3 工程。
         </div>
@@ -6215,19 +6214,19 @@ const GuidePage = ({ onNavigate }) => {
         </ol>
       </Section>
 
-      <Section title="📚 確定アクション（STEP3 完了後・必須）">
+      <Section title="📚 STEP3 内の確定アクション（必須・v5 から STEP3 に統合）">
         <div style={{ marginBottom: 8, fontSize: 12.5, color: C.textSub }}>
-          STEP1〜3 を統合した「書籍プロファイル確定版」を生成する重要なステップです。サイドメニューの「<strong>確定 書籍プロファイル確定</strong>」をクリック。
+          STEP1〜3 を統合した「書籍プロファイル確定版」は <strong>STEP3 ページの末尾</strong> で生成します（v5 から独立ページを廃止して STEP3 に統合）。
         </div>
         <ol style={{ margin: 0, paddingLeft: 20 }}>
-          <li>前提チェック：STEP1 草案・STEP2 選定キーワード・STEP3 分析結果が揃っているか確認（揃っていなければ各STEPへ戻る案内）</li>
-          <li><strong>「▶ 書籍プロファイル確定版を生成」</strong>ボタン → AI が 30秒〜1分で生成</li>
-          <li>プレビュー画面で内容を確認（マークダウン形式・編集可能）</li>
-          <li>外部 AI（ChatGPT / Claude）で相談用プロンプトを取得してブラッシュアップも可能</li>
-          <li>「<strong>保存して STEP4 へ進む</strong>」ボタンで確定 → 制作フェーズへ</li>
+          <li>STEP3 ① 深掘り分析を実行 → ② 分析結果を確認 → ③ AI判定アシストで「確定アクション推奨」になっていることを確認</li>
+          <li>同ページ ④ <strong>「▶ 書籍プロファイル確定版を生成」</strong>ボタン → AI が 30秒〜1分で生成</li>
+          <li>⑤ プレビュー画面で内容を確認（マークダウン形式・編集可能）</li>
+          <li>⑥ 外部 AI（ChatGPT / Claude）で相談用プロンプトを取得してブラッシュアップも可能</li>
+          <li>⑦ <strong>「書籍プロファイルを確定保存して STEP4 へ進む」</strong>ボタンで確定 → 制作フェーズへ</li>
         </ol>
         <div style={{ marginTop: 8, padding: "8px 12px", background: "#eef7ee", border: `1px solid rgba(45,122,79,0.3)`, borderRadius: 3, fontSize: 12, color: C.navyMid }}>
-          ✓ 確定版は<strong>STEP4 以降の全STEPの判断軸</strong>として機能します。後で気づきがあれば、各STEPの右上「📝 確定版を見直す」ボタンからいつでも編集・再保存できます（ライブドキュメント運用）。
+          ✓ 確定版は<strong>STEP4 以降の全STEPの判断軸</strong>として機能します。後で気づきがあれば、各STEPの右上「📝 確定版を見直す」ボタン（STEP3 に遷移します）からいつでも編集・再保存できます（ライブドキュメント運用）。
         </div>
       </Section>
 
@@ -6238,7 +6237,7 @@ const GuidePage = ({ onNavigate }) => {
         <ol style={{ margin: 0, paddingLeft: 20 }}>
           <li><strong>STEP12「本の改善提案」</strong>：出版した本の ASIN を入力 → Amazon の現状データとレビューから AI が改善提案を生成</li>
           <li>改善提案を見て、改訂版・タイトル変更・施策実行を判断（実行は著者の判断・強制しません）</li>
-          <li><strong>STEP13「出版経験の振り返り」</strong>：STEP12 の結果＋著者プロファイルから、著者プロファイル更新版を生成</li>
+          <li><strong>STEP13「著者プロファイル更新」</strong>：STEP12 の結果＋著者プロファイルから、著者プロファイル更新版を生成</li>
           <li>更新版を確認・編集 → <strong>「✓ STEP0 に反映する」</strong>ボタンで上書き保存（任意）</li>
           <li>次回作を始めるなら STEP1 へ進む。続けないなら何もしなくて OK（著者の判断を尊重）</li>
         </ol>
