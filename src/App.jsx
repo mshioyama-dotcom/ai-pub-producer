@@ -2543,6 +2543,307 @@ const Step1Page = ({ savedAuthorProfile, savedWorkProfile, onSaveWorkProfile, on
   );
 };
 
+// ============================================================
+// 書式付きコピー（Wordに貼り付けると見出しスタイルが自動適用される）
+// ============================================================
+// 章タイトル/節タイトル/項タイトル を <h1>/<h2>/<h3> に変換した HTML を
+// クリップボードに書き込む。Word は <h1>〜<h3> を「見出し 1〜3」スタイルとして
+// 受け取るため、貼り付け直後から目次自動生成・スタイル一括変更が使える。
+//
+// 検出パターン:
+//   - Markdown 見出し: `# 章` → h1, `## 節` → h2, `### 項` → h3, `####` → h4
+//   - 「第◯章」表記      → h1
+//   - 「(1)」「（1）」表記 → h2
+//   - 「①②③」表記         → h3
+//   - 装飾 **太字** は <strong> に
+//   - それ以外は <p> 本文段落
+const ESCAPE_HTML_MAP = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+function escapeHtml(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ESCAPE_HTML_MAP[c]);
+}
+
+// 行内の **太字** を <strong> に置換（HTMLエスケープ済みの文字列に対して使う）
+function applyInlineFormatting(escaped) {
+  return escaped.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+}
+
+function convertOutputToHtml(text) {
+  if (!text || !text.trim()) return "";
+  const lines = text.split(/\r?\n/);
+  const out = [];
+  for (const rawLine of lines) {
+    const line = rawLine.replace(/\s+$/, ""); // 末尾の空白だけ落とす
+    if (!line.trim()) {
+      out.push(""); // 空行は段落区切り用に残す
+      continue;
+    }
+    // Markdown 見出し ##### → h5 ... # → h1
+    const md = line.match(/^(#{1,6})\s+(.+)$/);
+    if (md) {
+      const level = Math.min(md[1].length, 6);
+      out.push(`<h${level}>${applyInlineFormatting(escapeHtml(md[2].trim()))}</h${level}>`);
+      continue;
+    }
+    // 第◯章 表記 → h1
+    if (/^第[0-9０-９一二三四五六七八九十百千]+章/.test(line.trim())) {
+      out.push(`<h1>${applyInlineFormatting(escapeHtml(line.trim()))}</h1>`);
+      continue;
+    }
+    // (1) / （1） 節 → h2（行頭が数字付き括弧で始まる）
+    if (/^[（(]\s*[0-9０-９]+\s*[)）]/.test(line.trim())) {
+      out.push(`<h2>${applyInlineFormatting(escapeHtml(line.trim()))}</h2>`);
+      continue;
+    }
+    // ①②③ 項 → h3
+    if (/^[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]/.test(line.trim())) {
+      out.push(`<h3>${applyInlineFormatting(escapeHtml(line.trim()))}</h3>`);
+      continue;
+    }
+    // 通常の本文段落
+    out.push(`<p>${applyInlineFormatting(escapeHtml(line))}</p>`);
+  }
+  // 空行（段落区切り）は <p></p> として残さない（Wordで余計な空段落が増えるのを防ぐ）
+  return out.filter((l) => l !== "").join("\n");
+}
+
+// クリップボードに HTML + text/plain の両方で書き込む。
+// Word・Google Docs は HTML を優先的に読み取り、メモ帳など平文しか読まないアプリは
+// text/plain を読む。両方を入れることでどこに貼っても適切に振る舞う。
+async function copyAsFormatted(text) {
+  const html = convertOutputToHtml(text);
+  if (!html) return false;
+  try {
+    if (navigator.clipboard && typeof window !== "undefined" && window.ClipboardItem) {
+      const item = new window.ClipboardItem({
+        "text/html": new Blob([html], { type: "text/html" }),
+        "text/plain": new Blob([text || ""], { type: "text/plain" }),
+      });
+      await navigator.clipboard.write([item]);
+      return true;
+    }
+    // Fallback: 平文だけコピー
+    await navigator.clipboard.writeText(text || "");
+    return true;
+  } catch (e) {
+    console.error("copyAsFormatted failed:", e);
+    try {
+      // 最終フォールバック: 平文だけでも入れる
+      await navigator.clipboard.writeText(text || "");
+      return true;
+    } catch (e2) {
+      return false;
+    }
+  }
+}
+
+// ============================================================
+// Wordファイル（.docx）生成（章境界を見出し1、節を見出し2、項を見出し3に変換）
+// ============================================================
+// 動的importでdocxパッケージを呼ぶ（初期バンドルに含めず、ボタン押下時のみ読み込む）。
+// outputText の構造を解析して章・節・項を Heading 1/2/3 に、本文を通常段落にする。
+// 章境界（=== タイトル === または # タイトル）で改ページを挿入する。
+function parseOutputForDocx(text) {
+  // 戻り値: [{ type: "h1"|"h2"|"h3"|"h4"|"p"|"strong_p"|"empty", text }, ...]
+  if (!text || !text.trim()) return [];
+  const lines = text.split(/\r?\n/);
+  const blocks = [];
+  for (const rawLine of lines) {
+    const line = rawLine.replace(/\s+$/, "");
+    const t = line.trim();
+    if (!t) {
+      blocks.push({ type: "empty" });
+      continue;
+    }
+    // === タイトル === 形式（バルク生成の章セパレーター）
+    const sep = t.match(/^===\s*(.+?)\s*===$/);
+    if (sep) {
+      blocks.push({ type: "h1", text: sep[1].trim() });
+      continue;
+    }
+    // --- 形式の章間セパレーターはスキップ
+    if (/^-{3,}$/.test(t)) {
+      blocks.push({ type: "empty" });
+      continue;
+    }
+    // Markdown 見出し
+    const md = t.match(/^(#{1,6})\s+(.+)$/);
+    if (md) {
+      const level = Math.min(md[1].length, 4);
+      blocks.push({ type: `h${level}`, text: md[2].trim() });
+      continue;
+    }
+    // 第◯章 表記
+    if (/^第[0-9０-９一二三四五六七八九十百千]+章/.test(t)) {
+      blocks.push({ type: "h1", text: t });
+      continue;
+    }
+    // (1) / （1） 節
+    if (/^[（(]\s*[0-9０-９]+\s*[)）]/.test(t)) {
+      blocks.push({ type: "h2", text: t });
+      continue;
+    }
+    // ①②③ 項
+    if (/^[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]/.test(t)) {
+      blocks.push({ type: "h3", text: t });
+      continue;
+    }
+    // **太字** だけの行
+    const bold = t.match(/^\*\*(.+)\*\*$/);
+    if (bold) {
+      blocks.push({ type: "strong_p", text: bold[1].trim() });
+      continue;
+    }
+    // 通常段落
+    blocks.push({ type: "p", text: t });
+  }
+  return blocks;
+}
+
+// 章数をカウント（h1 ブロックの数）
+function countChapters(blocks) {
+  return blocks.filter((b) => b.type === "h1").length;
+}
+
+// outputText から .docx Blob を生成（動的importでdocxパッケージを呼ぶ）
+async function generateDocxBlob(outputText, stepNum, stepTitle) {
+  const docxModule = await import("docx");
+  const {
+    Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, PageBreak,
+  } = docxModule;
+
+  const blocks = parseOutputForDocx(outputText);
+  const children = [];
+
+  // 文書タイトル（先頭）
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 0, after: 400 },
+      children: [
+        new TextRun({ text: `${stepTitle || `STEP${stepNum}`} 出力`, bold: true, size: 32 }),
+      ],
+    }),
+  );
+
+  // 各ブロックを Paragraph に変換
+  let isFirstChapter = true;
+  for (const b of blocks) {
+    if (b.type === "empty") {
+      // 空段落（改行用）
+      children.push(new Paragraph({ children: [] }));
+      continue;
+    }
+    if (b.type === "h1") {
+      // 章前で改ページ（最初の章は除く）
+      const runs = [];
+      if (!isFirstChapter) {
+        runs.push(new TextRun({ children: [new PageBreak()] }));
+      }
+      runs.push(new TextRun({ text: b.text, bold: true, size: 36 }));
+      children.push(
+        new Paragraph({
+          heading: HeadingLevel.HEADING_1,
+          spacing: { before: 240, after: 200 },
+          children: runs,
+        }),
+      );
+      isFirstChapter = false;
+      continue;
+    }
+    if (b.type === "h2") {
+      children.push(
+        new Paragraph({
+          heading: HeadingLevel.HEADING_2,
+          spacing: { before: 240, after: 120 },
+          children: [new TextRun({ text: b.text, bold: true, size: 28 })],
+        }),
+      );
+      continue;
+    }
+    if (b.type === "h3") {
+      children.push(
+        new Paragraph({
+          heading: HeadingLevel.HEADING_3,
+          spacing: { before: 200, after: 100 },
+          children: [new TextRun({ text: b.text, bold: true, size: 24 })],
+        }),
+      );
+      continue;
+    }
+    if (b.type === "h4") {
+      children.push(
+        new Paragraph({
+          heading: HeadingLevel.HEADING_4,
+          spacing: { before: 160, after: 80 },
+          children: [new TextRun({ text: b.text, bold: true, size: 22 })],
+        }),
+      );
+      continue;
+    }
+    if (b.type === "strong_p") {
+      children.push(
+        new Paragraph({
+          spacing: { before: 120, after: 120 },
+          children: [new TextRun({ text: b.text, bold: true, size: 22 })],
+        }),
+      );
+      continue;
+    }
+    // 通常段落
+    children.push(
+      new Paragraph({
+        spacing: { before: 100, after: 100, line: 360 }, // 行間1.5
+        children: [new TextRun({ text: b.text, size: 22 })],
+      }),
+    );
+  }
+
+  const doc = new Document({
+    creator: "AI出版プロデューサー",
+    title: `${stepTitle || `STEP${stepNum}`} 出力`,
+    styles: {
+      default: {
+        document: {
+          run: {
+            font: { name: "Yu Gothic", hint: "eastAsia" },
+          },
+        },
+      },
+    },
+    sections: [
+      {
+        properties: {
+          page: {
+            margin: { top: 1134, bottom: 1134, left: 1134, right: 1134 }, // 2cm
+          },
+        },
+        children,
+      },
+    ],
+  });
+
+  return await Packer.toBlob(doc);
+}
+
+// Blob をブラウザにダウンロードさせる
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ファイル名のタイムスタンプ生成（YYYYMMDD-HHMM）
+function timestampForFilename() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
+}
+
 const CopyButton = ({ text, label }) => {
   const [copied, setCopied] = useState(false);
   const handleCopy = () => {
@@ -6016,6 +6317,50 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           {saveOutputMsg === "saved" && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました</span>}
           <BtnSecondary onClick={() => { if (!outputText) return; navigator.clipboard.writeText(outputText); setSaveOutputMsg("copy"); setTimeout(() => setSaveOutputMsg(false), 2000); }} style={{ fontSize: 13 }}>出力をコピー</BtnSecondary>
           {saveOutputMsg === "copy" && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ コピーしました</span>}
+          <BtnSecondary
+            onClick={async () => {
+              if (!outputText) return;
+              const ok = await copyAsFormatted(outputText);
+              setSaveOutputMsg(ok ? "copy_html" : "copy_html_err");
+              setTimeout(() => setSaveOutputMsg(false), 2500);
+            }}
+            style={{ fontSize: 13 }}
+            title="章・節・項の見出しを Word の見出しスタイルとして貼り付けられる形式でコピーします"
+          >
+            📝 書式付きコピー（Word用）
+          </BtnSecondary>
+          {saveOutputMsg === "copy_html" && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 書式付きでコピーしました（Wordに貼り付けて見出しスタイルが反映されます）</span>}
+          {saveOutputMsg === "copy_html_err" && <span style={{ fontSize: 12, color: C.red, fontWeight: 600 }}>⚠ 書式付きコピーに失敗しました（平文だけコピーされました）</span>}
+          <BtnSecondary
+            onClick={async () => {
+              if (!outputText || !outputText.trim()) return;
+              const blocks = parseOutputForDocx(outputText);
+              const chapterCount = countChapters(blocks);
+              const msg = chapterCount > 0
+                ? `現在の出力には ${chapterCount} 章分が含まれます。Word ファイル（.docx）として保存しますか？`
+                : "現在の出力内容を Word ファイル（.docx）として保存しますか？";
+              if (!window.confirm(msg)) return;
+              try {
+                setSaveOutputMsg("docx_busy");
+                const blob = await generateDocxBlob(outputText, step.num, step.title);
+                const filename = `AI出版_STEP${step.num}_${(step.title || "").replace(/[\\\/:*?"<>|]/g, "")}_${timestampForFilename()}.docx`;
+                downloadBlob(blob, filename);
+                setSaveOutputMsg("docx_ok");
+                setTimeout(() => setSaveOutputMsg(false), 2500);
+              } catch (e) {
+                console.error("docx生成失敗:", e);
+                setSaveOutputMsg("docx_err");
+                setTimeout(() => setSaveOutputMsg(false), 3000);
+              }
+            }}
+            style={{ fontSize: 13 }}
+            title="現在の出力内容を Word ファイル（.docx）としてダウンロードします。章・節・項が見出しスタイルで整形されます"
+          >
+            📥 Wordで保存
+          </BtnSecondary>
+          {saveOutputMsg === "docx_busy" && <span style={{ fontSize: 12, color: C.navy, fontWeight: 600 }}>⏳ Wordファイル生成中…</span>}
+          {saveOutputMsg === "docx_ok" && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ .docx をダウンロードしました</span>}
+          {saveOutputMsg === "docx_err" && <span style={{ fontSize: 12, color: C.red, fontWeight: 600 }}>⚠ Word保存に失敗しました。再度お試しください</span>}
           {nextStep && <BtnSecondary onClick={() => onNavigate(`step_${nextStep.num}`)} style={{ background: C.greenLight, color: C.green, border: `1px solid rgba(45,122,79,0.25)` }}>STEP{nextStep.num}へ進む →</BtnSecondary>}
           {!nextStep && <BtnSecondary onClick={() => onNavigate("saved")} style={{ background: C.greenLight, color: C.green, border: `1px solid rgba(45,122,79,0.25)` }}>完了 → 保存データを見る</BtnSecondary>}
         </div>
