@@ -6464,6 +6464,9 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           diagrams={diagrams}
           setDiagrams={setDiagrams}
           onInsertMarkerToBody={handleInsertMarkerToBody}
+          outputText={outputText}
+          authorProfile={getAutoInjectedProfiles().author_profile || ""}
+          workProfile={getAutoInjectedProfiles().work_profile || ""}
         />
       )}
 

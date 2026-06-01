@@ -155,8 +155,136 @@ const DiagramCard = ({ diagram, index, onChange, onDelete, onInsertMarker }) => 
   );
 };
 
-const DiagramPanel = ({ diagrams, setDiagrams, onInsertMarkerToBody }) => {
+// 単一のAI提案カード（プレビュー＋採用ボタン）
+const AiSuggestionCard = ({ suggestion, index, onAdopt }) => {
+  const previewRef = useRef(null);
+  const [renderError, setRenderError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    async function render() {
+      if (!previewRef.current || !suggestion.mermaid?.trim()) return;
+      try {
+        const mermaidModule = await import("mermaid");
+        const mermaid = mermaidModule.default || mermaidModule;
+        if (cancelled) return;
+        mermaid.initialize({ startOnLoad: false, theme: "default", securityLevel: "loose" });
+        const id = `mermaid-sug-${index}-${Date.now()}`;
+        const { svg } = await mermaid.render(id, suggestion.mermaid);
+        if (cancelled) return;
+        if (previewRef.current) {
+          previewRef.current.innerHTML = svg;
+          setRenderError("");
+        }
+      } catch (e) {
+        if (cancelled) return;
+        setRenderError(String(e?.message || e || "プレビュー失敗"));
+      }
+    }
+    render();
+    return () => { cancelled = true; };
+  }, [suggestion.mermaid, index]);
+
+  return (
+    <div style={{ border: `1px solid ${C.border}`, borderRadius: 4, padding: 10, marginBottom: 8, background: C.white }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: C.navy }}>
+          案{index + 1}{suggestion.title ? `：${suggestion.title}` : ""}
+        </div>
+        <button
+          onClick={() => onAdopt(suggestion)}
+          style={{ fontSize: 11, padding: "4px 10px", background: C.green, color: C.white, border: "none", borderRadius: 3, cursor: "pointer", fontWeight: 600 }}
+        >
+          ✓ この案で図解を追加
+        </button>
+      </div>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <div style={{ flex: "1 1 240px", minWidth: 0 }}>
+          <div style={{ fontSize: 10.5, color: C.textLight, marginBottom: 2 }}>Mermaid記法</div>
+          <pre style={{ margin: 0, padding: "6px 8px", fontSize: 11, fontFamily: "Consolas, Menlo, monospace", border: `1px solid ${C.border}`, borderRadius: 3, background: "#fafafa", overflow: "auto", maxHeight: 160, lineHeight: 1.4 }}>{suggestion.mermaid}</pre>
+        </div>
+        <div style={{ flex: "1 1 240px", minWidth: 0 }}>
+          <div style={{ fontSize: 10.5, color: C.textLight, marginBottom: 2 }}>プレビュー</div>
+          <div style={{ border: `1px solid ${C.border}`, borderRadius: 3, padding: 6, background: "#fafafa", minHeight: 100, overflow: "auto" }}>
+            {renderError ? (
+              <div style={{ fontSize: 10.5, color: C.red, lineHeight: 1.5 }}>⚠ {renderError}</div>
+            ) : (
+              <div ref={previewRef} style={{ textAlign: "center" }} />
+            )}
+          </div>
+        </div>
+      </div>
+      {suggestion.caption && (
+        <div style={{ marginTop: 6, fontSize: 11, color: C.textSub }}>
+          📝 キャプション案：{suggestion.caption}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const DiagramPanel = ({ diagrams, setDiagrams, onInsertMarkerToBody, outputText = "", authorProfile = "", workProfile = "" }) => {
   const [open, setOpen] = useState(false);
+
+  // AI下書き生成用 state
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiBodyText, setAiBodyText] = useState("");
+  const [aiHint, setAiHint] = useState("");
+  const [aiType, setAiType] = useState("flow");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
+  const [aiSuggestions, setAiSuggestions] = useState([]);
+
+  const handleGenerateAi = async () => {
+    setAiError("");
+    setAiSuggestions([]);
+    if (!aiBodyText.trim() && !aiHint.trim()) {
+      setAiError("「図解にしたい本文」または「ヒント」のどちらかは入力してください。");
+      return;
+    }
+    setAiLoading(true);
+    try {
+      const response = await fetch("/api/diagram-suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bodyText: aiBodyText,
+          diagramType: aiType,
+          hint: aiHint,
+          authorProfile,
+          workProfile,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setAiError(data?.error || `生成に失敗しました（HTTP ${response.status}）`);
+        return;
+      }
+      if (data.warning) setAiError(`⚠ ${data.warning}`);
+      setAiSuggestions(Array.isArray(data.suggestions) ? data.suggestions : []);
+    } catch (e) {
+      setAiError(`通信エラー：${e.message}`);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const adoptSuggestion = (suggestion) => {
+    const newId = Date.now();
+    const newDiagrams = [
+      ...diagrams,
+      { id: newId, type: aiType, code: suggestion.mermaid, caption: suggestion.caption || suggestion.title || "" },
+    ];
+    setDiagrams(newDiagrams);
+    // 採用後は AI セクションをリセット（連続生成しやすく）
+    setAiSuggestions([]);
+    setAiBodyText("");
+    setAiHint("");
+  };
+
+  const useCurrentBodyAsAiInput = () => {
+    setAiBodyText((outputText || "").slice(0, 4000));
+  };
 
   const addDiagram = (templateKey) => {
     const template = DIAGRAM_TEMPLATES[templateKey] || DIAGRAM_TEMPLATES.flow;
@@ -223,7 +351,7 @@ const DiagramPanel = ({ diagrams, setDiagrams, onInsertMarkerToBody }) => {
 
           {/* テンプレート追加ボタン */}
           <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, marginBottom: 6 }}>新しい図解を追加：</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: C.navy, marginBottom: 6 }}>新しい図解を追加（テンプレートから）：</div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {Object.entries(DIAGRAM_TEMPLATES).map(([key, t]) => (
                 <button
@@ -235,6 +363,95 @@ const DiagramPanel = ({ diagrams, setDiagrams, onInsertMarkerToBody }) => {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* AI下書き生成セクション */}
+          <div style={{ marginBottom: 14, border: `1px solid ${C.goldLight}`, borderRadius: 4, background: C.goldPale }}>
+            <div
+              onClick={() => setAiOpen(!aiOpen)}
+              style={{ padding: "8px 12px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", userSelect: "none" }}
+            >
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: C.gold }}>
+                ✨ AIに下書きを作らせる（本文セクションから3案提案）
+              </div>
+              <div style={{ fontSize: 11.5, color: C.textSub }}>{aiOpen ? "▲ 閉じる" : "▼ 開く"}</div>
+            </div>
+            {aiOpen && (
+              <div style={{ padding: "0 12px 12px", borderTop: `1px solid ${C.goldLight}` }}>
+                <div style={{ marginTop: 10, marginBottom: 8 }}>
+                  <label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>
+                    図解にしたい本文（該当章・節の本文をペースト・最大4000字）
+                  </label>
+                  <textarea
+                    value={aiBodyText}
+                    onChange={(e) => setAiBodyText(e.target.value.slice(0, 4000))}
+                    rows={5}
+                    placeholder="本文の該当部分をペーストしてください（または『現在の本文を全部使う』ボタンで)"
+                    style={{ width: "100%", padding: "8px 10px", fontSize: 12, border: `1px solid ${C.border}`, borderRadius: 3, outline: "none", boxSizing: "border-box", resize: "vertical", lineHeight: 1.5, background: C.white }}
+                  />
+                  <div style={{ marginTop: 4, fontSize: 10.5, color: C.textLight, display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 6 }}>
+                    <span>{aiBodyText.length} / 4000 字</span>
+                    {outputText && outputText.trim() && (
+                      <button
+                        onClick={useCurrentBodyAsAiInput}
+                        style={{ fontSize: 10.5, padding: "2px 8px", background: C.white, color: C.navy, border: `1px solid ${C.navy}`, borderRadius: 3, cursor: "pointer", fontWeight: 600 }}
+                      >
+                        📋 現在の本文（先頭4000字）を取り込む
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div style={{ marginBottom: 8 }}>
+                  <label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>
+                    ヒント（任意・「Before/After を比較したい」「変化プロセスを見せたい」など）
+                  </label>
+                  <input
+                    value={aiHint}
+                    onChange={(e) => setAiHint(e.target.value)}
+                    placeholder="例: 読者の不安が解消されるプロセスを段階的に示したい"
+                    style={{ width: "100%", padding: "6px 10px", fontSize: 12, border: `1px solid ${C.border}`, borderRadius: 3, outline: "none", boxSizing: "border-box", background: C.white }}
+                  />
+                </div>
+                <div style={{ marginBottom: 10, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <label style={{ fontSize: 11, color: C.textLight }}>図解タイプ：</label>
+                  <select
+                    value={aiType}
+                    onChange={(e) => setAiType(e.target.value)}
+                    style={{ fontSize: 12, padding: "4px 8px", border: `1px solid ${C.border}`, borderRadius: 3, background: C.white }}
+                  >
+                    <option value="flow">フロー図</option>
+                    <option value="compare">比較図（Before/After）</option>
+                    <option value="hierarchy">階層図</option>
+                    <option value="timeline">時系列図</option>
+                  </select>
+                  <button
+                    onClick={handleGenerateAi}
+                    disabled={aiLoading}
+                    style={{ marginLeft: "auto", fontSize: 12, padding: "6px 14px", background: aiLoading ? "rgba(0,0,0,0.2)" : C.gold, color: C.white, border: "none", borderRadius: 3, cursor: aiLoading ? "default" : "pointer", fontWeight: 700 }}
+                  >
+                    {aiLoading ? "⏳ 生成中（最大30秒）…" : "✨ 3案を生成"}
+                  </button>
+                </div>
+                {aiError && (
+                  <div style={{ marginBottom: 10, padding: "8px 10px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 3, fontSize: 11.5, color: C.red, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+                    {aiError}
+                  </div>
+                )}
+                {aiSuggestions.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 11.5, fontWeight: 700, color: C.navy, marginBottom: 6 }}>
+                      生成された下書き案（{aiSuggestions.length} 個）：
+                    </div>
+                    {aiSuggestions.map((s, i) => (
+                      <AiSuggestionCard key={i} suggestion={s} index={i} onAdopt={adoptSuggestion} />
+                    ))}
+                    <div style={{ fontSize: 10.5, color: C.textLight, marginTop: 4 }}>
+                      💡 採用後は下の図解一覧に追加されます。記法を微調整したり、別の案を採用するときは再度「3案を生成」してください。
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* 既存図解一覧 */}
