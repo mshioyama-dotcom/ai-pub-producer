@@ -5,7 +5,6 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { extractTextFromFile, buildSourceText, ACCEPTED_EXTENSIONS } from "./utils/extractText";
 import { extractBookEssence, formatEssenceAsText } from "./utils/extractEssence";
 import DiscussionPanel from "./DiscussionPanel";
-import DiagramPanel, { renderMermaidToPng } from "./DiagramPanel";
 
 // ============================================================
 // デザイントークン（ネイビー × ゴールド × ホワイト）
@@ -2644,7 +2643,7 @@ async function copyAsFormatted(text) {
 // outputText の構造を解析して章・節・項を Heading 1/2/3 に、本文を通常段落にする。
 // 章境界（=== タイトル === または # タイトル）で改ページを挿入する。
 function parseOutputForDocx(text) {
-  // 戻り値: [{ type: "h1"|"h2"|"h3"|"h4"|"p"|"strong_p"|"diagram"|"empty", text or figNum }, ...]
+  // 戻り値: [{ type: "h1"|"h2"|"h3"|"h4"|"p"|"strong_p"|"empty", text }, ...]
   if (!text || !text.trim()) return [];
   const lines = text.split(/\r?\n/);
   const blocks = [];
@@ -2653,12 +2652,6 @@ function parseOutputForDocx(text) {
     const t = line.trim();
     if (!t) {
       blocks.push({ type: "empty" });
-      continue;
-    }
-    // [図解 N] マーカー（行全体がマーカーの場合のみ画像化対象に）
-    const fig = t.match(/^\[図解\s*([0-9]+)\]$/);
-    if (fig) {
-      blocks.push({ type: "diagram", figNum: parseInt(fig[1], 10) });
       continue;
     }
     // === タイトル === 形式（バルク生成の章セパレーター）
@@ -2706,40 +2699,19 @@ function parseOutputForDocx(text) {
   return blocks;
 }
 
-// PNG dataURL を docx の ImageRun に渡せる Uint8Array に変換
-function dataUrlToUint8Array(dataUrl) {
-  const base64 = (dataUrl || "").split(",")[1] || "";
-  const binStr = atob(base64);
-  const bytes = new Uint8Array(binStr.length);
-  for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
-  return bytes;
-}
-
 // 章数をカウント（h1 ブロックの数）
 function countChapters(blocks) {
   return blocks.filter((b) => b.type === "h1").length;
 }
 
 // outputText から .docx Blob を生成（動的importでdocxパッケージを呼ぶ）
-// diagrams: [{ id, code, caption }] の配列（[図解 N] マーカーを画像化するために使う）
-async function generateDocxBlob(outputText, stepNum, stepTitle, diagrams = []) {
+async function generateDocxBlob(outputText, stepNum, stepTitle) {
   const docxModule = await import("docx");
   const {
-    Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, PageBreak, ImageRun,
+    Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, PageBreak,
   } = docxModule;
 
   const blocks = parseOutputForDocx(outputText);
-
-  // 本文中で参照されている図解番号を集めて、必要な分だけ Mermaid → PNG 変換
-  const usedFigNums = new Set(blocks.filter((b) => b.type === "diagram").map((b) => b.figNum));
-  const figImages = {}; // { 1: { dataUrl, width, height }, 2: ... }
-  for (const figNum of usedFigNums) {
-    const d = diagrams?.[figNum - 1];
-    if (!d || !d.code?.trim()) continue;
-    const img = await renderMermaidToPng(d.code, { scale: 2 });
-    if (img) figImages[figNum] = { ...img, caption: d.caption || "" };
-  }
-
   const children = [];
 
   // 文書タイトル（先頭）
@@ -2815,51 +2787,6 @@ async function generateDocxBlob(outputText, stepNum, stepTitle, diagrams = []) {
           children: [new TextRun({ text: b.text, bold: true, size: 22 })],
         }),
       );
-      continue;
-    }
-    if (b.type === "diagram") {
-      const fig = figImages[b.figNum];
-      if (fig) {
-        // 画像サイズを Word ページ幅（A4: ~17cm）に合わせて調整
-        // 元 PNG が canvas で scale=2 倍されているので、表示時は半分にする
-        const maxDisplayWidth = 500; // px
-        let displayW = fig.width / 2;
-        let displayH = fig.height / 2;
-        if (displayW > maxDisplayWidth) {
-          const ratio = maxDisplayWidth / displayW;
-          displayW = maxDisplayWidth;
-          displayH = Math.round(displayH * ratio);
-        }
-        children.push(
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            spacing: { before: 200, after: 80 },
-            children: [
-              new ImageRun({
-                data: dataUrlToUint8Array(fig.dataUrl),
-                transformation: { width: displayW, height: displayH },
-              }),
-            ],
-          }),
-        );
-        // キャプション
-        const caption = `図${b.figNum}${fig.caption ? `：${fig.caption}` : ""}`;
-        children.push(
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            spacing: { before: 0, after: 200 },
-            children: [new TextRun({ text: caption, italics: true, size: 18, color: "666666" })],
-          }),
-        );
-      } else {
-        // 画像化できなかった場合は [図解 N] テキストをそのまま残す（フォールバック）
-        children.push(
-          new Paragraph({
-            spacing: { before: 100, after: 100 },
-            children: [new TextRun({ text: `[図解 ${b.figNum}]（生成失敗）`, italics: true, size: 20, color: "b52b1e" })],
-          }),
-        );
-      }
       continue;
     }
     // 通常段落
@@ -5075,25 +5002,6 @@ const Step4ConfirmPanel = ({ outputText }) => {
 const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutput, onUpdateProject, onInputChange, allSteps, onRefPanel }) => {
   const [inputs, setInputs] = useState(stepData.inputData || {});
   const [outputText, setOutputText] = useState(stepData.outputText || "");
-  // STEP別の図解（Mermaid）を localStorage に永続化（key: aipub:step_${num}_diagrams）
-  const diagramsKey = `aipub:step_${step.num}_diagrams`;
-  const [diagrams, setDiagramsState] = useState(() => {
-    try {
-      if (typeof window === "undefined") return [];
-      const raw = localStorage.getItem(diagramsKey);
-      return raw ? (JSON.parse(raw) || []) : [];
-    } catch { return []; }
-  });
-  const setDiagrams = (next) => {
-    setDiagramsState(next);
-    try { if (typeof window !== "undefined") localStorage.setItem(diagramsKey, JSON.stringify(next)); } catch (e) { console.error(e); }
-  };
-  // 「本文末尾に [図解 N] を挿入」のコールバック
-  const handleInsertMarkerToBody = (marker) => {
-    const current = outputText || "";
-    const sep = current && !current.endsWith("\n") ? "\n\n" : "";
-    setOutputText(`${current}${sep}${marker}\n`);
-  };
   const [saveInputMsg, setSaveInputMsg] = useState(false);
   const [saveOutputMsg, setSaveOutputMsg] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -6434,7 +6342,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
               if (!window.confirm(msg)) return;
               try {
                 setSaveOutputMsg("docx_busy");
-                const blob = await generateDocxBlob(outputText, step.num, step.title, diagrams);
+                const blob = await generateDocxBlob(outputText, step.num, step.title);
                 const filename = `AI出版_STEP${step.num}_${(step.title || "").replace(/[\\\/:*?"<>|]/g, "")}_${timestampForFilename()}.docx`;
                 downloadBlob(blob, filename);
                 setSaveOutputMsg("docx_ok");
@@ -6457,18 +6365,6 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           {!nextStep && <BtnSecondary onClick={() => onNavigate("saved")} style={{ background: C.greenLight, color: C.green, border: `1px solid rgba(45,122,79,0.25)` }}>完了 → 保存データを見る</BtnSecondary>}
         </div>
       </div>
-
-      {/* 図解管理パネル（STEP6以降の本文系STEP用・Word保存時に [図解 N] マーカーを画像化して埋め込む） */}
-      {step.num >= 6 && step.num <= 13 && (
-        <DiagramPanel
-          diagrams={diagrams}
-          setDiagrams={setDiagrams}
-          onInsertMarkerToBody={handleInsertMarkerToBody}
-          outputText={outputText}
-          authorProfile={getAutoInjectedProfiles().author_profile || ""}
-          workProfile={getAutoInjectedProfiles().work_profile || ""}
-        />
-      )}
 
       {/* 外部AIで相談するためのプロンプト生成パネル（全STEP共通） */}
       {/* STEP5（タイトル）では「採用案を確定する」UI より先に相談機能を置くことで、

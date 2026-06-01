@@ -3,9 +3,8 @@
     { "source": "/api/(.*)", "destination": "/api/$1" }
   ],
   "functions": {
-    "api/dify.js":             { "maxDuration": 300 },
-    "api/dify-chat.js":        { "maxDuration": 300 },
-    "api/diagram-suggest.js":  { "maxDuration": 60 },
-    "api/debug-log.js":        { "maxDuration": 10 }
+    "api/dify.js":      { "maxDuration": 300 },
+    "api/dify-chat.js": { "maxDuration": 300 },
+    "api/debug-log.js": { "maxDuration": 10 }
   }
 }
