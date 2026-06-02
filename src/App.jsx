@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { extractTextFromFile, buildSourceText, ACCEPTED_EXTENSIONS } from "./utils/extractText";
 import { extractBookEssence, formatEssenceAsText } from "./utils/extractEssence";
 import DiscussionPanel from "./DiscussionPanel";
+import DiagramStepPage from "./DiagramStepPage";
 
 // ============================================================
 // デザイントークン（ネイビー × ゴールド × ホワイト）
@@ -1748,6 +1749,15 @@ const SideMenu = ({ currentPage, onNavigate, stepStatuses, confirmStatus }) => {
               const item = menuItem(`STEP${n}　${s.title}`, `step_${n}`, stepStatuses[n]);
               // v5: STEP3 末尾に「書籍プロファイル確定」機能を統合したため、専用の
               // step_confirm メニュー項目は廃止（STEP3 ページ内 ④〜⑦ で完結）。
+              // v6: STEP9（本文作成）の直後に「📊 図解作成」（番号なし独立ページ）を追加
+              if (n === 9) {
+                return (
+                  <div key={`stepwrap_${n}`}>
+                    {item}
+                    {menuItem("　　📊 図解作成", "step_diagram", null)}
+                  </div>
+                );
+              }
               return item;
             })}
           </div>
@@ -6511,6 +6521,7 @@ const GuidePage = ({ onNavigate }) => {
           <StepRow num="7" title="章構成作成" desc="目次から章ごとに節要約を一括生成（全章順次処理）。" />
           <StepRow num="8" title="詳細プロット作成" desc="章ごとに「節 → 項」レベルまで分解（全章順次処理）。" />
           <StepRow num="9" title="本文作成" desc="章ごとに本文を生成。1 章ずつ確認しながら進められます。" />
+          <StepRow num="–" title="📊 図解作成（独立ページ・任意）" badge="🆕" desc="本文の章ごとに Mermaid 記法で図解を作成。本文+図解 Word／図解のみ Word／PNG ZIP の3形式で出力できます。AI 不使用・完全ブラウザ内処理。" />
         </div>
         <div style={{ marginBottom: 12 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: C.gold, marginBottom: 4 }}>📣 販売準備フェーズ（STEP10〜11）</div>
@@ -6775,6 +6786,8 @@ export default function App() {
     if (page === "step_2") return <Step2Page savedAuthorProfile={authorProfile} savedWorkProfileDraft={workProfile} onNavigate={nav} project={project} />;
     // v5: STEP3 末尾に書籍プロファイル確定機能を統合したため、step_3 と step_confirm の両方を Step3Page にルーティング（古いリンク・ブックマーク対策）
     if (page === "step_3" || page === "step_confirm") return <Step3Page savedAuthorProfile={authorProfile} savedWorkProfileDraft={workProfile} savedWorkProfileConfirmed={workProfileConfirmed} onSaveWorkProfileConfirmed={handleSaveWorkProfileConfirmed} onNavigate={nav} project={project} />;
+    // v6: STEP9（本文作成）後の独立ページ「📊 図解作成」（番号なし・既存STEP番号に影響なし）
+    if (page === "step_diagram") return <DiagramStepPage onNavigate={nav} allSteps={allSteps} />;
     if (page === "step_12") return <Step12Page savedAuthorProfile={authorProfile} savedWorkProfileConfirmed={workProfileConfirmed} onNavigate={nav} />;
     if (page === "step_13") return <Step13Page savedAuthorProfile={authorProfile} savedWorkProfileConfirmed={workProfileConfirmed} onSaveAuthorProfile={handleSaveAuthorProfile} onNavigate={nav} />;
     if (page.startsWith("step_")) {
