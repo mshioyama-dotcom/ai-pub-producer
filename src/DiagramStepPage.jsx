@@ -141,6 +141,22 @@ function extractChapters(text) {
   return chapters;
 }
 
+// 章本文を「段落」単位に分割する（空行区切り）。Word出力時の挿入位置指定に使う。
+// 戻り値: [{ index: 1, text: "..." }, ...]  (index は 1 始まり)
+function extractParagraphs(body) {
+  if (!body || !body.trim()) return [];
+  return body
+    .split(/\r?\n\s*\r?\n/)
+    .map((s, i) => ({ index: i + 1, text: s.replace(/^\s+|\s+$/g, "") }))
+    .filter((p) => p.text.length > 0);
+}
+
+// 段落プレビュー用：最初の N 文字を切り取る
+function paragraphPreview(text, max = 18) {
+  const t = (text || "").replace(/\s+/g, " ");
+  return t.length > max ? `${t.slice(0, max)}…` : t;
+}
+
 // Mermaid → PNG dataURL（堅牢化版）
 // 改善ポイント:
 //   1. SVG の width/height を viewBox から復元（mermaid が省略するケース対応）
@@ -314,8 +330,10 @@ const MermaidPreview = ({ code, error, setError }) => {
 };
 
 // 1つの図解編集パネル
-const DiagramEditor = ({ diagram, onChange, onDelete, chapterTitle, figNumber }) => {
+const DiagramEditor = ({ diagram, onChange, onDelete, chapterTitle, figNumber, paragraphs }) => {
   const [previewError, setPreviewError] = useState("");
+  // position: 0 (=章末) または 1〜N (=段落Nの後)
+  const position = typeof diagram.position === "number" ? diagram.position : 0;
   return (
     <div style={{ border: `1px solid ${C.border}`, borderRadius: 4, padding: 12, marginBottom: 10, background: "#fafafa" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
@@ -326,6 +344,29 @@ const DiagramEditor = ({ diagram, onChange, onDelete, chapterTitle, figNumber })
           🗑 削除
         </button>
       </div>
+
+      {/* 挿入位置の指定 */}
+      <div style={{ marginBottom: 10, padding: "8px 10px", background: C.goldPale, border: `1px solid ${C.goldLight}`, borderRadius: 3 }}>
+        <label style={{ fontSize: 11.5, fontWeight: 700, color: C.navy, display: "block", marginBottom: 4 }}>
+          挿入位置：
+        </label>
+        <select
+          value={position}
+          onChange={(e) => onChange({ ...diagram, position: parseInt(e.target.value, 10) })}
+          style={{ fontSize: 12, padding: "4px 8px", border: `1px solid ${C.border}`, borderRadius: 3, background: C.white, maxWidth: "100%" }}
+        >
+          <option value={0}>章末（デフォルト）</option>
+          {paragraphs.map((p) => (
+            <option key={p.index} value={p.index}>
+              段落 {p.index} の後：「{paragraphPreview(p.text, 24)}」
+            </option>
+          ))}
+        </select>
+        <div style={{ marginTop: 4, fontSize: 10.5, color: C.textLight, lineHeight: 1.5 }}>
+          ※ 「段落」は本文の空行区切りで判定されます。挿入位置はWord出力時に反映されます。
+        </div>
+      </div>
+
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start", flexWrap: "wrap" }}>
         <div style={{ flex: "1 1 280px", minWidth: 0 }}>
           <div style={{ fontSize: 11, color: C.textLight, marginBottom: 4 }}>Mermaid 記法（編集可能）</div>
@@ -361,13 +402,15 @@ const DiagramEditor = ({ diagram, onChange, onDelete, chapterTitle, figNumber })
 
 // 章セクション（章タイトル＋既存図解一覧＋追加ボタン）
 const ChapterSection = ({ chapter, chapterIndex, diagrams, onChange, onDelete, onAdd }) => {
+  // 章本文を段落単位に分解（挿入位置プルダウン用）
+  const paragraphs = useMemo(() => extractParagraphs(chapter.body), [chapter.body]);
   return (
     <div style={{ marginBottom: 18, padding: "12px 14px", border: `1px solid ${C.border}`, borderRadius: 4, background: C.white }}>
       <div style={{ fontSize: 14, fontWeight: 700, color: C.navy, marginBottom: 6 }}>
         📖 {chapter.title}
       </div>
       <div style={{ fontSize: 11, color: C.textLight, marginBottom: 10 }}>
-        この章の図解：{diagrams.length} 個
+        この章：{paragraphs.length} 段落 / 図解：{diagrams.length} 個
       </div>
       {diagrams.length === 0 && (
         <div style={{ fontSize: 12, color: C.textLight, padding: "10px 12px", border: `1px dashed ${C.border}`, borderRadius: 3, textAlign: "center", marginBottom: 10 }}>
@@ -380,6 +423,7 @@ const ChapterSection = ({ chapter, chapterIndex, diagrams, onChange, onDelete, o
           diagram={d}
           figNumber={`${chapterIndex + 1}-${i + 1}`}
           chapterTitle={chapter.title}
+          paragraphs={paragraphs}
           onChange={(next) => onChange(d.id, next)}
           onDelete={() => onDelete(d.id)}
         />
@@ -510,6 +554,49 @@ const DiagramStepPage = ({ onNavigate, allSteps }) => {
         children: [new TextRun({ text: "本文＋図解（AI出版プロデューサー）", bold: true, size: 32 })],
       }));
 
+      // 図解を1つ分の Paragraph 配列に変換するヘルパー（章末・段落間共通）
+      const buildDiagramParagraphs = async (d, figLabel) => {
+        const out = [];
+        const png = await renderMermaidToPng(d.code, { scale: 2 });
+        if (!png) {
+          out.push(new Paragraph({
+            spacing: { before: 200, after: 100 },
+            children: [new TextRun({ text: `[図 ${figLabel} の生成に失敗（Mermaid 構文を確認してください）]`, italics: true, color: "b52b1e", size: 20 })],
+          }));
+          return out;
+        }
+        // 表示サイズ：min 400 / max 680 px に収める（小さい図解は拡大、大きい図解は縮小）
+        // canvas は scale=2 で生成しているので半分にしてから min/max を適用
+        const minW = 400;
+        const maxW = 680;
+        let dispW = png.width / 2;
+        let dispH = png.height / 2;
+        if (dispW < minW) {
+          const r = minW / dispW;
+          dispW = minW;
+          dispH = Math.round(dispH * r);
+        } else if (dispW > maxW) {
+          const r = maxW / dispW;
+          dispW = maxW;
+          dispH = Math.round(dispH * r);
+        }
+        out.push(new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 240, after: 80 },
+          children: [new ImageRun({
+            data: dataUrlToUint8Array(png.dataUrl),
+            transformation: { width: dispW, height: dispH },
+          })],
+        }));
+        const caption = `図 ${figLabel}${d.caption ? `：${d.caption}` : ""}`;
+        out.push(new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 0, after: 240 },
+          children: [new TextRun({ text: caption, italics: true, size: 18, color: "666666" })],
+        }));
+        return out;
+      };
+
       let isFirst = true;
       for (let ci = 0; ci < chapters.length; ci++) {
         const ch = chapters[ci];
@@ -524,73 +611,71 @@ const DiagramStepPage = ({ onNavigate, allSteps }) => {
         }));
         isFirst = false;
 
-        // 章本文を段落に分解
-        const bodyLines = ch.body.split(/\r?\n/);
-        for (const line of bodyLines) {
-          const t = line.trim();
-          if (!t) {
-            children.push(new Paragraph({ children: [] }));
-            continue;
-          }
-          // 節 (1)（1）→ 見出し2
-          if (/^[（(]\s*[0-9０-９]+\s*[)）]/.test(t)) {
-            children.push(new Paragraph({
-              heading: HeadingLevel.HEADING_2,
-              spacing: { before: 240, after: 120 },
-              children: [new TextRun({ text: t, bold: true, size: 28 })],
-            }));
-            continue;
-          }
-          // 項 ①②③ → 見出し3
-          if (/^[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]/.test(t)) {
-            children.push(new Paragraph({
-              heading: HeadingLevel.HEADING_3,
-              spacing: { before: 200, after: 100 },
-              children: [new TextRun({ text: t, bold: true, size: 24 })],
-            }));
-            continue;
-          }
-          children.push(new Paragraph({
-            spacing: { before: 100, after: 100, line: 360 },
-            children: [new TextRun({ text: t, size: 22 })],
-          }));
+        // 章本文を段落単位（空行区切り）に分解。各段落の終わりで挿入位置とマッチング
+        const chDiagrams = byChapter[ch.key] || [];
+        const paragraphsForCh = extractParagraphs(ch.body);
+
+        // 段落 N の後に入れる図解をグルーピング
+        // grouped: { [paragraphIndex]: [diagrams ...] } 、0 = 章末
+        const grouped = { 0: [] };
+        for (let di = 0; di < chDiagrams.length; di++) {
+          const d = chDiagrams[di];
+          const pos = typeof d.position === "number" ? d.position : 0;
+          const validPos = pos > 0 && pos <= paragraphsForCh.length ? pos : 0;
+          if (!grouped[validPos]) grouped[validPos] = [];
+          grouped[validPos].push({ diagram: d, originalIndex: di });
         }
 
-        // 章末に図解を配置
-        const diagrams = byChapter[ch.key] || [];
-        for (let di = 0; di < diagrams.length; di++) {
-          const d = diagrams[di];
-          const png = await renderMermaidToPng(d.code, { scale: 2 });
-          if (!png) {
+        // 段落を順番に Paragraph 化しつつ、その段落の後に紐づく図解を挿入
+        for (let pi = 0; pi < paragraphsForCh.length; pi++) {
+          const para = paragraphsForCh[pi];
+          // 段落内の改行（複数行段落）を1段落として保持しつつ、各行を解釈
+          const lines = para.text.split(/\r?\n/);
+          for (const line of lines) {
+            const t = line.trim();
+            if (!t) {
+              children.push(new Paragraph({ children: [] }));
+              continue;
+            }
+            if (/^[（(]\s*[0-9０-９]+\s*[)）]/.test(t)) {
+              children.push(new Paragraph({
+                heading: HeadingLevel.HEADING_2,
+                spacing: { before: 240, after: 120 },
+                children: [new TextRun({ text: t, bold: true, size: 28 })],
+              }));
+              continue;
+            }
+            if (/^[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]/.test(t)) {
+              children.push(new Paragraph({
+                heading: HeadingLevel.HEADING_3,
+                spacing: { before: 200, after: 100 },
+                children: [new TextRun({ text: t, bold: true, size: 24 })],
+              }));
+              continue;
+            }
             children.push(new Paragraph({
-              spacing: { before: 200, after: 100 },
-              children: [new TextRun({ text: `[図 ${ci + 1}-${di + 1} の生成に失敗（Mermaid 構文を確認してください）]`, italics: true, color: "b52b1e", size: 20 })],
+              spacing: { before: 100, after: 100, line: 360 },
+              children: [new TextRun({ text: t, size: 22 })],
             }));
-            continue;
           }
-          // 画像サイズ：max 480px 幅に収める（scale=2 から半分にする）
-          const maxW = 480;
-          let dispW = png.width / 2;
-          let dispH = png.height / 2;
-          if (dispW > maxW) {
-            const r = maxW / dispW;
-            dispW = maxW;
-            dispH = Math.round(dispH * r);
+          // 段落間に空行を1つ入れる
+          children.push(new Paragraph({ children: [] }));
+
+          // この段落の後に挿入する図解があれば配置
+          const inserts = grouped[para.index] || [];
+          for (const { diagram: d, originalIndex } of inserts) {
+            const figLabel = `${ci + 1}-${originalIndex + 1}`;
+            const paras = await buildDiagramParagraphs(d, figLabel);
+            for (const p of paras) children.push(p);
           }
-          children.push(new Paragraph({
-            alignment: AlignmentType.CENTER,
-            spacing: { before: 240, after: 80 },
-            children: [new ImageRun({
-              data: dataUrlToUint8Array(png.dataUrl),
-              transformation: { width: dispW, height: dispH },
-            })],
-          }));
-          const caption = `図 ${ci + 1}-${di + 1}${d.caption ? `：${d.caption}` : ""}`;
-          children.push(new Paragraph({
-            alignment: AlignmentType.CENTER,
-            spacing: { before: 0, after: 200 },
-            children: [new TextRun({ text: caption, italics: true, size: 18, color: "666666" })],
-          }));
+        }
+
+        // 章末に入れる図解（position=0 または無効値）
+        const endInserts = grouped[0] || [];
+        for (const { diagram: d, originalIndex } of endInserts) {
+          const figLabel = `${ci + 1}-${originalIndex + 1}`;
+          const paras = await buildDiagramParagraphs(d, figLabel);
+          for (const p of paras) children.push(p);
         }
       }
 
@@ -646,10 +731,13 @@ const DiagramStepPage = ({ onNavigate, allSteps }) => {
           const d = diagrams[di];
           const png = await renderMermaidToPng(d.code, { scale: 2 });
           if (!png) continue;
-          const maxW = 480;
+          // min/max 幅で読みやすいサイズに調整
+          const minW = 400;
+          const maxW = 680;
           let dispW = png.width / 2;
           let dispH = png.height / 2;
-          if (dispW > maxW) { const r = maxW / dispW; dispW = maxW; dispH = Math.round(dispH * r); }
+          if (dispW < minW) { const r = minW / dispW; dispW = minW; dispH = Math.round(dispH * r); }
+          else if (dispW > maxW) { const r = maxW / dispW; dispW = maxW; dispH = Math.round(dispH * r); }
           children.push(new Paragraph({
             alignment: AlignmentType.CENTER,
             spacing: { before: 240, after: 80 },
@@ -658,7 +746,7 @@ const DiagramStepPage = ({ onNavigate, allSteps }) => {
           const caption = `図 ${ci + 1}-${di + 1}${d.caption ? `：${d.caption}` : ""}`;
           children.push(new Paragraph({
             alignment: AlignmentType.CENTER,
-            spacing: { before: 0, after: 200 },
+            spacing: { before: 0, after: 240 },
             children: [new TextRun({ text: caption, italics: true, size: 18, color: "666666" })],
           }));
           hasAny = true;
