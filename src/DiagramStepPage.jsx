@@ -141,7 +141,12 @@ function extractChapters(text) {
   return chapters;
 }
 
-// Mermaid → PNG dataURL
+// Mermaid → PNG dataURL（堅牢化版）
+// 改善ポイント:
+//   1. SVG の width/height を viewBox から復元（mermaid が省略するケース対応）
+//   2. blob URL ではなく data URL（base64エンコード）で Image にロード（CORS/汚染回避）
+//   3. encodeURIComponent + btoa の組み合わせで日本語にも対応
+//   4. 各段階で詳細ログ（失敗箇所が console に出るように）
 async function renderMermaidToPng(code, options = {}) {
   if (!code || !code.trim()) return null;
   try {
@@ -149,28 +154,87 @@ async function renderMermaidToPng(code, options = {}) {
     const mermaid = mermaidModule.default || mermaidModule;
     mermaid.initialize({ startOnLoad: false, theme: "default", securityLevel: "loose" });
     const id = `mermaid-export-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
-    const { svg } = await mermaid.render(id, code);
-    const svgBlob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
-    const svgUrl = URL.createObjectURL(svgBlob);
+    let svg;
+    try {
+      const result = await mermaid.render(id, code);
+      svg = result.svg;
+    } catch (e) {
+      console.error("[diagram] Mermaid render failed:", e);
+      return null;
+    }
+    if (!svg) {
+      console.error("[diagram] Mermaid returned empty SVG");
+      return null;
+    }
+
+    // SVG をパースして width/height を取り出す（無ければ viewBox から補う）
+    const parser = new DOMParser();
+    const svgDoc = parser.parseFromString(svg, "image/svg+xml");
+    const svgRoot = svgDoc.documentElement;
+    if (svgRoot.tagName.toLowerCase() !== "svg") {
+      console.error("[diagram] root element is not <svg>:", svgRoot.tagName);
+      return null;
+    }
+    let width = parseFloat(svgRoot.getAttribute("width") || "") || 0;
+    let height = parseFloat(svgRoot.getAttribute("height") || "") || 0;
+    if (!width || !height) {
+      const viewBox = svgRoot.getAttribute("viewBox");
+      if (viewBox) {
+        const parts = viewBox.trim().split(/\s+/);
+        if (parts.length === 4) {
+          if (!width) width = parseFloat(parts[2]) || 0;
+          if (!height) height = parseFloat(parts[3]) || 0;
+        }
+      }
+    }
+    if (!width) width = 600;
+    if (!height) height = 400;
+    // SVGに明示的に width/height を設定
+    svgRoot.setAttribute("width", String(width));
+    svgRoot.setAttribute("height", String(height));
+
+    const serializer = new XMLSerializer();
+    const svgString = serializer.serializeToString(svgRoot);
+    // 日本語などUTF-8文字を含むSVGを安全にdataURL化
+    const svgDataUrl = "data:image/svg+xml;charset=utf-8;base64," +
+      btoa(unescape(encodeURIComponent(svgString)));
+
     const img = new Image();
-    const loaded = new Promise((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = reject;
-    });
-    img.src = svgUrl;
-    await loaded;
+    try {
+      await new Promise((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = (e) => reject(new Error("SVGをImageに読み込めませんでした"));
+        img.src = svgDataUrl;
+      });
+    } catch (e) {
+      console.error("[diagram] Image load failed:", e);
+      return null;
+    }
+
     const scale = options.scale || 2;
     const canvas = document.createElement("canvas");
-    canvas.width = (img.naturalWidth || 600) * scale;
-    canvas.height = (img.naturalHeight || 400) * scale;
+    canvas.width = Math.max(1, Math.round(width * scale));
+    canvas.height = Math.max(1, Math.round(height * scale));
     const ctx = canvas.getContext("2d");
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    URL.revokeObjectURL(svgUrl);
-    return { dataUrl: canvas.toDataURL("image/png"), width: canvas.width, height: canvas.height };
+    try {
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    } catch (e) {
+      console.error("[diagram] drawImage failed:", e);
+      return null;
+    }
+
+    let dataUrl;
+    try {
+      dataUrl = canvas.toDataURL("image/png");
+    } catch (e) {
+      console.error("[diagram] toDataURL failed (canvas may be tainted):", e);
+      return null;
+    }
+    return { dataUrl, width: canvas.width, height: canvas.height };
   } catch (e) {
-    console.error("renderMermaidToPng failed:", e);
+    console.error("[diagram] renderMermaidToPng top-level failure:", e);
     return null;
   }
 }
