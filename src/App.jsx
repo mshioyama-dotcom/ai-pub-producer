@@ -6364,6 +6364,12 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           {nextStep && <BtnSecondary onClick={() => onNavigate(`step_${nextStep.num}`)} style={{ background: C.greenLight, color: C.green, border: `1px solid rgba(45,122,79,0.25)` }}>STEP{nextStep.num}へ進む →</BtnSecondary>}
           {!nextStep && <BtnSecondary onClick={() => onNavigate("saved")} style={{ background: C.greenLight, color: C.green, border: `1px solid rgba(45,122,79,0.25)` }}>完了 → 保存データを見る</BtnSecondary>}
         </div>
+        {(step.num === 6 || step.num === 7 || step.num === 8 || step.num === 9) && (
+          <div style={{ marginTop: 8, padding: "8px 12px", background: "#eef7ee", border: `1px solid rgba(45,122,79,0.25)`, borderRadius: 3, fontSize: 11.5, color: C.navyMid, lineHeight: 1.7 }}>
+            <strong>💡 「📥 Wordで保存」は出力欄の全章をまとめて出力します</strong><br />
+            各章を生成するたびに <code style={{ background: C.white, padding: "0 4px", borderRadius: 2 }}>=== 章タイトル ===</code> 区切りで出力欄に蓄積されます（同じ章タイトルは置換、新しい章は追加）。最後に「Wordで保存」を1回押せば全章まとまった .docx がダウンロードされます。各章生成のたびに必ず<strong>「出力データを保存」</strong>を押すこと（押さないと次の章生成時にロストするリスク）。詳しい使い方は<strong>「使い方」→「📥 章ごとの本文蓄積と Word 出力」</strong>を参照。
+          </div>
+        )}
       </div>
 
       {/* 外部AIで相談するためのプロンプト生成パネル（全STEP共通） */}
@@ -6572,6 +6578,56 @@ const GuidePage = ({ onNavigate }) => {
         </ol>
         <div style={{ marginTop: 8, padding: "8px 12px", background: "#eef7ee", border: `1px solid rgba(45,122,79,0.3)`, borderRadius: 3, fontSize: 12, color: C.navyMid }}>
           ✓ 確定版は<strong>STEP4 以降の全STEPの判断軸</strong>として機能します。後で気づきがあれば、各STEPの右上「📝 確定版を見直す」ボタン（STEP3 に遷移します）からいつでも編集・再保存できます（ライブドキュメント運用）。
+        </div>
+      </Section>
+
+      <Section title="📥 章ごとの本文蓄積と Word 出力（STEP6〜9）">
+        <div style={{ marginBottom: 8, fontSize: 12.5, color: C.textSub, lineHeight: 1.7 }}>
+          STEP6 目次／STEP7 章構成／STEP8 詳細プロット／STEP9 本文 は、<strong>1章ずつ生成して蓄積し、最後にまとめて Word 出力</strong>するフローです。各章を生成しても以前の章は消えません。
+        </div>
+        <div style={{ marginBottom: 8, fontSize: 12.5, color: C.text, fontWeight: 700 }}>
+          📖 基本の流れ（STEP9 本文を例に）
+        </div>
+        <ol style={{ margin: "0 0 12px 0", paddingLeft: 20, fontSize: 12.5, lineHeight: 1.8 }}>
+          <li>第1章を選んで「▶ この章の本文を生成」 → 出力欄に第1章が入る</li>
+          <li><strong>「出力データを保存」</strong>を必ず押す（押さないと次の章生成時に消えるリスク）</li>
+          <li>第2章を選んで「▶ この章の本文を生成」 → 出力欄が <strong>「第1章 + 第2章」</strong> になる（自動マージ）</li>
+          <li>「出力データを保存」を押す</li>
+          <li>第3章...と繰り返す</li>
+          <li>全章生成し終わったら <strong>「📥 Wordで保存」</strong> をクリック</li>
+          <li>確認ダイアログに「現在の出力には <strong>N 章分</strong> が含まれます」と表示される</li>
+          <li>OK → 全章まとまった .docx がダウンロードされる</li>
+        </ol>
+        <div style={{ marginBottom: 8, fontSize: 12.5, color: C.text, fontWeight: 700 }}>
+          🔄 内部の動き（章マージのロジック）
+        </div>
+        <div style={{ marginBottom: 8, fontSize: 12.5, color: C.textSub, lineHeight: 1.7 }}>
+          各章は <code style={{ background: "#eef2f7", padding: "1px 6px", borderRadius: 2, fontSize: 11.5 }}>=== 章タイトル ===</code> という区切り行とともに出力欄に蓄積されます。同じ章タイトルの章を再生成すると<strong>その章だけ置換</strong>され、他の章はそのまま残ります。並び順は本書の章順序（STEP6 目次の順）が自動で維持されます。
+        </div>
+        <div style={{ marginBottom: 8, fontSize: 12.5, color: C.text, fontWeight: 700 }}>
+          ✏️ 手で編集したいとき
+        </div>
+        <div style={{ marginBottom: 8, fontSize: 12.5, color: C.textSub, lineHeight: 1.7 }}>
+          出力欄は <strong>textarea で直接編集可能</strong>です。AI生成後に気に入らない箇所を直接書き換え → 「出力データを保存」 → そのまま Word 出力で OK。<strong>「Wordで保存」は現在 textarea に表示されている内容</strong>（編集中の内容含む）が反映されます。
+        </div>
+        <div style={{ marginTop: 12, padding: "10px 12px", background: "#fff8e1", border: `1px solid ${C.gold}`, borderRadius: 3, fontSize: 12, color: C.navyMid, lineHeight: 1.7 }}>
+          <strong>⚠️ ハマりやすい注意点</strong>
+          <ul style={{ margin: "4px 0 0 0", paddingLeft: 18 }}>
+            <li><strong>「出力データを保存」忘れ</strong>：章を生成しただけだとブラウザ閉じたら消えます。各章生成のたびに必ず保存ボタン</li>
+            <li><strong>同じ章を再生成すると以前の手編集は消える</strong>：再生成 = その章を AI 新出力で上書き</li>
+            <li><strong>章タイトルを手で変えると別章扱い</strong>：「第1章 ◯◯」を「序章 ◯◯」に変えると、次の AI 生成時には別の章として追加される</li>
+            <li><strong>Word出力は現在表示中の内容</strong>：textarea で編集中の未保存内容も Word に反映されます（逆にブラウザ閉じる前に「出力データを保存」推奨）</li>
+          </ul>
+        </div>
+        <div style={{ marginTop: 10, padding: "10px 12px", background: "#eef7ee", border: `1px solid rgba(45,122,79,0.3)`, borderRadius: 3, fontSize: 12, color: C.navyMid, lineHeight: 1.7 }}>
+          <strong>💡 出力された Word の中身</strong>
+          <ul style={{ margin: "4px 0 0 0", paddingLeft: 18 }}>
+            <li>章タイトル → <strong>見出し1</strong>（章ごとに自動改ページ）</li>
+            <li>節（(1)(2)(3)） → <strong>見出し2</strong></li>
+            <li>項（①②③） → <strong>見出し3</strong></li>
+            <li>通常段落 → 本文（行間1.5、Yu Gothic、A4 余白2cm）</li>
+            <li>「参考資料」→「目次」で目次の自動生成も可能</li>
+          </ul>
         </div>
       </Section>
 
