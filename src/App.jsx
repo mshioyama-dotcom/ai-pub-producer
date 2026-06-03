@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { extractTextFromFile, buildSourceText, ACCEPTED_EXTENSIONS } from "./utils/extractText";
 import { extractBookEssence, formatEssenceAsText } from "./utils/extractEssence";
 import DiscussionPanel from "./DiscussionPanel";
+import MermaidPromptPanel from "./MermaidPromptPanel";
 
 // ============================================================
 // デザイントークン（ネイビー × ゴールド × ホワイト）
@@ -6394,6 +6395,17 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         interviewNotes={(step.num === 6 || step.num === 7 || step.num === 8) ? ((allSteps?.[4]?.outputText) || "").trim() : ""}
       />
 
+      {/* 図解化案を作る用プロンプト生成パネル（本文系STEPのみ：STEP6〜9） */}
+      {(step.num === 6 || step.num === 7 || step.num === 8 || step.num === 9) && (
+        <MermaidPromptPanel
+          stepNum={step.num}
+          stepName={step.title}
+          bodyText={outputText}
+          authorProfile={getAutoInjectedProfiles().author_profile || ""}
+          workProfile={extractDiscussionContext(getAutoInjectedProfiles().work_profile || "")}
+        />
+      )}
+
       {/* STEP5（タイトル・サブタイトル）専用：採用案を確定する UI（相談機能の後に配置） */}
       {step.num === 5 && <Step4ConfirmPanel outputText={outputText} />}
 
@@ -6578,6 +6590,24 @@ const GuidePage = ({ onNavigate }) => {
         </ol>
         <div style={{ marginTop: 8, padding: "8px 12px", background: "#eef7ee", border: `1px solid rgba(45,122,79,0.3)`, borderRadius: 3, fontSize: 12, color: C.navyMid }}>
           ✓ 確定版は<strong>STEP4 以降の全STEPの判断軸</strong>として機能します。後で気づきがあれば、各STEPの右上「📝 確定版を見直す」ボタン（STEP3 に遷移します）からいつでも編集・再保存できます（ライブドキュメント運用）。
+        </div>
+      </Section>
+
+      <Section title="🎨 図解化案を作る（STEP6〜9・外部AI連携）">
+        <div style={{ marginBottom: 8, fontSize: 12.5, color: C.textSub, lineHeight: 1.7 }}>
+          本文に図解を入れたい場合の運用フローです。サーバ側で図解を生成・埋め込みすると Word のサイズ調整がうまくいかないため、<strong>外部AI（ChatGPT / Claude / Gemini）と mermaid.live を組み合わせる方式</strong>に統一しました。
+        </div>
+        <ol style={{ margin: 0, paddingLeft: 20, fontSize: 12.5, lineHeight: 1.8 }}>
+          <li>STEP6〜9 の出力欄の下にある <strong>「🎨 図解化案を作る用プロンプトを取得（外部AI用）」</strong>を開く</li>
+          <li>「📋 プロンプトをコピー」をクリック</li>
+          <li>ChatGPT / Claude.ai / Gemini に貼り付け（どれも無料アカウントでOK）</li>
+          <li>図解化すべき箇所 <strong>3〜5案</strong> と各案の Mermaid 記法が返ってくる</li>
+          <li>気に入った案の Mermaid 記法を <a href="https://mermaid.live/" target="_blank" rel="noreferrer" style={{ color: C.gold, fontWeight: 700 }}>mermaid.live</a> に貼り付け → プレビュー</li>
+          <li>「Actions」→「PNG」でダウンロード</li>
+          <li>Word の該当箇所に画像として貼り付け → サイズ・位置調整</li>
+        </ol>
+        <div style={{ marginTop: 8, padding: "8px 12px", background: "#eef7ee", border: `1px solid rgba(45,122,79,0.3)`, borderRadius: 3, fontSize: 12, color: C.navyMid, lineHeight: 1.7 }}>
+          ✓ <strong>このフローのメリット</strong>：API キー不要・無料・図解サイズ自由・mermaid.live のプレビューで事前確認できる
         </div>
       </Section>
 
