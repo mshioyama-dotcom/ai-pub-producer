@@ -5,7 +5,6 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { extractTextFromFile, buildSourceText, ACCEPTED_EXTENSIONS } from "./utils/extractText";
 import { extractBookEssence, formatEssenceAsText } from "./utils/extractEssence";
 import DiscussionPanel from "./DiscussionPanel";
-import MermaidPromptPanel from "./MermaidPromptPanel";
 
 // ============================================================
 // デザイントークン（ネイビー × ゴールド × ホワイト）
@@ -6332,43 +6331,49 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           </BtnSecondary>
           {saveOutputMsg === "copy_html" && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 書式付きでコピーしました（Wordに貼り付けて見出しスタイルが反映されます）</span>}
           {saveOutputMsg === "copy_html_err" && <span style={{ fontSize: 12, color: C.red, fontWeight: 600 }}>⚠ 書式付きコピーに失敗しました（平文だけコピーされました）</span>}
-          <BtnSecondary
-            onClick={async () => {
-              if (!outputText || !outputText.trim()) return;
-              const blocks = parseOutputForDocx(outputText);
-              const chapterCount = countChapters(blocks);
-              const msg = chapterCount > 0
-                ? `現在の出力には ${chapterCount} 章分が含まれます。Word ファイル（.docx）として保存しますか？`
-                : "現在の出力内容を Word ファイル（.docx）として保存しますか？";
-              if (!window.confirm(msg)) return;
-              try {
-                setSaveOutputMsg("docx_busy");
-                const blob = await generateDocxBlob(outputText, step.num, step.title);
-                const filename = `AI出版_STEP${step.num}_${(step.title || "").replace(/[\\\/:*?"<>|]/g, "")}_${timestampForFilename()}.docx`;
-                downloadBlob(blob, filename);
-                setSaveOutputMsg("docx_ok");
-                setTimeout(() => setSaveOutputMsg(false), 2500);
-              } catch (e) {
-                console.error("docx生成失敗:", e);
-                setSaveOutputMsg("docx_err");
-                setTimeout(() => setSaveOutputMsg(false), 3000);
-              }
-            }}
-            style={{ fontSize: 13 }}
-            title="現在の出力内容を Word ファイル（.docx）としてダウンロードします。章・節・項が見出しスタイルで整形されます"
-          >
-            📥 Wordで保存
-          </BtnSecondary>
-          {saveOutputMsg === "docx_busy" && <span style={{ fontSize: 12, color: C.navy, fontWeight: 600 }}>⏳ Wordファイル生成中…</span>}
-          {saveOutputMsg === "docx_ok" && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ .docx をダウンロードしました</span>}
-          {saveOutputMsg === "docx_err" && <span style={{ fontSize: 12, color: C.red, fontWeight: 600 }}>⚠ Word保存に失敗しました。再度お試しください</span>}
+          {/* Word保存ボタン：STEP6/7/8（目次・章構成・詳細プロットの設計段階）は中間成果物なので非表示。
+              STEP9（本文）など実際にWordに残したい出力でのみ表示。 */}
+          {step.num !== 6 && step.num !== 7 && step.num !== 8 && (
+            <>
+              <BtnSecondary
+                onClick={async () => {
+                  if (!outputText || !outputText.trim()) return;
+                  const blocks = parseOutputForDocx(outputText);
+                  const chapterCount = countChapters(blocks);
+                  const msg = chapterCount > 0
+                    ? `現在の出力には ${chapterCount} 章分が含まれます。Word ファイル（.docx）として保存しますか？`
+                    : "現在の出力内容を Word ファイル（.docx）として保存しますか？";
+                  if (!window.confirm(msg)) return;
+                  try {
+                    setSaveOutputMsg("docx_busy");
+                    const blob = await generateDocxBlob(outputText, step.num, step.title);
+                    const filename = `AI出版_STEP${step.num}_${(step.title || "").replace(/[\\\/:*?"<>|]/g, "")}_${timestampForFilename()}.docx`;
+                    downloadBlob(blob, filename);
+                    setSaveOutputMsg("docx_ok");
+                    setTimeout(() => setSaveOutputMsg(false), 2500);
+                  } catch (e) {
+                    console.error("docx生成失敗:", e);
+                    setSaveOutputMsg("docx_err");
+                    setTimeout(() => setSaveOutputMsg(false), 3000);
+                  }
+                }}
+                style={{ fontSize: 13 }}
+                title="現在の出力内容を Word ファイル（.docx）としてダウンロードします。章・節・項が見出しスタイルで整形されます"
+              >
+                📥 Wordで保存
+              </BtnSecondary>
+              {saveOutputMsg === "docx_busy" && <span style={{ fontSize: 12, color: C.navy, fontWeight: 600 }}>⏳ Wordファイル生成中…</span>}
+              {saveOutputMsg === "docx_ok" && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ .docx をダウンロードしました</span>}
+              {saveOutputMsg === "docx_err" && <span style={{ fontSize: 12, color: C.red, fontWeight: 600 }}>⚠ Word保存に失敗しました。再度お試しください</span>}
+            </>
+          )}
           {nextStep && <BtnSecondary onClick={() => onNavigate(`step_${nextStep.num}`)} style={{ background: C.greenLight, color: C.green, border: `1px solid rgba(45,122,79,0.25)` }}>STEP{nextStep.num}へ進む →</BtnSecondary>}
           {!nextStep && <BtnSecondary onClick={() => onNavigate("saved")} style={{ background: C.greenLight, color: C.green, border: `1px solid rgba(45,122,79,0.25)` }}>完了 → 保存データを見る</BtnSecondary>}
         </div>
-        {(step.num === 6 || step.num === 7 || step.num === 8 || step.num === 9) && (
+        {step.num === 9 && (
           <div style={{ marginTop: 8, padding: "8px 12px", background: "#eef7ee", border: `1px solid rgba(45,122,79,0.25)`, borderRadius: 3, fontSize: 11.5, color: C.navyMid, lineHeight: 1.7 }}>
             <strong>💡 「📥 Wordで保存」は出力欄の全章をまとめて出力します</strong><br />
-            各章を生成するたびに <code style={{ background: C.white, padding: "0 4px", borderRadius: 2 }}>=== 章タイトル ===</code> 区切りで出力欄に蓄積されます（同じ章タイトルは置換、新しい章は追加）。最後に「Wordで保存」を1回押せば全章まとまった .docx がダウンロードされます。各章生成のたびに必ず<strong>「出力データを保存」</strong>を押すこと（押さないと次の章生成時にロストするリスク）。詳しい使い方は<strong>「使い方」→「📥 章ごとの本文蓄積と Word 出力」</strong>を参照。
+            各章を生成するたびに <code style={{ background: C.white, padding: "0 4px", borderRadius: 2 }}>=== 章タイトル ===</code> 区切りで出力欄に蓄積されます（同じ章タイトルは置換、新しい章は追加）。最後に「Wordで保存」を1回押せば全章まとまった .docx がダウンロードされます。各章生成のたびに必ず<strong>「出力データを保存」</strong>を押すこと（押さないと次の章生成時にロストするリスク）。詳しい使い方は<strong>「使い方」→「📥 STEP9 本文の章蓄積と Word 出力」</strong>を参照。
           </div>
         )}
       </div>
@@ -6394,17 +6399,6 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
         confirmedSubtitle={step.num >= 6 ? (getAutoInjectedProfiles().subtitle || "") : ""}
         interviewNotes={(step.num === 6 || step.num === 7 || step.num === 8) ? ((allSteps?.[4]?.outputText) || "").trim() : ""}
       />
-
-      {/* 図解化案を作る用プロンプト生成パネル（本文系STEPのみ：STEP6〜9） */}
-      {(step.num === 6 || step.num === 7 || step.num === 8 || step.num === 9) && (
-        <MermaidPromptPanel
-          stepNum={step.num}
-          stepName={step.title}
-          bodyText={outputText}
-          authorProfile={getAutoInjectedProfiles().author_profile || ""}
-          workProfile={extractDiscussionContext(getAutoInjectedProfiles().work_profile || "")}
-        />
-      )}
 
       {/* STEP5（タイトル・サブタイトル）専用：採用案を確定する UI（相談機能の後に配置） */}
       {step.num === 5 && <Step4ConfirmPanel outputText={outputText} />}
@@ -6593,30 +6587,85 @@ const GuidePage = ({ onNavigate }) => {
         </div>
       </Section>
 
-      <Section title="🎨 図解化案を作る（STEP6〜9・外部AI連携）">
-        <div style={{ marginBottom: 8, fontSize: 12.5, color: C.textSub, lineHeight: 1.7 }}>
-          本文に図解を入れたい場合の運用フローです。サーバ側で図解を生成・埋め込みすると Word のサイズ調整がうまくいかないため、<strong>外部AI（ChatGPT / Claude / Gemini）と mermaid.live を組み合わせる方式</strong>に統一しました。
+      <Section title="🤖 外部AIと相談する（全STEP共通・最重要機能）">
+        <div style={{ marginBottom: 10, fontSize: 12.5, color: C.textSub, lineHeight: 1.7 }}>
+          各STEPの出力欄の下にある <strong>「📋 外部AIで相談する用プロンプトを取得」</strong>パネルは、ChatGPT / Claude / Gemini などの外部AIに、現在のSTEP出力を「専門家視点で評価してもらう」ためのプロンプトを生成する機能です。AI出版プロデューサーの<strong>品質を担保する核となる機能</strong>なので、各STEPで必ず使うことをおすすめします。
         </div>
-        <ol style={{ margin: 0, paddingLeft: 20, fontSize: 12.5, lineHeight: 1.8 }}>
-          <li>STEP6〜9 の出力欄の下にある <strong>「🎨 図解化案を作る用プロンプトを取得（外部AI用）」</strong>を開く</li>
-          <li>「📋 プロンプトをコピー」をクリック</li>
-          <li>ChatGPT / Claude.ai / Gemini に貼り付け（どれも無料アカウントでOK）</li>
-          <li>図解化すべき箇所 <strong>3〜5案</strong> と各案の Mermaid 記法が返ってくる</li>
-          <li>気に入った案の Mermaid 記法を <a href="https://mermaid.live/" target="_blank" rel="noreferrer" style={{ color: C.gold, fontWeight: 700 }}>mermaid.live</a> に貼り付け → プレビュー</li>
-          <li>「Actions」→「PNG」でダウンロード</li>
-          <li>Word の該当箇所に画像として貼り付け → サイズ・位置調整</li>
+
+        <div style={{ marginBottom: 8, fontSize: 12.5, color: C.text, fontWeight: 700 }}>
+          📖 基本の流れ
+        </div>
+        <ol style={{ margin: "0 0 12px 0", paddingLeft: 20, fontSize: 12.5, lineHeight: 1.8 }}>
+          <li>STEPの実行ボタンで本文を生成</li>
+          <li><strong>「出力データを保存」</strong>を押す</li>
+          <li><strong>「📋 外部AIで相談する用プロンプトを取得」</strong>パネルを「▼ 開く」</li>
+          <li><strong>「📋 プロンプトをコピー」</strong>をクリック</li>
+          <li>ChatGPT / Claude / Gemini を別タブで開き、貼り付け</li>
+          <li>AIから返ってくる評価を読む</li>
+          <li>合格判定なら次のSTEPへ／不合格なら修正版を取り込む（下記）</li>
         </ol>
-        <div style={{ marginTop: 8, padding: "8px 12px", background: "#eef7ee", border: `1px solid rgba(45,122,79,0.3)`, borderRadius: 3, fontSize: 12, color: C.navyMid, lineHeight: 1.7 }}>
-          ✓ <strong>このフローのメリット</strong>：API キー不要・無料・図解サイズ自由・mermaid.live のプレビューで事前確認できる
+
+        <div style={{ marginBottom: 8, fontSize: 12.5, color: C.text, fontWeight: 700 }}>
+          🎯 プロンプトの中身（自動で組み立てられる）
+        </div>
+        <ul style={{ margin: "0 0 12px 0", paddingLeft: 18, fontSize: 12.5, lineHeight: 1.7 }}>
+          <li><strong>STEP専用の核観点 6〜7個</strong>での厳格な評価指示（読者像の一貫性／差別化／コア・ベネフィット／KDP規約 など、STEPごとに最適化）</li>
+          <li><strong>著者プロファイル</strong>（自動注入）</li>
+          <li><strong>書籍プロファイル確定版</strong>（自動注入・STEP3で確定したもの）</li>
+          <li><strong>そのSTEPの現在の出力本文</strong></li>
+          <li>STEPに応じて：<strong>選定キーワード</strong>（STEP5）／<strong>確定タイトル・サブタイトル</strong>（STEP6以降）／<strong>インタビュー要約</strong>（STEP6/7/8）</li>
+          <li><strong>検知補助線テスト</strong>（観点を見落とさない追加チェック手順）</li>
+          <li><strong>合格判定ルール</strong>（致命的0個＋△1個以下なら即合格・修正版は出さない）</li>
+          <li><strong>1回完結原則</strong>（2回目以降のレビューで新規△を出さない・前回✓を△に変えない）</li>
+        </ul>
+
+        <div style={{ marginBottom: 8, fontSize: 12.5, color: C.text, fontWeight: 700 }}>
+          ✅ 合格判定が出たケース
+        </div>
+        <div style={{ marginBottom: 12, fontSize: 12.5, color: C.textSub, lineHeight: 1.7 }}>
+          AIが「<strong>✅ 合格：このまま次STEPへ進んでOK</strong>」と1〜2行で終わる。修正版や確認質問は出ない。AIが過剰に指摘を増やさないよう「合格に倒すバイアス」がプロンプトに組み込まれています。
+        </div>
+
+        <div style={{ marginBottom: 8, fontSize: 12.5, color: C.text, fontWeight: 700 }}>
+          ⚠ 不合格（修正版を取り込む手順）
+        </div>
+        <ol style={{ margin: "0 0 12px 0", paddingLeft: 20, fontSize: 12.5, lineHeight: 1.8 }}>
+          <li>AIが <strong>致命的問題</strong>と <strong>各観点の評価</strong>を出す</li>
+          <li>必要なら <strong>事実確認の質問</strong>が並ぶ（一括で回答すると、まとめて反映してくれる）</li>
+          <li>回答すると、修正版本文が <code style={{ background: C.navyLight, padding: "1px 6px", borderRadius: 2 }}>{`<<<出力データ>>>`}</code> 〜 <code style={{ background: C.navyLight, padding: "1px 6px", borderRadius: 2 }}>{`<<<出力データここまで>>>`}</code> で囲まれて出力される</li>
+          <li>そのマーカー内の本文を<strong>全選択コピー</strong></li>
+          <li>ai-pub-producer の出力欄を全選択 → 削除 → コピーした修正版を貼り付け</li>
+          <li><strong>「出力データを保存」</strong>を押す</li>
+          <li>必要なら同じAIに「<strong>もう一度レビューして</strong>」と言う → 改善されていれば ✓ 合格判定</li>
+        </ol>
+
+        <div style={{ marginBottom: 8, fontSize: 12.5, color: C.text, fontWeight: 700 }}>
+          🤝 おすすめの外部AI
+        </div>
+        <ul style={{ margin: "0 0 12px 0", paddingLeft: 18, fontSize: 12.5, lineHeight: 1.7 }}>
+          <li><strong>Claude.ai</strong>（<a href="https://claude.ai/" target="_blank" rel="noreferrer" style={{ color: C.gold, fontWeight: 700 }}>claude.ai</a>）：長文評価が得意。批判的レビューが鋭い。プロンプトの「率直に・建前抜きで」指示が効きやすい</li>
+          <li><strong>ChatGPT</strong>（<a href="https://chatgpt.com/" target="_blank" rel="noreferrer" style={{ color: C.gold, fontWeight: 700 }}>chatgpt.com</a>）：全般的にバランス良い。無料枠でも GPT-4o レベルで使える</li>
+          <li><strong>Gemini</strong>（<a href="https://gemini.google.com/" target="_blank" rel="noreferrer" style={{ color: C.gold, fontWeight: 700 }}>gemini.google.com</a>）：無料枠が広い。何度も相談する用</li>
+        </ul>
+
+        <div style={{ padding: "10px 12px", background: "#eef7ee", border: `1px solid rgba(45,122,79,0.3)`, borderRadius: 3, fontSize: 12, color: C.navyMid, lineHeight: 1.7 }}>
+          ✓ <strong>このフローの強み</strong>：
+          <ul style={{ margin: "4px 0 0 0", paddingLeft: 18 }}>
+            <li>API キー不要・無料（外部AIの無料枠で十分）</li>
+            <li>各STEP「専用の核観点」が自動で組み込まれるので、AI が方向違いの評価をしない</li>
+            <li>「合格バイアス」と「1回完結原則」で、際限なく修正を要求する構造的バイアスを抑制</li>
+            <li>修正版が <code>{`<<<出力データ>>>`}</code> マーカー付きで返るので、コピペが正確</li>
+          </ul>
         </div>
       </Section>
 
-      <Section title="📥 章ごとの本文蓄積と Word 出力（STEP6〜9）">
+      <Section title="📥 STEP9 本文の章蓄積と Word 出力">
         <div style={{ marginBottom: 8, fontSize: 12.5, color: C.textSub, lineHeight: 1.7 }}>
-          STEP6 目次／STEP7 章構成／STEP8 詳細プロット／STEP9 本文 は、<strong>1章ずつ生成して蓄積し、最後にまとめて Word 出力</strong>するフローです。各章を生成しても以前の章は消えません。
+          <strong>STEP9 本文作成</strong>は、1章ずつ生成して出力欄に蓄積し、全章揃ってから1回まとめて Word 出力するフローです。各章を生成しても以前の章は消えません。<br />
+          ※ STEP6 目次／STEP7 章構成／STEP8 詳細プロット は本文作成の<strong>設計段階</strong>のSTEPなので Word 出力ボタンはありません（本文Wordに集約する設計）。
         </div>
         <div style={{ marginBottom: 8, fontSize: 12.5, color: C.text, fontWeight: 700 }}>
-          📖 基本の流れ（STEP9 本文を例に）
+          📖 基本の流れ
         </div>
         <ol style={{ margin: "0 0 12px 0", paddingLeft: 20, fontSize: 12.5, lineHeight: 1.8 }}>
           <li>第1章を選んで「▶ この章の本文を生成」 → 出力欄に第1章が入る</li>
