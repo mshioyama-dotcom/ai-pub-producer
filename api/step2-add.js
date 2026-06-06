@@ -32,7 +32,7 @@
 //   }
 //
 // 必要な環境変数:
-//   - DIFY_API_KEY_STEP02B  (スコア判定ワークフロー)
+//   - DIFY_API_KEY_STEP2B  (スコア判定ワークフロー)
 //   - RAPIDAPI_KEY
 //   - RAPIDAPI_HOST (任意)
 //
@@ -215,12 +215,12 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const difyKeyB = process.env.DIFY_API_KEY_STEP02B;
+  const difyKeyB = process.env.DIFY_API_KEY_STEP2B;
   const rapidApiKey = process.env.RAPIDAPI_KEY;
   const rapidApiHost = process.env.RAPIDAPI_HOST || RAPIDAPI_DEFAULT_HOST;
 
   const missingEnv = [];
-  if (!difyKeyB) missingEnv.push("DIFY_API_KEY_STEP02B");
+  if (!difyKeyB) missingEnv.push("DIFY_API_KEY_STEP2B");
   if (!rapidApiKey) missingEnv.push("RAPIDAPI_KEY");
   if (missingEnv.length > 0) {
     return res.status(500).json({

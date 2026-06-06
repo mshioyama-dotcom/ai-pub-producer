@@ -24,7 +24,7 @@
 //   }
 //
 // 必要な環境変数:
-//   - DIFY_API_KEY_STEP_CONFIRM           (書籍プロファイル確定 Dify ワークフロー)
+//   - DIFY_API_KEY_STEP3_CONFIRM           (書籍プロファイル確定 Dify ワークフロー)
 
 const DIFY_API_BASE = "https://api.dify.ai/v1";
 
@@ -182,11 +182,11 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const difyKey = process.env.DIFY_API_KEY_STEP_CONFIRM;
+  const difyKey = process.env.DIFY_API_KEY_STEP3_CONFIRM;
   if (!difyKey) {
     return res.status(500).json({
-      error: "DIFY_API_KEY_STEP_CONFIRM が未設定です。Vercelの環境変数に確定アクション用Difyワークフローの APIキー を追加してください。",
-      missingEnv: ["DIFY_API_KEY_STEP_CONFIRM"],
+      error: "DIFY_API_KEY_STEP3_CONFIRM が未設定です。Vercelの環境変数に確定アクション用Difyワークフローの APIキー を追加してください。",
+      missingEnv: ["DIFY_API_KEY_STEP3_CONFIRM"],
     });
   }
 

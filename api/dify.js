@@ -1,39 +1,34 @@
 // Vercel Serverless Function - Dify API Proxy
 const DIFY_API_BASE = "https://api.dify.ai/v1";
 
-// v4改修(2026-05): 番号繰り上げ後の対応表
-//   旧STEP3 (エピソードインタビュー)   → 新STEP4
-//   旧STEP4 (タイトル・サブタイトル)   → 新STEP5
-//   旧STEP5 (目次作成)                 → 新STEP6
-//   旧STEP6 (章構成作成)               → 新STEP7
-//   旧STEP7 (詳細プロット作成)         → 新STEP8
-//   旧STEP8 (本文作成)                 → 新STEP9
-//   旧STEP9 (Amazon説明文作成)         → 新STEP10
+// v5改修(2026-06): env var 名を新 STEP 番号に統一（クリーン化）
+//   旧 DIFY_API_KEY_STEP00_A → DIFY_API_KEY_STEP0
+//   旧 DIFY_API_KEY_STEP01   → DIFY_API_KEY_STEP1
+//   旧 DIFY_API_KEY_STEP03   → DIFY_API_KEY_STEP4  (チャット型: api/dify-chat.js 側)
+//   旧 DIFY_API_KEY_STEP04   → DIFY_API_KEY_STEP5
+//   旧 DIFY_API_KEY_STEP05   → DIFY_API_KEY_STEP6
+//   旧 DIFY_API_KEY_STEP06   → DIFY_API_KEY_STEP7
+//   旧 DIFY_API_KEY_STEP07   → DIFY_API_KEY_STEP8
+//   旧 DIFY_API_KEY_STEP08   → DIFY_API_KEY_STEP9
+//   旧 DIFY_API_KEY_STEP09   → DIFY_API_KEY_STEP10
 // 新STEP2 (キーワード絞り込み) と 新STEP3 (競合レビュー評価) は本ファイルを通らず
-// api/step2.js / api/step3.js (実装は優先度3後半) でそれぞれ専用フローを呼ぶ。
-//
-// 既存の DIFY_API_KEY_STEP03〜09 はそのまま流用する設計（中身のDify workflowは変更不要）。
-// 新STEP4のリクエストが来たら DIFY_API_KEY_STEP03 を使う、というシフトを resolveApiKey で吸収する。
+// api/step2.js / api/step3.js でそれぞれ専用フローを呼ぶ。
+// 新STEP4 (チャット型 エピソードインタビュー) は api/dify-chat.js 側。
 const API_KEYS = {
-  0:  process.env.DIFY_API_KEY_STEP00_A,
-  1:  process.env.DIFY_API_KEY_STEP01,
-  2:  process.env.DIFY_API_KEY_STEP02,   // 旧STEP2(廃止)・新STEP2はapi/step2.js経由なので未使用
-  3:  process.env.DIFY_API_KEY_STEP03,   // 旧STEP3 エピソード - 新STEP4 用に流用
-  4:  process.env.DIFY_API_KEY_STEP04,   // 旧STEP4 タイトル - 新STEP5 用に流用
-  5:  process.env.DIFY_API_KEY_STEP05,   // 旧STEP5 目次 - 新STEP6 用に流用
-  6:  process.env.DIFY_API_KEY_STEP06,   // 旧STEP6 章構成 - 新STEP7 用に流用
-  7:  process.env.DIFY_API_KEY_STEP07,   // 旧STEP7 プロット - 新STEP8 用に流用
-  8:  process.env.DIFY_API_KEY_STEP08,   // 旧STEP8 本文 - 新STEP9 用に流用
-  9:  process.env.DIFY_API_KEY_STEP09,   // 旧STEP9 Amazon説明文 - 新STEP10 用に流用
-  11: process.env.DIFY_API_KEY_STEP11,   // 新STEP11 X投稿生成（新規ワークフロー）
+  0:  process.env.DIFY_API_KEY_STEP0,    // STEP0  著者プロファイル
+  1:  process.env.DIFY_API_KEY_STEP1,    // STEP1  書籍プロファイル草案
+  5:  process.env.DIFY_API_KEY_STEP5,    // STEP5  タイトル・サブタイトル
+  6:  process.env.DIFY_API_KEY_STEP6,    // STEP6  目次
+  7:  process.env.DIFY_API_KEY_STEP7,    // STEP7  章構成
+  8:  process.env.DIFY_API_KEY_STEP8,    // STEP8  詳細プロット
+  9:  process.env.DIFY_API_KEY_STEP9,    // STEP9  本文
+  10: process.env.DIFY_API_KEY_STEP10,   // STEP10 Amazon説明文
+  11: process.env.DIFY_API_KEY_STEP11,   // STEP11 X投稿生成
 };
 
-// 新stepNum → 使用する API Key を解決する
-// 新STEP4〜10 のリクエストは旧キー3〜9 にルーティング、新STEP11 以降は独自キー
+// 新stepNum → 使用する API Key を解決する（env var 名が新STEP番号に揃ったので単純なテーブル参照）
 function resolveApiKey(newStepNum) {
-  if (newStepNum <= 3) return API_KEYS[newStepNum];
-  if (newStepNum >= 11) return API_KEYS[newStepNum];
-  return API_KEYS[newStepNum - 1];
+  return API_KEYS[newStepNum];
 }
 
 function mapInputs(stepNum, inputs) {
