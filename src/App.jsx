@@ -6814,6 +6814,24 @@ export default function App() {
   stepStatuses[0] = (typeof window !== "undefined" && (localStorage.getItem(AUTHOR_PROFILE_KEY) || "").trim())
     ? "completed"
     : "not_started";
+  // v6 fix: STEP1〜3 は専用ページ（Step1Page/Step2Page/Step3Page）が独自に localStorage に保存するため、
+  // allSteps[i].status が更新されない。STEP0 と同じパターンで、対応する localStorage キーの有無で判定する。
+  // - STEP1: 書籍プロファイル草案（WORK_PROFILE_KEY）
+  // - STEP2: 選定キーワード（STEP2_SELECTED_KEYWORDS_KEY が空配列以外）
+  // - STEP3: 書籍プロファイル確定版（WORK_PROFILE_CONFIRMED_KEY）
+  if (typeof window !== "undefined") {
+    const wpDraft = (localStorage.getItem(WORK_PROFILE_KEY) || "").trim();
+    if (wpDraft) stepStatuses[1] = "completed";
+
+    try {
+      const rawKw = localStorage.getItem(STEP2_SELECTED_KEYWORDS_KEY);
+      const kws = rawKw ? JSON.parse(rawKw) : [];
+      if (Array.isArray(kws) && kws.length > 0) stepStatuses[2] = "completed";
+    } catch { /* noop */ }
+
+    const wpConfirmed = (localStorage.getItem(WORK_PROFILE_CONFIRMED_KEY) || "").trim();
+    if (wpConfirmed) stepStatuses[3] = "completed";
+  }
 
   const [pendingInputs, setPendingInputs] = useState({});
   const [refPanel, setRefPanel] = useState(null);
