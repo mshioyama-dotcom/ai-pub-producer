@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 //     将来的に App.jsx を import に切り替えてシングルソース化したい（ただし大型ファイルのため段階的に実施）。
 import { extractTextFromFile, buildSourceText, ACCEPTED_EXTENSIONS } from "./utils/extractText";
 import { extractBookEssence, formatEssenceAsText } from "./utils/extractEssence";
+import { hashInputs, readCache, writeCache, formatCacheAge } from "./utils/cache";
 import DiscussionPanel from "./DiscussionPanel";
 
 // ============================================================
@@ -295,16 +296,26 @@ const RETURN_FEEDBACK_KEY = "aipub:return_feedback";
 // v4新規：新STEP2「キーワード絞り込み」の分析結果（api/step2 の戻り値そのまま）
 // 形式: { keywords, market_data, scored, judgment_text, ai_recommendation, return_feedback_for_step1, warnings }
 const STEP2_ANALYSIS_KEY = "aipub:step2_analysis";
+// Task#9：STEP2 分析結果の入力ハッシュ付きキャッシュ（src/utils/cache.js）。
+// 同じ入力（草案＋著者プロファイル＋出版ゴール）なら API を叩かずキャッシュから復元し、
+// RapidAPI 消費を削減する。形式: { hash, cachedAt, data }（TTL 7日）。
+const STEP2_CACHE_KEY = "aipub:step2_cache";
 // v4新規：新STEP2で著者が選定したキーワード（1〜2個）。STEP3 と確定アクションへ引き渡す。
 const STEP2_SELECTED_KEYWORDS_KEY = "aipub:step2_selected_keywords";
 // v4新規：新STEP3「競合レビュー評価」の分析結果（api/step3 の戻り値そのまま）
 // 形式: { analyzed_books, analysis_text, ai_recommendation, differentiation_count, return_feedback_for_step1, warnings }
 const STEP3_ANALYSIS_KEY = "aipub:step3_analysis";
+// Task#9：STEP3 分析結果の入力ハッシュ付きキャッシュ（src/utils/cache.js、TTL7日）。
+// 入力（草案＋著者プロファイル＋出版ゴール＋選定キーワード＋上位本ASIN）が同じなら API を叩かず復元。
+const STEP3_CACHE_KEY = "aipub:step3_cache";
 
 // STEP12 出版状況分析: 入力（ASIN・KDP手動データ・キャンペーン）と分析結果を保存
 // 形式: { asin, kdp_manual_data, campaign_notes, product_snapshot, review_summary, analysis_text, ai_recommendation, warnings }
 const STEP12_INPUTS_KEY = "aipub:step12_inputs";
 const STEP12_ANALYSIS_KEY = "aipub:step12_analysis";
+// Task#9：STEP12 分析結果の入力ハッシュ付きキャッシュ（src/utils/cache.js、TTL7日）。
+// 入力（ASIN＋KDP手動データ＋キャンペーン＋著者プロファイル＋書籍プロファイル確定版）が同じなら API を叩かず復元。
+const STEP12_CACHE_KEY = "aipub:step12_cache";
 
 // STEP13 著者プロファイル更新: 入力（振り返りコメント）と結果（著者プロファイル更新版・次回作テーマ候補）を保存
 const STEP13_INPUTS_KEY = "aipub:step13_inputs";
@@ -566,10 +577,13 @@ async function resetAllData() {
     localStorage.removeItem(STEP2_INPUTS_KEY);
     localStorage.removeItem(RETURN_FEEDBACK_KEY);
     localStorage.removeItem(STEP2_ANALYSIS_KEY);
+    localStorage.removeItem(STEP2_CACHE_KEY);
     localStorage.removeItem(STEP2_SELECTED_KEYWORDS_KEY);
     localStorage.removeItem(STEP3_ANALYSIS_KEY);
+    localStorage.removeItem(STEP3_CACHE_KEY);
     localStorage.removeItem(STEP12_INPUTS_KEY);
     localStorage.removeItem(STEP12_ANALYSIS_KEY);
+    localStorage.removeItem(STEP12_CACHE_KEY);
     localStorage.removeItem(STEP13_INPUTS_KEY);
     localStorage.removeItem(STEP13_RESULT_KEY);
   } catch (e) { console.error(e); }
@@ -2890,8 +2904,29 @@ const ApplyToStep1Button = ({ title, proposal, onApply }) => {
 // 相談機能（DiscussionPanel）は無し（客観データ分析のためAI判定アシストで代替）。
 // v4実装指示書 §4 を参照。
 const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, project }) => {
-  // 既存の分析結果（あれば復元）
+  // STEP1 入力欄で別途保存されている publishing_goal を取り込む（あれば）
+  const savedPublishingGoal = (() => {
+    try {
+      const raw = (typeof window !== "undefined") ? localStorage.getItem(STEP1_INPUTS_KEY) : null;
+      if (!raw) return "";
+      const parsed = JSON.parse(raw) || {};
+      return buildPublishingGoalText(parsed.publishingGoals || [], parsed.customPublishingGoal || "");
+    } catch { return ""; }
+  })();
+
+  // Task#9：現在の入力に対するキャッシュキー（草案＋著者プロファイル＋出版ゴール）
+  const currentHash = useMemo(
+    () => hashInputs(savedWorkProfileDraft || "", savedAuthorProfile || "", savedPublishingGoal || ""),
+    [savedWorkProfileDraft, savedAuthorProfile, savedPublishingGoal]
+  );
+
+  // 既存の分析結果を復元。入力一致のキャッシュ（TTL内）があれば最優先。
+  // 無ければ従来の STEP2_ANALYSIS_KEY（入力非依存の最終表示状態）にフォールバック。
+  const initialCache = (() => {
+    try { return readCache(STEP2_CACHE_KEY, currentHash); } catch { return null; }
+  })();
   const initialAnalysis = (() => {
+    if (initialCache) return initialCache.data;
     try {
       const raw = (typeof window !== "undefined") ? localStorage.getItem(STEP2_ANALYSIS_KEY) : null;
       return raw ? JSON.parse(raw) : null;
@@ -2903,15 +2938,9 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
       return raw ? (JSON.parse(raw) || []) : [];
     } catch { return []; }
   })();
-  // STEP1 入力欄で別途保存されている publishing_goal を取り込む（あれば）
-  const savedPublishingGoal = (() => {
-    try {
-      const raw = (typeof window !== "undefined") ? localStorage.getItem(STEP1_INPUTS_KEY) : null;
-      if (!raw) return "";
-      const parsed = JSON.parse(raw) || {};
-      return buildPublishingGoalText(parsed.publishingGoals || [], parsed.customPublishingGoal || "");
-    } catch { return ""; }
-  })();
+
+  // キャッシュ由来の結果を表示中かどうか（バナー表示制御）。null = 新規 API 結果 or 未実行。
+  const [cacheInfo, setCacheInfo] = useState(initialCache ? { cachedAt: initialCache.cachedAt } : null);
 
   const [analysis, setAnalysis] = useState(initialAnalysis);
   const [selectedKeywords, setSelectedKeywords] = useState(Array.isArray(initialSelected) ? initialSelected : []);
@@ -2945,10 +2974,22 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
     try { localStorage.setItem(STEP2_SELECTED_KEYWORDS_KEY, JSON.stringify(selectedKeywords || [])); } catch (e) { console.error(e); }
   }, [selectedKeywords]);
 
-  const handleRunAnalysis = async () => {
+  const handleRunAnalysis = async (force = false) => {
     setRunError("");
     if (!hasAuthorProfile) { setRunError("先にSTEP0で著者プロファイルを生成してください。"); return; }
     if (!hasDraft) { setRunError("先にSTEP1で書籍プロファイル草案を生成してください。"); return; }
+
+    // Task#9：同じ入力のキャッシュ（TTL内）があれば API を叩かず復元する。
+    // force=true（バナーの「再実行」）のときはキャッシュを無視して必ず叩く。
+    if (!force) {
+      const cached = readCache(STEP2_CACHE_KEY, currentHash);
+      if (cached) {
+        setAnalysis(cached.data);
+        setCacheInfo({ cachedAt: cached.cachedAt });
+        try { localStorage.setItem(STEP2_ANALYSIS_KEY, JSON.stringify(cached.data)); } catch (e) {}
+        return;
+      }
+    }
 
     setIsRunning(true);
     setStageMsg("キーワード10個を生成中（AI）…");
@@ -2990,6 +3031,9 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
       // 成功
       setAnalysis(data);
       try { localStorage.setItem(STEP2_ANALYSIS_KEY, JSON.stringify(data)); } catch (e) {}
+      // Task#9：新しい API 結果を入力ハッシュ付きでキャッシュ（次回は無料で復元）
+      writeCache(STEP2_CACHE_KEY, currentHash, data);
+      setCacheInfo(null); // 新規結果なのでバナー解除
       // 既存の選定は分析が変わったらリセット
       setSelectedKeywords([]);
     } catch (e) {
@@ -3106,6 +3150,9 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
       // 既存 analysis を新しい統合結果で上書き
       setAnalysis(data);
       try { localStorage.setItem(STEP2_ANALYSIS_KEY, JSON.stringify(data)); } catch (e) {}
+      // Task#9：追加評価も API 結果なのでキャッシュを更新（同じ入力の拡張結果として保存）
+      writeCache(STEP2_CACHE_KEY, currentHash, data);
+      setCacheInfo(null); // 新規結果なのでバナー解除
       setAddKeywordsInput("");
     } catch (e) {
       if (e.name === "AbortError") {
@@ -3192,9 +3239,18 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
           <div style={{ fontSize: 13, color: C.textSub, marginBottom: 12, lineHeight: 1.8 }}>
             ボタンを押すと、AIがキーワード候補10個を生成→Real-Time Amazon Data API で各キーワードの市場データを並列取得→需要・競合の弱さ・意図合致の3軸でスコアリングします。1〜2分かかります。
           </div>
-          <BtnPrimary onClick={handleRunAnalysis} disabled={isRunning || !hasAuthorProfile || !hasDraft}>
+          <BtnPrimary onClick={() => handleRunAnalysis(false)} disabled={isRunning || !hasAuthorProfile || !hasDraft}>
             {isRunning ? "分析中..." : "▶ キーワード分析を実行"}
           </BtnPrimary>
+          {/* Task#9：キャッシュ復元中バナー（同じ入力なら API を消費せず前回結果を表示） */}
+          {cacheInfo && !isRunning && (
+            <div style={{ marginTop: 12, padding: "10px 14px", background: "#eef4fb", border: `1px solid #b9d0e8`, borderRadius: 4, fontSize: 12.5, color: C.navy, lineHeight: 1.7, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+              <span>📦 前回の分析結果を表示中（{formatCacheAge(cacheInfo.cachedAt)}にキャッシュ）。Amazon API を消費せず復元しました。最新の市場データで取り直す場合は再実行してください。</span>
+              <button onClick={() => handleRunAnalysis(true)} disabled={isRunning || !hasAuthorProfile || !hasDraft} style={{ background: C.white, border: `1px solid ${C.navyMid}`, color: C.navy, padding: "6px 14px", borderRadius: 4, fontSize: 12.5, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+                🔄 再実行（API消費）
+              </button>
+            </div>
+          )}
           {isRunning && stageMsg && (
             <div style={{ marginTop: 10, padding: "8px 12px", background: C.white, border: `1px solid ${C.border}`, borderRadius: 4, fontSize: 12.5, color: C.navy, fontWeight: 600 }}>
               ⏳ {stageMsg}
@@ -3400,25 +3456,14 @@ const Step3Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
     } catch { return ""; }
   })();
 
-  // 既存の STEP3 分析結果（あれば復元）
-  const initialAnalysis = (() => {
-    try {
-      const raw = (typeof window !== "undefined") ? localStorage.getItem(STEP3_ANALYSIS_KEY) : null;
-      return raw ? JSON.parse(raw) : null;
-    } catch { return null; }
-  })();
-
-  const [analysis, setAnalysis] = useState(initialAnalysis);
-  const [isRunning, setIsRunning] = useState(false);
-  const [runError, setRunError] = useState("");
-  const [stageMsg, setStageMsg] = useState("");
-
   const hasDraft = !!(savedWorkProfileDraft || "").trim();
   const hasSelectedKeywords = Array.isArray(selectedKeywords) && selectedKeywords.length > 0;
   const hasStep2Data = !!step2Analysis && Array.isArray(step2Analysis.scored);
 
-  // STEP2 の選定キーワードに紐づく上位本データを取得（api/step3.js への入力用）
-  const selectedBooks = useMemo(() => {
+  // STEP2 の選定キーワードに紐づく上位本データを取得（api/step3.js への入力用）。
+  // step2Analysis / selectedKeywords はマウント時に localStorage から読む不変値なので、
+  // useMemo ではなく init 時の const として確定させる（キャッシュキー算出にも使うため）。
+  const selectedBooks = (() => {
     if (!hasStep2Data || !hasSelectedKeywords) return [];
     const scored = step2Analysis.scored || [];
     const books = [];
@@ -3433,15 +3478,52 @@ const Step3Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
       }
     }
     return books;
-  }, [hasStep2Data, hasSelectedKeywords, selectedKeywords, step2Analysis]);
+  })();
 
   const canRunAnalysis = hasDraft && hasSelectedKeywords && selectedBooks.length > 0;
 
-  const handleRunAnalysis = async () => {
+  // Task#9：現在の入力に対するキャッシュキー（草案＋著者＋ゴール＋選定KW＋上位本ASIN）
+  const currentHash = hashInputs(
+    savedWorkProfileDraft || "",
+    savedAuthorProfile || "",
+    savedPublishingGoal || "",
+    JSON.stringify(selectedKeywords || []),
+    JSON.stringify(selectedBooks.map((b) => b.asin))
+  );
+
+  // 既存の STEP3 分析結果を復元。入力一致のキャッシュ（TTL内）があれば最優先。
+  const initialCache = (() => {
+    try { return readCache(STEP3_CACHE_KEY, currentHash); } catch { return null; }
+  })();
+  const initialAnalysis = (() => {
+    if (initialCache) return initialCache.data;
+    try {
+      const raw = (typeof window !== "undefined") ? localStorage.getItem(STEP3_ANALYSIS_KEY) : null;
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  })();
+
+  const [cacheInfo, setCacheInfo] = useState(initialCache ? { cachedAt: initialCache.cachedAt } : null);
+  const [analysis, setAnalysis] = useState(initialAnalysis);
+  const [isRunning, setIsRunning] = useState(false);
+  const [runError, setRunError] = useState("");
+  const [stageMsg, setStageMsg] = useState("");
+
+  const handleRunAnalysis = async (force = false) => {
     setRunError("");
     if (!canRunAnalysis) {
       setRunError("STEP3を実行するには、書籍プロファイル草案・STEP2 選定キーワード・上位本データの3つが必要です。");
       return;
+    }
+    // Task#9：同じ入力のキャッシュ（TTL内）があれば API を叩かず復元（force時は無視）
+    if (!force) {
+      const cached = readCache(STEP3_CACHE_KEY, currentHash);
+      if (cached) {
+        setAnalysis(cached.data);
+        setCacheInfo({ cachedAt: cached.cachedAt });
+        try { localStorage.setItem(STEP3_ANALYSIS_KEY, JSON.stringify(cached.data)); } catch (e) {}
+        return;
+      }
     }
     setIsRunning(true);
     setStageMsg("競合本3冊のAmazonレビューを並列取得中…");
@@ -3479,6 +3561,9 @@ const Step3Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
       }
       setAnalysis(data);
       try { localStorage.setItem(STEP3_ANALYSIS_KEY, JSON.stringify(data)); } catch (e) {}
+      // Task#9：新しい API 結果を入力ハッシュ付きでキャッシュ
+      writeCache(STEP3_CACHE_KEY, currentHash, data);
+      setCacheInfo(null);
     } catch (e) {
       if (e.name === "AbortError") {
         setRunError("4分以上応答がなかったため処理を中断しました。もう一度「深掘り分析実行」を押してみてください。");
@@ -3691,9 +3776,18 @@ const Step3Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
           <div style={{ fontSize: 13, color: C.textSub, marginBottom: 12, lineHeight: 1.8 }}>
             ボタンを押すと、上位3冊のAmazonレビューを並列取得→★分布と本文をLLMで分析→「読者の共通不満点／既存本がカバーできていない切り口／本企画が差別化できるポイント／注意すべき落とし穴」を抽出します。1〜2分かかります。
           </div>
-          <BtnPrimary onClick={handleRunAnalysis} disabled={isRunning || !canRunAnalysis}>
+          <BtnPrimary onClick={() => handleRunAnalysis(false)} disabled={isRunning || !canRunAnalysis}>
             {isRunning ? "分析中..." : "▶ 深掘り分析を実行"}
           </BtnPrimary>
+          {/* Task#9：キャッシュ復元中バナー（同じ入力なら API を消費せず前回結果を表示） */}
+          {cacheInfo && !isRunning && (
+            <div style={{ marginTop: 12, padding: "10px 14px", background: "#eef4fb", border: `1px solid #b9d0e8`, borderRadius: 4, fontSize: 12.5, color: C.navy, lineHeight: 1.7, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+              <span>📦 前回の分析結果を表示中（{formatCacheAge(cacheInfo.cachedAt)}にキャッシュ）。Amazon API を消費せず復元しました。最新のレビューで取り直す場合は再実行してください。</span>
+              <button onClick={() => handleRunAnalysis(true)} disabled={isRunning || !canRunAnalysis} style={{ background: C.white, border: `1px solid ${C.navyMid}`, color: C.navy, padding: "6px 14px", borderRadius: 4, fontSize: 12.5, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+                🔄 再実行（API消費）
+              </button>
+            </div>
+          )}
           {isRunning && stageMsg && (
             <div style={{ marginTop: 10, padding: "8px 12px", background: C.white, border: `1px solid ${C.border}`, borderRadius: 4, fontSize: 12.5, color: C.navy, fontWeight: 600 }}>
               ⏳ {stageMsg}
@@ -3862,7 +3956,19 @@ const Step12Page = ({ savedAuthorProfile, savedWorkProfileConfirmed, onNavigate 
       return raw ? JSON.parse(raw) : { asin: "", kdp_manual_data: "", campaign_notes: "" };
     } catch { return { asin: "", kdp_manual_data: "", campaign_notes: "" }; }
   })();
+  // Task#9：初期入力に対するキャッシュキー（ASIN は trim+大文字に正規化して照合）
+  const initialHash = hashInputs(
+    (initialInputs.asin || "").trim().toUpperCase(),
+    initialInputs.kdp_manual_data || "",
+    initialInputs.campaign_notes || "",
+    savedAuthorProfile || "",
+    savedWorkProfileConfirmed || ""
+  );
+  const initialCache = (() => {
+    try { return readCache(STEP12_CACHE_KEY, initialHash); } catch { return null; }
+  })();
   const initialAnalysis = (() => {
+    if (initialCache) return initialCache.data;
     try {
       const raw = (typeof window !== "undefined") ? localStorage.getItem(STEP12_ANALYSIS_KEY) : null;
       return raw ? JSON.parse(raw) : null;
@@ -3872,11 +3978,23 @@ const Step12Page = ({ savedAuthorProfile, savedWorkProfileConfirmed, onNavigate 
   const [asin, setAsin] = useState(initialInputs.asin || "");
   const [kdpData, setKdpData] = useState(initialInputs.kdp_manual_data || "");
   const [campaignNotes, setCampaignNotes] = useState(initialInputs.campaign_notes || "");
+  // cacheInfo は対象ハッシュも保持。入力（ASIN等）を編集して currentHash が変わると
+  // バナー表示条件（cacheInfo.hash === currentHash）が外れて自動的に隠れる。
+  const [cacheInfo, setCacheInfo] = useState(initialCache ? { cachedAt: initialCache.cachedAt, hash: initialHash } : null);
   const [analysis, setAnalysis] = useState(initialAnalysis);
   const [isRunning, setIsRunning] = useState(false);
   const [runError, setRunError] = useState("");
   const [stageMsg, setStageMsg] = useState("");
   const [saveMsg, setSaveMsg] = useState(false);
+
+  // 現在の入力に対するキャッシュキー（入力変更で再計算）
+  const currentHash = useMemo(() => hashInputs(
+    asin.trim().toUpperCase(),
+    kdpData,
+    campaignNotes,
+    savedAuthorProfile || "",
+    savedWorkProfileConfirmed || ""
+  ), [asin, kdpData, campaignNotes, savedAuthorProfile, savedWorkProfileConfirmed]);
 
   const hasConfirmedProfile = !!(savedWorkProfileConfirmed || "").trim();
   const hasAuthorProfile = !!(savedAuthorProfile || "").trim();
@@ -3888,10 +4006,21 @@ const Step12Page = ({ savedAuthorProfile, savedWorkProfileConfirmed, onNavigate 
     } catch (e) { console.error(e); }
   }, [asin, kdpData, campaignNotes]);
 
-  const handleRunAnalysis = async () => {
+  const handleRunAnalysis = async (force = false) => {
     setRunError("");
     const trimmed = asin.trim().toUpperCase();
     if (!trimmed) { setRunError("ASINを入力してください。"); return; }
+    // Task#9：同じ入力のキャッシュ（TTL内）があれば API を叩かず復元（force時は無視）。
+    // 形式確認ダイアログより前に判定し、ヒット時は再確認なしで即復元する。
+    if (!force) {
+      const cached = readCache(STEP12_CACHE_KEY, currentHash);
+      if (cached) {
+        setAnalysis(cached.data);
+        setCacheInfo({ cachedAt: cached.cachedAt, hash: currentHash });
+        try { localStorage.setItem(STEP12_ANALYSIS_KEY, JSON.stringify(cached.data)); } catch (e) {}
+        return;
+      }
+    }
     if (!/^B0[A-Z0-9]{8}$/.test(trimmed)) {
       const ok = window.confirm("ASIN の形式が一般的なKindle ASIN（B0で始まる10文字）と異なります。このまま実行しますか？");
       if (!ok) return;
@@ -3933,6 +4062,9 @@ const Step12Page = ({ savedAuthorProfile, savedWorkProfileConfirmed, onNavigate 
       }
       setAnalysis(data);
       try { localStorage.setItem(STEP12_ANALYSIS_KEY, JSON.stringify(data)); } catch (e) {}
+      // Task#9：新しい API 結果を入力ハッシュ付きでキャッシュ
+      writeCache(STEP12_CACHE_KEY, currentHash, data);
+      setCacheInfo(null);
     } catch (e) {
       if (e.name === "AbortError") {
         setRunError("4分以上応答がなかったため処理を中断しました。もう一度お試しください。");
@@ -4040,9 +4172,18 @@ const Step12Page = ({ savedAuthorProfile, savedWorkProfileConfirmed, onNavigate 
           <div style={{ fontSize: 13, color: C.textSub, marginBottom: 12, lineHeight: 1.8 }}>
             ボタンを押すと、Real-Time Amazon Data API で ASIN の現状（タイトル・評価・レビュー）を取得し、Dify で「現状サマリ／レビュー傾向／改善提案」の 3 セクション改善レポートを生成します。30秒〜2分かかります。
           </div>
-          <BtnPrimary onClick={handleRunAnalysis} disabled={isRunning || !asin.trim()}>
+          <BtnPrimary onClick={() => handleRunAnalysis(false)} disabled={isRunning || !asin.trim()}>
             {isRunning ? "生成中..." : "▶ 改善提案を生成する"}
           </BtnPrimary>
+          {/* Task#9：キャッシュ復元中バナー（同じ入力なら API を消費せず前回結果を表示。入力変更で自動的に隠れる） */}
+          {cacheInfo && cacheInfo.hash === currentHash && !isRunning && (
+            <div style={{ marginTop: 12, padding: "10px 14px", background: "#eef4fb", border: `1px solid #b9d0e8`, borderRadius: 4, fontSize: 12.5, color: C.navy, lineHeight: 1.7, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+              <span>📦 前回の改善提案を表示中（{formatCacheAge(cacheInfo.cachedAt)}にキャッシュ）。Amazon API を消費せず復元しました。最新データで取り直す場合は再実行してください。</span>
+              <button onClick={() => handleRunAnalysis(true)} disabled={isRunning || !asin.trim()} style={{ background: C.white, border: `1px solid ${C.navyMid}`, color: C.navy, padding: "6px 14px", borderRadius: 4, fontSize: 12.5, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+                🔄 再実行（API消費）
+              </button>
+            </div>
+          )}
           {isRunning && stageMsg && (
             <div style={{ marginTop: 10, padding: "8px 12px", background: C.white, border: `1px solid ${C.border}`, borderRadius: 4, fontSize: 12.5, color: C.navy, fontWeight: 600 }}>
               ⏳ {stageMsg}
