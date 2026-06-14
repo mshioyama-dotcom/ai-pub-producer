@@ -4957,13 +4957,20 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
       if (decision.value !== null) updates[field.name] = decision.value;
       if (decision.markerHash !== null) markerUpdates[markerKey] = decision.markerHash;
     });
+    if (Object.keys(updates).length === 0) {
+      // 値の変更が無い場合のみマーカーを更新（current が既に最新＝整合済なので安全）
+      if (Object.keys(markerUpdates).length > 0) writeAutofillSyncMarkers(markerUpdates);
+      return;
+    }
+    // 値を最新へ同期した場合は「即時永続化」する。
+    // onInputChange(pending) だけだと、リロード/離脱前に保存されず stepData は旧値のまま。
+    // 一方マーカーは同期的に書かれるため、次回ロードで「手編集された」と誤判定され、旧値が固着する。
+    // → 値を onSaveInput で確実に保存してから、マーカーを書く（両者を常に一致させる）。
+    const merged = { ...baseInputs, ...updates };
+    setInputs((prev) => ({ ...prev, ...updates }));
+    if (onSaveInput) onSaveInput(step.num, merged);
+    else onInputChange?.(step.num, merged);
     if (Object.keys(markerUpdates).length > 0) writeAutofillSyncMarkers(markerUpdates);
-    if (Object.keys(updates).length === 0) return;
-    setInputs((prev) => {
-      const merged = { ...prev, ...updates };
-      onInputChange?.(step.num, merged);
-      return merged;
-    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step.num, allSteps, stepData]);
 
