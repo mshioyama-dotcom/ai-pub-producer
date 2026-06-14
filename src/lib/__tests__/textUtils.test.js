@@ -15,6 +15,7 @@ import {
   stripChapterSection,
   extractKeywords3Axes,
   parseWorkProfileKeywords,
+  resolveAutofillSync,
 } from "../textUtils.js";
 
 // ============================================================
@@ -318,5 +319,59 @@ describe("stripChapterSection (legacy)", () => {
     expect(result).not.toMatch(/^第1章/);
     expect(result).not.toMatch(/^\(1\)/);
     expect(result).toContain("② 項");
+  });
+});
+
+// ============================================================
+// resolveAutofillSync
+// 「上流STEPの出力が新しくなったら、下流のautoFill欄を再転記なしで自動更新する。
+//  ただしユーザーが手編集した欄は上書きしない」挙動の回帰テスト。
+// 元の不具合：autoFillが空欄のときしか投入されず、STEP4を更新してもSTEP5の欄が旧値のまま固定された。
+// ============================================================
+
+describe("resolveAutofillSync", () => {
+  // テスト用の決定的ハッシュ（中身が見えるように接頭辞付与）
+  const h = (s) => `h:${s}`;
+
+  it("空欄なら上流値を投入し、マーカーも設定する", () => {
+    const r = resolveAutofillSync("", undefined, "NEW", h);
+    expect(r.value).toBe("NEW");
+    expect(r.markerHash).toBe("h:NEW");
+  });
+
+  it("上流が空なら何もしない（既存値を消さない）", () => {
+    const r = resolveAutofillSync("既存", "h:既存", "", h);
+    expect(r.value).toBeNull();
+    expect(r.markerHash).toBeNull();
+  });
+
+  it("旧データ（マーカー無し）で値が古ければ最新へ治す", () => {
+    const r = resolveAutofillSync("OLD", undefined, "NEW", h);
+    expect(r.value).toBe("NEW");
+    expect(r.markerHash).toBe("h:NEW");
+  });
+
+  it("旧データ（マーカー無し）で既に最新なら値は変えずマーカーだけ設定", () => {
+    const r = resolveAutofillSync("NEW", undefined, "NEW", h);
+    expect(r.value).toBeNull();
+    expect(r.markerHash).toBe("h:NEW");
+  });
+
+  it("未編集（前回同期値のまま）かつ上流が更新 → 再同期する", () => {
+    const r = resolveAutofillSync("OLD", "h:OLD", "NEW", h);
+    expect(r.value).toBe("NEW");
+    expect(r.markerHash).toBe("h:NEW");
+  });
+
+  it("ユーザーが手編集した欄（マーカーと不一致）は上書きしない", () => {
+    const r = resolveAutofillSync("MY EDIT", "h:OLD", "NEW", h);
+    expect(r.value).toBeNull();
+    expect(r.markerHash).toBeNull();
+  });
+
+  it("既に最新と同期済み（current=marker=src）なら何もしない", () => {
+    const r = resolveAutofillSync("NEW", "h:NEW", "NEW", h);
+    expect(r.value).toBeNull();
+    expect(r.markerHash).toBeNull();
   });
 });

@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { extractTextFromFile, buildSourceText, ACCEPTED_EXTENSIONS } from "./utils/extractText";
 import { extractBookEssence, formatEssenceAsText } from "./utils/extractEssence";
 import { hashInputs, readCache, writeCache, formatCacheAge } from "./utils/cache";
+import { resolveAutofillSync } from "./lib/textUtils";
 import DiscussionPanel from "./DiscussionPanel";
 
 // ============================================================
@@ -321,6 +322,26 @@ const STEP12_CACHE_KEY = "aipub:step12_cache";
 const STEP13_INPUTS_KEY = "aipub:step13_inputs";
 const STEP13_RESULT_KEY = "aipub:step13_result";
 
+// autoFill 自動同期マーカー：各 autoFill フィールドが「最後に上流出力から同期した値のハッシュ」を保持。
+// 上流STEPの出力が更新されたら、下流の autoFill 欄を「再転記」なしで自動更新する（手編集した欄は保護）。
+// 判定ロジックは textUtils.js の resolveAutofillSync（テスト済）に集約。Dify へ送る inputs を汚さないよう別キーに保存。
+const AUTOFILL_SYNC_KEY = "aipub:autofill_sync";
+function readAutofillSyncMap() {
+  try {
+    if (typeof window === "undefined") return {};
+    const raw = localStorage.getItem(AUTOFILL_SYNC_KEY);
+    return raw ? (JSON.parse(raw) || {}) : {};
+  } catch { return {}; }
+}
+function writeAutofillSyncMarkers(markersByKey) {
+  try {
+    if (typeof window === "undefined") return;
+    const map = readAutofillSyncMap();
+    Object.assign(map, markersByKey);
+    localStorage.setItem(AUTOFILL_SYNC_KEY, JSON.stringify(map));
+  } catch (e) { console.error(e); }
+}
+
 // 出版目標のチェックボックス選択肢（マーケティング観点の主要ゴール）
 const PUBLISHING_GOAL_OPTIONS = [
   { value: "longseller", label: "ロングセラー化（長期で読まれ続ける）" },
@@ -586,6 +607,7 @@ async function resetAllData() {
     localStorage.removeItem(STEP12_CACHE_KEY);
     localStorage.removeItem(STEP13_INPUTS_KEY);
     localStorage.removeItem(STEP13_RESULT_KEY);
+    localStorage.removeItem(AUTOFILL_SYNC_KEY);
   } catch (e) { console.error(e); }
 }
 
@@ -5232,30 +5254,34 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step.num, allSteps]);
 
-  // 自動投入: autoFill: true で source 定義のあるフィールドが空欄なら、前STEPの outputText で自動補完。
-  // 永続化された stepData.inputData を見て判定する（局所 state の inputs を見ると
-  // ページ遷移直後の React state 更新タイミングで誤判定するため）。
-  // 既に保存値があれば上書きしない（ユーザーの手動編集を尊重）。
+  // 自動投入＋自動同期: autoFill: true で source 定義のあるフィールドを、上流STEPの最新 outputText に追従させる。
+  // - 空欄なら投入。
+  // - 上流が更新され、かつ欄が「前回同期値のまま（＝手編集されていない）」なら自動で最新へ再同期。
+  // - ユーザーが手編集した欄は上書きしない（同期マーカーのハッシュ不一致で判定）。
+  // 旧データ（マーカー無し）は初回ロード時に最新へ一度だけ治す。
+  // 判定は textUtils.js の resolveAutofillSync（テスト済）に集約。
+  // 永続化された stepData.inputData を見て判定する（局所 state の inputs だと遷移直後のタイミングで誤判定するため）。
   useEffect(() => {
     if (!step.inputs || !allSteps) return;
     const baseInputs = stepData?.inputData || {};
+    const syncMap = readAutofillSyncMap();
     const updates = {};
+    const markerUpdates = {};
     step.inputs.forEach((field) => {
       if (field.autoFill !== true || !field.source) return;
-      if ((baseInputs[field.name] || "").trim()) return; // 永続化された値があればスキップ
       const srcMatch = field.source.match(/^STEP(\d+)$/);
       if (!srcMatch) return;
       const srcNum = parseInt(srcMatch[1], 10);
-      const srcOutput = allSteps?.[srcNum]?.outputText;
-      if (srcOutput) updates[field.name] = srcOutput;
+      const srcOutput = allSteps?.[srcNum]?.outputText || "";
+      const markerKey = `${step.num}:${field.name}`;
+      const decision = resolveAutofillSync(baseInputs[field.name], syncMap[markerKey], srcOutput, hashInputs);
+      if (decision.value !== null) updates[field.name] = decision.value;
+      if (decision.markerHash !== null) markerUpdates[markerKey] = decision.markerHash;
     });
+    if (Object.keys(markerUpdates).length > 0) writeAutofillSyncMarkers(markerUpdates);
     if (Object.keys(updates).length === 0) return;
     setInputs((prev) => {
-      // 局所 state 側も空欄のものだけ投入（既にユーザーが入力中なら邪魔しない）
-      const merged = { ...prev };
-      Object.entries(updates).forEach(([k, v]) => {
-        if (!(merged[k] || "").trim()) merged[k] = v;
-      });
+      const merged = { ...prev, ...updates };
       onInputChange?.(step.num, merged);
       return merged;
     });
@@ -6047,8 +6073,13 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                     const srcNum = parseInt(field.source.replace("STEP", ""), 10);
                     const srcOutput = allSteps?.[srcNum]?.outputText;
                     sendDebugLog(`AUTOFILL from STEP${srcNum} to STEP${step.num}.${field.name}`, { length: (srcOutput || "").length, tail: (srcOutput || "").slice(-30) });
-                    if (srcOutput) handleInputChange(field.name, srcOutput);
-                    else alert(`STEP${srcNum}の出力データがまだ保存されていません。`);
+                    if (srcOutput) {
+                      handleInputChange(field.name, srcOutput);
+                      // 手動再転記も「同期済み」として記録（次回ロードで手編集と誤判定しないように）
+                      writeAutofillSyncMarkers({ [`${step.num}:${field.name}`]: hashInputs(srcOutput) });
+                    } else {
+                      alert(`STEP${srcNum}の出力データがまだ保存されていません。`);
+                    }
                   }}
                   onRef={() => {
                     const srcNum = parseInt(field.source.replace("STEP", ""), 10);

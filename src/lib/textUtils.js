@@ -343,3 +343,38 @@ export function parseWorkProfileKeywords(workProfile) {
   const themeParts = themePhrase.split(/[\s　]+/).filter(Boolean);
   return { keyword1: themeParts[0] || "", keyword2: themeParts[1] || "" };
 }
+
+// --------------------------------------------------------
+// autoFill フィールドの自動同期 判定（純粋関数・テスト対象）
+// --------------------------------------------------------
+// 上流STEPの出力(sourceOutput)を、下流STEPの autoFill 入力欄に「再転記なしで」反映するための判定。
+// 「最後に同期した上流値のハッシュ(markerHash)」を手がかりに、ユーザーの手編集だけは保護する。
+//
+// 引数:
+//   current      現在のフィールド値
+//   markerHash   前回同期した上流値のハッシュ（無ければ undefined/null）
+//   sourceOutput 上流STEPの最新出力
+//   hashFn       ハッシュ関数（cache.js の hashInputs を渡す）
+// 返り値:
+//   { value, markerHash }
+//     value !== null      → フィールドをその値に更新する
+//     markerHash !== null → 同期マーカーをその値に更新する
+//   どちらも null は「何もしない」。
+export function resolveAutofillSync(current, markerHash, sourceOutput, hashFn) {
+  const src = (sourceOutput || "");
+  if (!src.trim()) return { value: null, markerHash: null }; // 上流が空 → 触らない
+  const cur = (current || "");
+  const srcHash = hashFn(src);
+  // 空欄 → 投入
+  if (!cur.trim()) return { value: src, markerHash: srcHash };
+  // マーカー無し（旧データ）→ 最新へ一度だけ治す（一致していれば値は変えずマーカーのみ設定）
+  if (markerHash === undefined || markerHash === null) {
+    return { value: hashFn(cur) === srcHash ? null : src, markerHash: srcHash };
+  }
+  // 未編集（前回同期値のまま）かつ 上流が更新された → 再同期
+  if (hashFn(cur) === markerHash && markerHash !== srcHash) {
+    return { value: src, markerHash: srcHash };
+  }
+  // 手編集された（current が前回同期値と違う）or 既に最新 → 触らない
+  return { value: null, markerHash: null };
+}
