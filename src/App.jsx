@@ -3350,12 +3350,12 @@ const Step2Page = ({ savedAuthorProfile, savedWorkProfileDraft, onNavigate, proj
           <Card style={{ background: "#f7f5ee", border: `1px solid ${C.goldLight}` }}>
             <div style={{ fontSize: 12.5, color: C.textSub, marginBottom: 10, lineHeight: 1.8 }}>
               AIが生成した10件以外に、著者ご自身が「これも評価してみたい」というキーワードを 1〜3 個まで追加できます。同じ Amazon 検索＋3軸スコアリング＋AI意図合致判定を再実行し、全件まとめて再ランキングします。<br />
-              <span style={{ color: C.textLight, fontSize: 11.5 }}>※ 半角スペース区切りで2語のキーワード（例：「自己理解 適職」）。複数追加する場合は <b>改行・読点・カンマ</b> で区切ってください。</span>
+              <span style={{ color: C.textLight, fontSize: 11.5 }}>※ 半角スペース区切りで2語のキーワード（例：「副業 始め方」）。複数追加する場合は <b>改行・読点・カンマ</b> で区切ってください。</span>
             </div>
             <textarea
               value={addKeywordsInput}
               onChange={(e) => setAddKeywordsInput(e.target.value)}
-              placeholder="例：自己理解 適職&#10;ライフプラン 30代"
+              placeholder="例：副業 始め方&#10;個人事業主 集客"
               rows={3}
               disabled={isAddingKeywords}
               style={{
@@ -4817,8 +4817,8 @@ const Step4ConfirmPanel = ({ outputText }) => {
             メインタイトルは「Kindleストア検索結果のサムネ下」で読まれるため、<b>20〜25字</b>が理想です。長すぎる場合は次の手順で短縮できます：
           </div>
           <ol style={{ margin: "6px 0 0 18px", padding: 0, lineHeight: 1.85 }}>
-            <li><b>核となる対比・順序を残す</b>（例：「やりたいことは、書いてから見えてくる」← この一文を残す）</li>
-            <li><b>追加の説明はサブタイトルへ移す</b>（例：「仕事の診断疲れを終わらせる自己理解」はサブへ）</li>
+            <li><b>核となる対比・問いかけを残す</b>（メインには本書の中心メッセージを短く1行で）</li>
+            <li><b>追加の説明はサブタイトルへ移す</b>（ジャンル指示語＋ベネフィットはサブへ）</li>
             <li><b>下の「📋 外部AIで相談する用プロンプトを取得」を使って ChatGPT/Claude に短縮版を作ってもらう</b>のが最速です（メイン入力欄にコピペで反映）</li>
           </ol>
         </div>
@@ -5101,7 +5101,15 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
       if (!response.ok) { setRunError(data.error || "実行中にエラーが発生しました。少し時間をおいてからもう一度お試しください。"); }
       else {
         setOutputText(data.output || "");
-        await onSaveInput(step.num, execInputs);
+        // 自動転記キー（author_profile/work_profile/title/subtitle）は inputData に保存しない。
+        // 保存すると次回実行時に古いコピーが inputs に残り、最新の確定値と食い違う原因になる
+        // （実行時は常に getAutoInjectedProfiles() の最新値を使うため、保存は不要・有害）。
+        const inputsToSave = { ...execInputs };
+        delete inputsToSave.author_profile;
+        delete inputsToSave.work_profile;
+        delete inputsToSave.title;
+        delete inputsToSave.subtitle;
+        await onSaveInput(step.num, inputsToSave);
         setTimeout(async () => {
           const reloaded = await loadStepData(step.num);
           sendDebugLog(`STORED STEP${step.num}`, { length: (reloaded?.outputText || "").length, tail: (reloaded?.outputText || "").slice(-30) });
@@ -5405,7 +5413,7 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
           } else {
             // 2段階目以降: 「これを拡張して」と explicit に指示する
             // existing_summary フィールドに「過去の生成結果＋拡張指示」を入れる
-            const expandInstruction = `\n\n━━━━━━━━━━━━━\n【重要：拡張指示】\n━━━━━━━━━━━━━\n\n前回 ${content.length}字 の以下の短文記事を生成しました：\n\n---\n${content}\n---\n\n**この内容を保ちつつ、${targetChars}字（${minChars}〜${targetChars + 20}字）まで拡張してください。**\n\n拡張の方法：\n- 著者の具体的なシーン描写を1〜2文追加（例：「会議室で資料を出した瞬間、上司が無言で赤入れした」など）\n- 固有実績の数字を補強（Kindle20冊／印税300万円超／ITコンサル／東工大院 等）\n- 本書の固有概念をもう1つ織り込む（未整理仮説／3行モヤモヤ／反応駆動ループ／経験の4分類 等）\n- 読者への問いかけを最後に追加\n\n上記4点のうち2〜3個を加えて、必ず ${minChars}字以上 にしてください。元の核メッセージは保ち、改善版として書き直す。`;
+            const expandInstruction = `\n\n━━━━━━━━━━━━━\n【重要：拡張指示】\n━━━━━━━━━━━━━\n\n前回 ${content.length}字 の以下の短文記事を生成しました：\n\n---\n${content}\n---\n\n**この内容を保ちつつ、${targetChars}字（${minChars}〜${targetChars + 20}字）まで拡張してください。**\n\n拡張の方法：\n- 著者の具体的なシーン描写を1〜2文追加（著者プロファイルの経歴・場面から）\n- 著者プロファイルにある実績の数字を補強（プロファイルに根拠がある数字のみ。無ければ使わない）\n- 本書プロファイル／Amazon説明文にある固有概念をもう1つ織り込む\n- 読者への問いかけを最後に追加\n\n上記4点のうち2〜3個を加えて、必ず ${minChars}字以上 にしてください。元の核メッセージは保ち、改善版として書き直す。`;
             reqInputs = {
               ...execInputs,
               existing_summary: (execInputs.existing_summary || "") + expandInstruction,
