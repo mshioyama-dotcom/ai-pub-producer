@@ -5077,7 +5077,12 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     try {
       let execInputs = { ...inputs };
       if (step.num === 2 && execInputs.amazon_html) { const cleaned = cleanHtmlMinimal(execInputs.amazon_html); if (cleaned) execInputs.amazon_html = cleaned; }
-      if (step.num >= 3) { execInputs = { ...getAutoInjectedProfiles(), ...execInputs }; }
+      // 自動転記プロファイル（author_profile / work_profile / title / subtitle）は「常に最新」で勝たせる。
+      // 旧実装は { ...getAutoInjectedProfiles(), ...execInputs } で、前回実行時に inputData へ保存された
+      // 古い title/work_profile が execInputs 側に残っていると最新値を上書きしてしまっていた
+      // （画面パネルは最新を表示するのに、API には古い書籍プロファイル/タイトルが送られる不一致が発生）。
+      // → getAutoInjectedProfiles() を後勝ちにして、確定済みの最新値が必ず使われるようにする。
+      if (step.num >= 3) { execInputs = { ...execInputs, ...getAutoInjectedProfiles() }; }
       // 防御的な実行時 autoFill: autoFill: true / source: "STEPN" のフィールドで値が空なら、
       // allSteps[N].outputText から直接注入する。これにより useEffect 経由の autoFill タイミングずれ
       // （ナビゲーション直後 等）でも、API 呼び出し時点では必ず正しい値が入る。
