@@ -3680,22 +3680,6 @@ const Step3Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
     setTimeout(() => setConfirmSaveMsg(false), 2500);
   };
 
-  // 書籍プロファイルを保存して STEP4 へ進む
-  const handleSaveAndProceedToStep4 = async () => {
-    const cleaned = cleanOutputText(confirmedText);
-    if (!cleaned.trim()) {
-      setConfirmGenerateError("書籍プロファイルが空です。STEP1草案を読み込むか、内容を入力してください。");
-      return;
-    }
-    setConfirmGenerateError("");
-    if (cleaned !== confirmedText) setConfirmedText(cleaned);
-    await onSaveWorkProfileConfirmed(cleaned);
-    setConfirmSaveMsg(true);
-    setTimeout(() => {
-      setConfirmSaveMsg(false);
-      onNavigate("step_4");
-    }, 1500);
-  };
 
   return (
     <div>
@@ -3874,25 +3858,6 @@ const Step3Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
         />
       )}
 
-      {/* ⑥ 保存して STEP4 へ進む */}
-      {analysis && (
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-            <StepBadge num="⑥" />
-            <h2 style={{ fontSize: 15, fontWeight: 700, color: C.navy, margin: 0 }}>保存して STEP4 へ進む</h2>
-          </div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <BtnPrimary onClick={handleSaveAndProceedToStep4} disabled={!confirmedText.trim()}>
-              書籍プロファイルを保存して STEP4 へ進む →
-            </BtnPrimary>
-          </div>
-          {confirmSaveMsg && <div style={{ marginTop: 8, fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 保存しました。STEP4 に移動します...</div>}
-          <div style={{ marginTop: 8, fontSize: 11.5, color: C.textLight, lineHeight: 1.7 }}>
-            ※ 保存すると STEP4 エピソードインタビュー以降のすべてのSTEPが、この書籍プロファイルを土台にします。<br />
-            ※ 後で内容を変えたら、このページで保存し直せば下流STEPにも反映されます。
-          </div>
-        </div>
-      )}
 
       {/* 分析が未実行の場合のフォールバック導線 */}
       {!analysis && (
