@@ -290,6 +290,9 @@ const STEP1_INPUTS_KEY = "aipub:step1_inputs";
 const STEP2_INPUTS_KEY = "aipub:step2_inputs";
 const TITLE_CONFIRMED_KEY = "aipub:title_confirmed";
 const SUBTITLE_CONFIRMED_KEY = "aipub:subtitle_confirmed";
+// ①stale検知：タイトル確定時の「元になったSTEP5出力」のハッシュ。STEP5を作り直すと出力ハッシュが変わり、
+// 確定タイトルが古い（最新の案から選び直していない）ことを検知して警告するために使う。
+const TITLE_CONFIRMED_SRC_KEY = "aipub:title_confirmed_src";
 // v4新規：新STEP2/3から戻ってきた時にSTEP1上部に表示する市場検証フィードバック
 // 形式: { from: "STEP2" | "STEP3", content: string (markdown), generated_at: ISO string }
 const RETURN_FEEDBACK_KEY = "aipub:return_feedback";
@@ -4866,6 +4869,12 @@ const Step4ConfirmPanel = ({ outputText }) => {
   const [selectedCase, setSelectedCase] = useState(null); // "1" | "2" | "3" | null
   const [titleInput, setTitleInput] = useState(initialTitle);
   const [subtitleInput, setSubtitleInput] = useState(initialSubtitle);
+  // ①stale検知用：確定済みの値と「確定元STEP5出力のハッシュ」を state で保持（確定時に更新）
+  const [confirmedTitle, setConfirmedTitle] = useState(initialTitle);
+  const [confirmedSubtitle, setConfirmedSubtitle] = useState(initialSubtitle);
+  const [confirmedSrcHash, setConfirmedSrcHash] = useState(
+    (typeof window !== "undefined") ? (localStorage.getItem(TITLE_CONFIRMED_SRC_KEY) || "") : ""
+  );
   const [savedMsg, setSavedMsg] = useState(false);
   const [autoFilledFromSingle, setAutoFilledFromSingle] = useState(false);
   const [showAlternatives, setShowAlternatives] = useState(false);
@@ -4908,8 +4917,14 @@ const Step4ConfirmPanel = ({ outputText }) => {
       return;
     }
     try {
+      const srcHash = (outputText || "").trim() ? hashInputs(outputText) : "";
       localStorage.setItem(TITLE_CONFIRMED_KEY, titleInput.trim());
       localStorage.setItem(SUBTITLE_CONFIRMED_KEY, subtitleInput.trim());
+      localStorage.setItem(TITLE_CONFIRMED_SRC_KEY, srcHash);
+      // state も更新して stale 警告を即座に解除
+      setConfirmedTitle(titleInput.trim());
+      setConfirmedSubtitle(subtitleInput.trim());
+      setConfirmedSrcHash(srcHash);
       setSavedMsg(true);
       setTimeout(() => setSavedMsg(false), 2500);
     } catch {
@@ -4917,16 +4932,31 @@ const Step4ConfirmPanel = ({ outputText }) => {
     }
   };
 
-  const isConfirmed = !!(initialTitle && initialSubtitle);
+  const isConfirmed = !!(confirmedTitle && confirmedSubtitle);
   const totalLen = (titleInput || "").length + (subtitleInput || "").length;
   const isOverLimit = totalLen > 200;
+  // ①stale検知：確定済みなのに、確定元のSTEP5出力ハッシュが現在の出力と食い違う＝古い案を確定したまま。
+  // 確定元ハッシュが無い旧データは、確定タイトルが現在の出力に含まれるかで代替判定する。
+  const isConfirmStale = isConfirmed && !!(outputText || "").trim() && (
+    confirmedSrcHash
+      ? confirmedSrcHash !== hashInputs(outputText)
+      : !outputText.includes(confirmedTitle)
+  );
 
   return (
     <div style={{ marginTop: 24, marginBottom: 16, padding: 16, border: `2px solid ${C.gold}`, borderRadius: 6, background: C.goldPale }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
         <span style={{ fontSize: 14, fontWeight: 700, color: C.gold }}>⭐ 採用する案を確定する</span>
-        {isConfirmed && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 確定済み（STEP5以降に自動転記されます）</span>}
+        {isConfirmed && !isConfirmStale && <span style={{ fontSize: 12, color: C.green, fontWeight: 600 }}>✓ 確定済み（STEP5以降に自動転記されます）</span>}
+        {isConfirmStale && <span style={{ fontSize: 12, color: C.red, fontWeight: 700 }}>⚠ 確定タイトルが古い可能性</span>}
       </div>
+      {/* ①stale警告：タイトルを再生成したのに確定し直していない場合に表示 */}
+      {isConfirmStale && (
+        <div style={{ marginBottom: 12, padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.35)`, borderRadius: 4, fontSize: 12.5, color: C.red, lineHeight: 1.7 }}>
+          ⚠ <strong>確定済みのタイトルは、今表示されている最新の案より古い出力に基づいています。</strong><br />
+          タイトルを作り直した場合、ここで<strong>選び直して「確定」を押し直さない限り</strong>、STEP6以降には古いタイトルが使われ続けます。最新の案から選んで確定し直してください。
+        </div>
+      )}
       <div style={{ fontSize: 13, color: C.textSub, marginBottom: 12, lineHeight: 1.7 }}>
         STEP5（目次）以降では、ここで確定したタイトル・サブタイトルが本の核となります。
         3案から1つ選ぶか、自分で書いた内容を直接入力してください。
