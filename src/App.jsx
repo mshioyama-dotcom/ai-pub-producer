@@ -3579,7 +3579,9 @@ const Step3Page = ({ savedAuthorProfile, savedWorkProfileDraft, savedWorkProfile
           author_profile: savedAuthorProfile || "",
           publishing_goal: savedPublishingGoal || "",
           selected_keywords: selectedKeywords,
-          selected_books: selectedBooks,
+          // 上位3冊に制限（設計どおり・画面表示も slice(0,3)）。RapidAPI 消費を抑え無料枠を長持ちさせる。
+          // 旧実装は全件(最大10〜20冊)送ってレビュー取得していたため、無料枠を一気に消費していた。
+          selected_books: selectedBooks.slice(0, 3),
         }),
       });
       const contentType = response.headers.get("content-type") || "";
