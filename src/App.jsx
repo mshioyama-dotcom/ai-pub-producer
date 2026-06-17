@@ -2735,7 +2735,25 @@ function parseOutputForDocx(text) {
     // 通常段落
     blocks.push({ type: "p", text: t });
   }
-  return blocks;
+  // 連続する同一見出しを1つに畳む。
+  // 本文は章ごとに「=== タイトル ===」セパレーター由来の見出しと、本文内の見出し（第N章 等）の
+  // 両方を持つため、Word に章タイトルが2回連続で出てしまう。直前の（空行を挟んでもよい）見出しと
+  // 正規化テキストが一致したら、後続の重複見出しを捨てて1回だけにする。
+  const isHeading = (ty) => /^h[1-4]$/.test(ty);
+  const normHeading = (s) => (s || "").replace(/[\s　#＃*：:、，,。.・\-—–「」『』""''（）()]/g, "");
+  const deduped = [];
+  for (const b of blocks) {
+    if (isHeading(b.type) && b.text) {
+      let j = deduped.length - 1;
+      while (j >= 0 && deduped[j].type === "empty") j--;
+      const prev = j >= 0 ? deduped[j] : null;
+      if (prev && isHeading(prev.type) && normHeading(prev.text) === normHeading(b.text)) {
+        continue; // 直前の見出しと同一 → 重複なので捨てる
+      }
+    }
+    deduped.push(b);
+  }
+  return deduped;
 }
 
 // 章数をカウント（h1 ブロックの数）
