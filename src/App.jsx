@@ -2740,7 +2740,17 @@ function parseOutputForDocx(text) {
 
 // 章数をカウント（h1 ブロックの数）
 function countChapters(blocks) {
-  return blocks.filter((b) => b.type === "h1").length;
+  // h1 ブロックから「第N章」の章番号を抽出し、ユニークな章数を返す。
+  // 本文は章ごとに「=== タイトル ===」セパレーター＋本文内の「第N章」見出しの両方を持つため、
+  // 単純な h1 カウントだと同じ章を二重に数えてしまう（例：7章なのに16と表示）。
+  // 章番号でユニーク化することで正しい章数（はじめに・おわりには除く）を返す。
+  const nums = new Set();
+  for (const b of blocks) {
+    if (b.type !== "h1" || !b.text) continue;
+    const m = b.text.match(/第\s*([0-9０-９一二三四五六七八九十百千]+)\s*章/);
+    if (m) nums.add(m[1].replace(/\s/g, ""));
+  }
+  return nums.size;
 }
 
 // outputText から .docx Blob を生成（動的importでdocxパッケージを呼ぶ）
