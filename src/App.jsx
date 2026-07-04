@@ -588,29 +588,17 @@ function importAllData(json) {
 
 async function resetAllData() {
   try {
-    localStorage.removeItem(STORAGE_KEY);
-    for (const s of STEPS) { localStorage.removeItem(STEPS_KEY_PREFIX + s.num); }
-    // マイグレーションフラグもリセット（次回 mount 時に旧データがあれば再マイグレーション可能）
-    localStorage.removeItem(MIGRATION_V4_KEY);
-    localStorage.removeItem(AUTHOR_PROFILE_KEY);
-    localStorage.removeItem(WORK_PROFILE_KEY);
-    localStorage.removeItem(WORK_PROFILE_CONFIRMED_KEY);
-    localStorage.removeItem(WORK_PROFILE_STEP2_FULL_KEY);
-    localStorage.removeItem(STEP1_PENDING_KEY);
-    localStorage.removeItem(STEP1_INPUTS_KEY);
-    localStorage.removeItem(STEP2_INPUTS_KEY);
-    localStorage.removeItem(RETURN_FEEDBACK_KEY);
-    localStorage.removeItem(STEP2_ANALYSIS_KEY);
-    localStorage.removeItem(STEP2_CACHE_KEY);
-    localStorage.removeItem(STEP2_SELECTED_KEYWORDS_KEY);
-    localStorage.removeItem(STEP3_ANALYSIS_KEY);
-    localStorage.removeItem(STEP3_CACHE_KEY);
-    localStorage.removeItem(STEP12_INPUTS_KEY);
-    localStorage.removeItem(STEP12_ANALYSIS_KEY);
-    localStorage.removeItem(STEP12_CACHE_KEY);
-    localStorage.removeItem(STEP13_INPUTS_KEY);
-    localStorage.removeItem(STEP13_RESULT_KEY);
-    localStorage.removeItem(AUTOFILL_SYNC_KEY);
+    if (typeof window === "undefined" || !window.localStorage) return;
+    // 別の本に切り替えたとき、前の本のデータ（著者/書籍プロファイル・目次・章構成・本文・確定タイトル等）が
+    // 残留して混ざるのを防ぐため、aipub: 接頭辞のkeyを全消去する。
+    // key を1つずつ列挙する方式は消し忘れ（title_confirmed / subtitle_confirmed / title_confirmed_src /
+    // step0_inputs 等が実際に漏れていた）が起きやすいため、prefix で一括削除する（将来 key が増えても取りこぼさない）。
+    const toRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith("aipub:")) toRemove.push(k);
+    }
+    toRemove.forEach((k) => localStorage.removeItem(k));
   } catch (e) { console.error(e); }
 }
 
@@ -1900,7 +1888,7 @@ const HomePage = ({ project, stepStatuses, allSteps, onNavigate }) => {
         </div>
         {showResetConfirm && (
           <div style={{ marginTop: 12, padding: 16, background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: C.red, marginBottom: 10 }}>現在のデータはすべてリセットされます。よろしいですか？</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: C.red, marginBottom: 10 }}>現在のデータ（著者プロファイル・書籍プロファイル・目次・章構成・本文・確定タイトルなど）をすべて削除します。<br />別の本を作るときは、これで前の本のデータを完全に消してから始めてください（前の本の内容が残って混ざるのを防げます）。よろしいですか？</div>
             <div style={{ display: "flex", gap: 8 }}>
               <BtnPrimary onClick={async () => { await resetAllData(); location.reload(); }} style={{ background: C.red }}>リセットする</BtnPrimary>
               <BtnSecondary onClick={() => setShowResetConfirm(false)}>キャンセル</BtnSecondary>
