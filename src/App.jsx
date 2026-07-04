@@ -5176,8 +5176,11 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
   // 移動したため、内部の step.num チェックは 7 を見る（v3 の旧STEP6 と同じ役割）。
   const handleRunAllChaptersForStep6 = async () => {
     if (step.num !== 7) return;
-    if (!chapterOptions || chapterOptions.length === 0) {
-      alert("STEP6（目次）の出力から章を検出できませんでした。STEP6の出力をご確認ください。");
+    // 更新後YMLは「全章まとめて1回」で全章の章構成を出力する設計。章ループを撤廃し、
+    // 全章分の目次（STEP6出力全体）を refined_toc(=toc_text) として1回だけ渡す。
+    const fullToc = (allSteps?.[6]?.outputText || "").trim();
+    if (!fullToc) {
+      alert("STEP6（目次）の出力データが見つかりません。STEP6で「出力データを保存」を押してから戻ってきてください。");
       return;
     }
     const interviewText = (inputs.interview_text || "").trim();
@@ -5191,135 +5194,89 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
     }
     setIsRunning(true);
     setRunError("");
-    setChapterStockProgress({ total: chapterOptions.length, current: 0, currentItemName: "" });
-    const results = [];
+    setChapterStockProgress({ total: 1, current: 0, currentItemName: "全章分の章構成" });
     try {
-      for (let i = 0; i < chapterOptions.length; i++) {
-        const ch = chapterOptions[i];
-        setChapterStockProgress({ total: chapterOptions.length, current: i + 1, currentItemName: ch.chapterTitle });
-        const execInputs = {
-          ...getAutoInjectedProfiles(),
-          // ai-pub-producer のキー名は toc_text、/api/dify.js が refined_toc にマップする。
-          // ここには「1章分のテキスト」だけを詰めて送る。
-          toc_text: ch.body.trim(),
-          interview_text: interviewText,
-        };
-        const response = await fetch("/api/dify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ stepNum: 7, inputs: execInputs }),
-        });
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(`「${ch.chapterTitle}」の生成で失敗：${data.error || "不明なエラー"}`);
-        }
-        const out = (data.output || "").trim();
-        if (!out || out.length < 30) {
-          throw new Error(`「${ch.chapterTitle}」で有効な出力が返りませんでした（${out.length}文字）`);
-        }
-        results.push({ title: ch.chapterTitle, content: out });
-        if (i < chapterOptions.length - 1) {
-          await new Promise((r) => setTimeout(r, 3000));
-        }
+      const execInputs = {
+        ...getAutoInjectedProfiles(),
+        // ai-pub-producer のキー名は toc_text、/api/dify.js が refined_toc にマップする。
+        // 全章分の目次（STEP6出力全体）をそのまま渡す。
+        toc_text: fullToc,
+        interview_text: interviewText,
+      };
+      const response = await fetch("/api/dify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stepNum: 7, inputs: execInputs }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "章構成の生成で失敗しました");
       }
-      const combined = results.map((r) => `=== ${r.title} ===\n\n${r.content}`).join("\n\n---\n\n");
-      // 念のため最終的な outputText でも章重複を排除する（LLM出力に「=== おわりに ===」が
-      // 自分で書き込まれているケースなど、二重防御として）
-      setOutputText(dedupeOutputSections(combined));
+      const out = (data.output || "").trim();
+      if (!out || out.length < 30) {
+        throw new Error(`有効な出力が返りませんでした（${out.length}文字）`);
+      }
+      // 念のため章重複を排除する（LLM出力に同一章見出しが重複するケースへの二重防御）
+      setOutputText(dedupeOutputSections(out));
       setChapterStockProgress(null);
     } catch (e) {
-      setRunError(e.message + "\n\n途中までの結果は破棄されます。少し時間をおいてから「全章を順次生成」をもう一度お試しください。");
+      setRunError(e.message + "\n\n少し時間をおいてから「章構成を生成」をもう一度お試しください。");
       setChapterStockProgress(null);
     } finally {
       setIsRunning(false);
     }
   };
 
-  // STEP9（本文作成）専用: 1章だけの本文を生成して既存 outputText に upsert する。
-  // 本文作成は1章でも数千〜1万字になり、全章一気に走らせると失敗時のロスが大きい。
-  // 章単位で生成 → 確認 → 次章へ進む、というインクリメンタルなフローに切り替えた。
+  // STEP9（本文作成）専用: 1章まるごとの本文を生成して既存 outputText に upsert する。
+  // Dify側プロンプトが「1章分の詳細プロットを受け取り、章全体をまとめて執筆する」設計に更新されたため、
+  // 章ごとに /api/dify を1回だけ呼ぶ（旧実装は項ごとにループしていて非常に遅かった）。
   //
-  // 試し読みフックゾーンの判定（is_opening_zone）:
-  //   - はじめに章のすべての項 → true
-  //   - 第1章の最初の節（section[0]）のすべての項 → true
-  //   - 上記以外 → false
-  // これによりDifyに「ここはAmazon試し読み範囲＝冒頭フック必須」を伝え、シーン描写・問いかけ・
-  // コア・ベネフィット予告を強制する。
+  // is_opening_zone（Amazon試し読みフック）は章単位で判定：
+  //   - 「はじめに」章 → "true"
+  //   - 「第1章」→ "true"
+  //   - それ以外 → "false"
+  // target_heading（1項指定）は送らない（更新後YMLは章全体を書くため不要）。
   const handleRunOneChapterForStep9 = async (chapterIdx) => {
     if (step.num !== 9) return;
     const ch = chapterOptions?.[chapterIdx];
     if (!ch) { alert("章が見つかりません。"); return; }
-    const sections = extractSections(ch.body);
-    const totalItems = sections.reduce((sum, s) => sum + (s.items?.length || 0), 0);
-    if (totalItems === 0) {
-      alert(`「${ch.chapterTitle}」の詳細プロットから節（1）(2)... や項①②③... を検出できませんでした。STEP8の出力をご確認ください。`);
+    const plot = (ch.body || "").trim();
+    if (!plot) {
+      alert(`「${ch.chapterTitle}」の詳細プロットが空です。STEP8の出力をご確認ください。`);
       return;
     }
-    // 章タイトルから試し読み範囲か判定（正規化キー比較）
+    // 章タイトルから試し読み範囲か判定（正規化キー比較）：はじめに/第1章 なら冒頭フックゾーン
     const chapterKey = normalizeChapterKey(ch.chapterTitle);
-    const isOpeningChapter = chapterKey === "はじめに";
-    const isFirstChapter = /^第1章/.test(chapterKey) || /^第１章/.test(chapterKey);
+    const isOpeningZone = chapterKey === "はじめに" || /^第1章/.test(chapterKey) || /^第１章/.test(chapterKey);
     setIsRunning(true);
     setRunError("");
-    let itemsDone = 0;
-    setChapterStockProgress({ total: totalItems, current: 0, currentItemName: ch.chapterTitle });
+    setChapterStockProgress({ total: 1, current: 0, currentItemName: ch.chapterTitle });
     try {
-      const sectionOutputs = [];
-      for (let secIdx = 0; secIdx < sections.length; secIdx++) {
-        const section = sections[secIdx];
-        const itemOutputs = [];
-        const items = section.items || [];
-        for (let itemIdx = 0; itemIdx < items.length; itemIdx++) {
-          const item = items[itemIdx];
-          // 試し読みフックゾーン判定:
-          //   - はじめに → 全項 true
-          //   - 第1章の最初の節 → 全項 true
-          //   - それ以外 → false
-          const isOpeningZone = isOpeningChapter || (isFirstChapter && secIdx === 0);
-          itemsDone++;
-          setChapterStockProgress({
-            total: totalItems,
-            current: itemsDone,
-            currentItemName: `${ch.chapterTitle} ／ ${item}${isOpeningZone ? " [試し読みフック]" : ""}`,
-          });
-          const response = await fetch("/api/dify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              stepNum: 9,
-              inputs: {
-                ...getAutoInjectedProfiles(),
-                detailed_plot_text: ch.body.trim(),
-                target_heading: item,
-                is_opening_zone: isOpeningZone ? "true" : "false",
-              },
-            }),
-          });
-          const data = await response.json();
-          if (!response.ok) {
-            throw new Error(`「${ch.chapterTitle}」の項「${item}」の本文生成で失敗：${data.error || "不明なエラー"}`);
-          }
-          const out = (data.output || "").trim();
-          if (out) itemOutputs.push(out);
-          // レート制御: 項ごとに 1.5 秒ウェイト
-          await new Promise((r) => setTimeout(r, 1500));
-        }
-        if (itemOutputs.length > 0) {
-          // 項単位の出力をそのまま連結（章タイトル・節見出しの重複は後段の dedupeBodyHeaders で一括除去）
-          sectionOutputs.push(itemOutputs.join("\n\n"));
-        }
+      const response = await fetch("/api/dify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stepNum: 9,
+          inputs: {
+            ...getAutoInjectedProfiles(),
+            detailed_plot_text: plot,   // 章の塊をそのまま渡す（見出しも加工しない）
+            is_opening_zone: isOpeningZone ? "true" : "false",
+          },
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(`「${ch.chapterTitle}」の本文生成で失敗：${data.error || "不明なエラー"}`);
       }
-      // 章単位で章タイトル・節見出しの重複を除去
-      //   - 章タイトル（はじめに / 第N章 / おわりに）→ 最初の1回だけ
-      //   - 節見出し（(1) (2) (3) ...）→ 各節の最初の1回だけ
-      const chapterContent = dedupeBodyHeaders(sectionOutputs.join("\n\n"));
+      // Difyが章全体を出力する前提。念のため章タイトル/節見出しの重複だけ除去（重複なければ無処理）。
+      const chapterContent = dedupeBodyHeaders((data.output || "").trim());
       // 既存 outputText に upsert（同じ章が既にあれば置換、無ければ chapterOptions 順で挿入）
       const orderTitles = chapterOptions.map((c) => c.chapterTitle);
       const newOutput = upsertChapterInOutput(outputText, ch.chapterTitle, chapterContent, orderTitles);
       setOutputText(newOutput);
       setChapterStockProgress(null);
     } catch (e) {
-      setRunError(e.message + "\n\nこの章の途中までの結果は破棄されます（既に生成済みの他の章は残ります）。少し時間をおいてから再度お試しください。");
+      setRunError(e.message + "\n\nこの章の結果は破棄されます（既に生成済みの他の章は残ります）。少し時間をおいてから再度お試しください。");
       setChapterStockProgress(null);
     } finally {
       setIsRunning(false);
@@ -5954,20 +5911,12 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
               {runError && <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginBottom: 12, fontSize: 13, color: C.red, whiteSpace: "pre-wrap", lineHeight: 1.7 }}>{runError}</div>}
               {chapterStockProgress ? (
                 <div style={{ padding: "12px 14px", background: C.navyLight, border: `1px solid rgba(42,68,104,0.2)`, borderRadius: 4 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, fontSize: 12.5, color: C.navyMid, fontWeight: 600 }}>
-                    <span>章の一括生成中：{chapterStockProgress.current} / {chapterStockProgress.total} 章</span>
-                    <span>{Math.round((chapterStockProgress.current / chapterStockProgress.total) * 100)}%</span>
-                  </div>
-                  <div style={{ height: 8, background: "rgba(0,0,0,0.08)", borderRadius: 4, overflow: "hidden" }}>
-                    <div style={{ width: `${(chapterStockProgress.current / chapterStockProgress.total) * 100}%`, height: "100%", background: C.navy, transition: "width 0.3s ease" }} />
-                  </div>
-                  <div style={{ marginTop: 8, fontSize: 12, color: C.textSub, lineHeight: 1.6 }}>⏳ 生成中：<span style={{ color: C.text, fontWeight: 600 }}>{chapterStockProgress.currentItemName}</span></div>
+                  <div style={{ fontSize: 12.5, color: C.navyMid, fontWeight: 600, lineHeight: 1.6 }}>⏳ 全章分の章構成を生成中…（全章まとめて1回・1〜2分ほどかかります）</div>
                 </div>
               ) : (
                 <>
                   <div style={{ fontSize: 13, color: C.textSub, lineHeight: 1.8, marginBottom: 12 }}>
-                    STEP6 の目次から章を自動抽出し、章ごとに Dify を呼び出して全章分の章構成を一括生成します。
-                    章間に3秒のウェイトを挟むため、章数 × 約30秒〜1分程度かかります。
+                    STEP6 の目次（全章分）をまとめて Dify に1回投げ、全章分の章構成を一括生成します（1〜2分程度）。
                   </div>
                   {!allSteps?.[6]?.outputText && (
                     <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginBottom: 12, fontSize: 13, color: C.red }}>
@@ -5982,13 +5931,13 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
                   {chapterOptions.length > 0 && (
                     <>
                       <button onClick={handleRunAllChaptersForStep6} disabled={isRunning}
-                        title="検出された全ての章を順番にDifyに投げて、全章分の章構成を一気に生成します。"
+                        title="全章分の目次をまとめてDifyに1回投げ、全章分の章構成を生成します。"
                         style={{ padding: "12px 36px", background: isRunning ? "#93c5fd" : C.navy, color: C.white, border: "none", borderRadius: 3, fontWeight: 700, fontSize: 14, cursor: isRunning ? "default" : "pointer", letterSpacing: "0.04em" }}>
-                        🚀 全章を順次生成（{chapterOptions.length}章）
+                        🚀 章構成を生成する（{chapterOptions.length}章分）
                       </button>
                       <div style={{ marginTop: 12, padding: "10px 14px", background: C.white, border: `1px solid ${C.border}`, borderRadius: 4 }}>
                         <div style={{ fontSize: 12, color: C.textSub, marginBottom: 8, fontWeight: 600 }}>
-                          検出された章（{chapterOptions.length}章 — 全て順次処理されます）：
+                          検出された章（{chapterOptions.length}章 — 全章まとめて生成されます）：
                         </div>
                         <ol style={{ margin: 0, paddingLeft: 22, fontSize: 13, color: C.text, lineHeight: 1.9 }}>
                           {chapterOptions.map((ch, i) => (
@@ -6069,20 +6018,13 @@ const StepPage = ({ step, stepData, project, onNavigate, onSaveInput, onSaveOutp
               {runError && <div style={{ padding: "10px 14px", background: "#fef2f2", border: `1px solid rgba(192,57,43,0.3)`, borderRadius: 4, marginBottom: 12, fontSize: 13, color: C.red, whiteSpace: "pre-wrap", lineHeight: 1.7 }}>{runError}</div>}
               {chapterStockProgress ? (
                 <div style={{ padding: "12px 14px", background: C.navyLight, border: `1px solid rgba(42,68,104,0.2)`, borderRadius: 4 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, fontSize: 12.5, color: C.navyMid, fontWeight: 600 }}>
-                    <span>本文を生成中：{chapterStockProgress.current} / {chapterStockProgress.total} 項</span>
-                    <span>{Math.round((chapterStockProgress.current / chapterStockProgress.total) * 100)}%</span>
-                  </div>
-                  <div style={{ height: 8, background: "rgba(0,0,0,0.08)", borderRadius: 4, overflow: "hidden" }}>
-                    <div style={{ width: `${(chapterStockProgress.current / chapterStockProgress.total) * 100}%`, height: "100%", background: C.navy, transition: "width 0.3s ease" }} />
-                  </div>
-                  <div style={{ marginTop: 8, fontSize: 12, color: C.textSub, lineHeight: 1.6 }}>⏳ 生成中：<span style={{ color: C.text, fontWeight: 600 }}>{chapterStockProgress.currentItemName}</span></div>
+                  <div style={{ fontSize: 12.5, color: C.navyMid, fontWeight: 600, lineHeight: 1.6 }}>⏳ 「{chapterStockProgress.currentItemName}」の本文を章まるごと生成中…（1〜3分ほどかかります）</div>
                 </div>
               ) : (
                 <>
                   <div style={{ fontSize: 13, color: C.textSub, lineHeight: 1.8, marginBottom: 12 }}>
                     STEP8 の詳細プロットから章を自動抽出します。<strong>1章ずつボタンを押して生成</strong>してください。
-                    各章の全節・全項を順次 Dify に投げます（節数 × 項数 × 約30秒 ／ 1章あたり5〜10分）。
+                    各章は Dify に1回だけ投げて章まるごと執筆します（1章あたり1〜3分程度）。
                     生成済みの章を再度押すと上書き再生成されます。
                   </div>
                   {!allSteps?.[8]?.outputText && (
